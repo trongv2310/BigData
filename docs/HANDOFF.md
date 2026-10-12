@@ -124,6 +124,24 @@ Mẫu:
 
 ## Frontend (Antigravity)
 
+### 2026-10-12 22:15 — Hoàn tất P4 và P5 Frontend, xử lý phản hồi P7 & P8
+- Xong:
+  + P4 (Sơ đồ luồng - `FlowsTab`): Lấy danh sách luồng `/api/flows` (đánh dấu "Sẵn sàng" cho `available`, "Chưa có" cho `planned`); hiển thị chi tiết luồng `/api/flows/hdfs-write` gồm 4 thành phần (Client, NameNode, DataNode đầu pipeline, Secondary NameNode) và 9 bước thực thi; phân biệt trực quan rõ ràng bước "Quan sát thật" (bước 2, 7, 8 từ NameNode log) vs "Suy ra từ log" (bước 1, 3, 4, 5, 6) vs "Tác vụ nền" (bước 9 checkpoint fsimage); theo dõi tiến trình thực thi thời gian thực từ sự kiện `flow.step` (trạng thái `done`, gom theo `runId`, hiển thị các bước sáng lên khi hoàn thành); không giả định `reading` đến sau bước 8; hiển thị bảng lịch sử thao tác HDFS (`hdfs.op` với `op`, `path`, `blockId`, `datanode`, `bytes`).
+  + P5 (Truy vấn SQL - `SqlTab`): Trình soạn thảo và chạy SparkSQL trực tiếp qua `POST /api/sql`; hỗ trợ nút chọn câu truy vấn mẫu (trung bình theo tháng, 20 bản ghi gần nhất, trung bình theo giờ); cấu hình timeout 65s (≥ 60s) để chờ Spark JVM khởi động lần đầu; hiển thị kết quả dạng bảng dữ liệu kèm `rowCount`, thời gian thực thi `elapsedMs`, cảnh báo `truncated`; hiển thị thẻ tham khảo cấu trúc bảng `aqi` và danh sách cột chuẩn; bắt và giải thích chi tiết các mã lỗi đặc tả: 400 `SQL_ERROR` / `SQL_NOT_ALLOWED`, 504 `SQL_TIMEOUT`, 503 `SQL_UNAVAILABLE`.
+  + P5 (Dự đoán CO Heuristic - `PredictTab`): Biểu mẫu `POST /api/predict` với các trường `hour`, `month`, `dayOfWeek`, `temperatureC`, `windSpeedKmh`; cảnh báo rõ ràng đây là Heuristic thống kê, KHÔNG PHẢI Mô hình Học máy (ML); làm nổi bật khoảng bách phân vị 10%–90% (`interval.low` – `interval.high`) là thông tin chính thay vì con số đơn; hiển thị `model.name`, `model.version`, `model.kind` và căn cứ dữ liệu `model.trainedOn`; ghi chú minh bạch rằng nhiệt độ, tốc độ gió, tháng, thứ được kiểm tra hợp lệ nhưng chưa được đưa vào công thức tính toán.
+  + P5 (Cửa sổ lệnh - `TerminalTab`): Tích hợp `@xterm/xterm` (v6) và `@xterm/addon-fit`; kết nối pty hai chiều qua `ws://localhost:8000/ws/terminal?token=...` với Origin `http://localhost:5173`; ô nhập và lưu trữ token xác thực trong `localStorage`; gửi sự kiện `{ type: "resize", cols, rows }` khi thay đổi kích thước khung nhìn; xử lý và giải thích chi tiết các mã đóng kết nối bảo mật: 4401 (sai/thiếu token), 4403 (cửa sổ lệnh tắt mặc định, hướng dẫn bật bằng `BACKEND_ALLOW_WRITES=1`), 4408 (hết hạn timeout 30 phút), 4409 (xung đột phiên), 1006 (lỗi bắt tay Origin/loopback).
+  + P7 & P8 (Phản hồi Backend): Cập nhật `SparkTab` gắn nhãn "ước tính" cho tốc độ nạp vào (`inputRowsPerSecond`) và tốc độ xử lý (`processedRowsPerSecond`); ghi chú rõ trường `Query:` hiển thị tên ứng dụng Structured Streaming; sửa triệt để lỗi lặp sự kiện 2 lần (`StreamContext` gọi `source.stop()` khi cleanup, deduplicate sự kiện theo `seq`, tách `StreamContext` và `useStream` ra các module độc lập); dọn dẹp sạch toàn bộ cảnh báo `oxlint` (0 errors, 0 warnings).
+  + Nâng cấp Header: Điều hướng 9 tab mượt mà, hỗ trợ responsive hoàn hảo trên mọi kích thước màn hình (laptop, tablet, điện thoại).
+- Chạy thế nào:
+  + Mock server: `python mock/serve.py` (cổng 8010)
+  + Frontend chạy với Backend thật trong WSL: `cd frontend && $env:VITE_API_BASE="http://localhost:8000"; $env:VITE_STREAM="ws"; npm run dev`
+  + Build production: `npm run build` (sạch sẽ, 0 lỗi, ~1.86s)
+  + Kiểm tra linter: `npm run lint` (0 warnings, 0 errors)
+- Chưa làm / chưa kiểm với backend thật:
+  + Cửa sổ lệnh `/ws/terminal`: Đã kiểm tra giao diện, xử lý đóng và thông báo lỗi. Cần backend thật chạy với `BACKEND_ALLOW_WRITES=1` và nhập token thật từ console backend để kiểm tra gõ lệnh bash và resize tương tác thực tế.
+  + Đã kiểm tra các endpoint P4 và P5 với mock server 8010; việc chạy phát bản ghi thật qua `python3 infra/replay_producer.py --count 20 --interval 3` trên WSL Ubuntu để quan sát 8 bước sáng lên sẽ hoạt động trực tiếp khi kết nối với backend thật.
+- Cần bên kia: Không có. Mọi route và sự kiện đều khớp chính xác hợp đồng `openapi.yaml` và `events.md`.
+
 ### 2026-10-12 16:45 — Sửa các điểm theo rà soát P6 của Claude
 - Xong:
   + 1. `AqiTab.tsx`: Hộp cảnh báo điểm gãy 01/07/2025 hiển thị trực tiếp chuỗi `note` từ `/api/aqi/hourly-profile` (do backend sinh từ dữ liệu thật), không tự viết số suy đoán hay nguyên nhân thay đổi thuật toán. Giữ nguyên việc tách đoạn biểu đồ tại 01/07/2025 (không nối mượt).

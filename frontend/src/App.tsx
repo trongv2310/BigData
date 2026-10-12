@@ -7,6 +7,10 @@ import { HdfsTab } from './components/HdfsTab';
 import { KafkaTab } from './components/KafkaTab';
 import { SparkTab } from './components/SparkTab';
 import { AqiTab } from './components/AqiTab';
+import { FlowsTab } from './components/FlowsTab';
+import { SqlTab } from './components/SqlTab';
+import { PredictTab } from './components/PredictTab';
+import { TerminalTab } from './components/TerminalTab';
 
 const AppContent: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<TabKey>('overview');
@@ -24,6 +28,10 @@ const AppContent: React.FC = () => {
         {currentTab === 'kafka' && <KafkaTab />}
         {currentTab === 'spark' && <SparkTab />}
         {currentTab === 'aqi' && <AqiTab />}
+        {currentTab === 'flows' && <FlowsTab />}
+        {currentTab === 'sql' && <SqlTab />}
+        {currentTab === 'predict' && <PredictTab />}
+        {currentTab === 'terminal' && <TerminalTab />}
       </main>
 
       {/* Footer */}

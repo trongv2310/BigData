@@ -11,7 +11,7 @@ import {
   Layers,
 } from 'lucide-react';
 import { api } from '../services/api';
-import { useStream } from '../context/StreamContext';
+import { useStream } from '../context/useStream';
 import type { SparkApplications } from '../types';
 import { formatDateTime } from '../utils/format';
 
@@ -36,7 +36,24 @@ export const SparkTab: React.FC = () => {
   };
 
   useEffect(() => {
-    loadData();
+    let ignore = false;
+    api.getSparkApplications()
+      .then((res) => {
+        if (!ignore) {
+          setData(res);
+          setLoading(false);
+        }
+      })
+      .catch((err) => {
+        if (!ignore) {
+          const msg = err instanceof Error ? err.message : String(err);
+          setError(`Không thể tải thông tin Spark: ${msg}`);
+          setLoading(false);
+        }
+      });
+    return () => {
+      ignore = true;
+    };
   }, []);
 
   return (
@@ -79,7 +96,7 @@ export const SparkTab: React.FC = () => {
             </h3>
           </div>
           <span className="text-xs font-mono text-slate-400">
-            {latestSparkProgress ? `Query: ${latestSparkProgress.queryName}` : 'Chưa có sự kiện spark.progress'}
+            {latestSparkProgress ? `Tên ứng dụng (Query): ${latestSparkProgress.queryName}` : 'Chưa có sự kiện spark.progress'}
           </span>
         </div>
 
@@ -100,14 +117,20 @@ export const SparkTab: React.FC = () => {
             </div>
 
             <div className="p-3 bg-slate-800/40 rounded-xl border border-slate-800">
-              <span className="text-xs text-slate-400 block mb-1">Tốc độ nạp vào</span>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs text-slate-400">Tốc độ nạp vào</span>
+                <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-400 border border-slate-700">ước tính</span>
+              </div>
               <span className="text-xl font-bold text-sky-400 font-mono">
                 {latestSparkProgress.inputRowsPerSecond.toFixed(1)} rows/s
               </span>
             </div>
 
             <div className="p-3 bg-slate-800/40 rounded-xl border border-slate-800">
-              <span className="text-xs text-slate-400 block mb-1">Tốc độ xử lý</span>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs text-slate-400">Tốc độ xử lý</span>
+                <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-400 border border-slate-700">ước tính</span>
+              </div>
               <span className="text-xl font-bold text-emerald-400 font-mono">
                 {latestSparkProgress.processedRowsPerSecond.toFixed(1)} rows/s
               </span>

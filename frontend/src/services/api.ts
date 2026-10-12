@@ -9,34 +9,79 @@ import type {
   AqiReading,
   AqiSeries,
   HourlyProfile,
+  FlowList,
+  FlowDefinition,
+  SqlRequest,
+  SqlResponse,
+  PredictRequest,
+  PredictResponse,
 } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8010';
 
-async function fetchJson<T>(path: string, options?: RequestInit): Promise<T> {
-  const url = `${API_BASE}${path}`;
-  const res = await fetch(url, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options?.headers,
-    },
-  });
+export class ApiError extends Error {
+  code?: string;
+  status: number;
 
-  if (!res.ok) {
-    let errorDetail = `Lỗi HTTP ${res.status}`;
-    try {
-      const errJson = await res.json();
-      if (errJson?.error?.message) {
-        errorDetail = errJson.error.message;
-      }
-    } catch {
-      // Bỏ qua lỗi parse
-    }
-    throw new Error(errorDetail);
+  constructor(message: string, status: number, code?: string) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.code = code;
   }
+}
 
-  return (await res.json()) as T;
+async function fetchJson<T>(
+  path: string,
+  options?: RequestInit,
+  timeoutMs: number = 15000
+): Promise<T> {
+  const url = `${API_BASE}${path}`;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const res = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        ...options?.headers,
+      },
+    });
+
+    if (!res.ok) {
+      let errorDetail = `Lỗi HTTP ${res.status}`;
+      let errorCode: string | undefined = undefined;
+      try {
+        const errJson = await res.json();
+        if (errJson?.error) {
+          if (errJson.error.message) errorDetail = errJson.error.message;
+          if (errJson.error.code) errorCode = errJson.error.code;
+        }
+      } catch {
+        // Bỏ qua lỗi parse JSON body
+      }
+      throw new ApiError(errorDetail, res.status, errorCode);
+    }
+
+    return (await res.json()) as T;
+  } catch (err: unknown) {
+    if (err instanceof ApiError) {
+      throw err;
+    }
+    if (err instanceof Error && err.name === 'AbortError') {
+      throw new ApiError(
+        `Quá thời gian chờ phản hồi từ máy chủ (${Math.round(timeoutMs / 1000)} giây).`,
+        504,
+        'TIMEOUT'
+      );
+    }
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new ApiError(msg, 0);
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 export const api = {
@@ -68,4 +113,24 @@ export const api = {
     return fetchJson<AqiSeries>(`/api/aqi/series${queryString}`);
   },
   getAqiHourlyProfile: () => fetchJson<HourlyProfile>('/api/aqi/hourly-profile'),
+
+  // P4: Sơ đồ luồng
+  listFlows: () => fetchJson<FlowList>('/api/flows'),
+  getFlow: (id: string) => fetchJson<FlowDefinition>(`/api/flows/${encodeURIComponent(id)}`),
+
+  // P5: SparkSQL & Dự đoán Heuristic
+  runSql: (req: SqlRequest) =>
+    fetchJson<SqlResponse>(
+      '/api/sql',
+      {
+        method: 'POST',
+        body: JSON.stringify(req),
+      },
+      65000 // Khởi động Spark lần đầu có thể mất 8-10 giây, timeout >= 60 giây
+    ),
+  predictCo: (req: PredictRequest) =>
+    fetchJson<PredictResponse>('/api/predict', {
+      method: 'POST',
+      body: JSON.stringify(req),
+    }),
 };

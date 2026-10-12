@@ -10,10 +10,22 @@ import {
   Wifi,
   WifiOff,
   RefreshCw,
+  GitCommit,
+  Sparkles,
+  Terminal,
 } from 'lucide-react';
-import { useStream } from '../context/StreamContext';
+import { useStream } from '../context/useStream';
 
-export type TabKey = 'overview' | 'hdfs' | 'kafka' | 'spark' | 'aqi';
+export type TabKey =
+  | 'overview'
+  | 'hdfs'
+  | 'kafka'
+  | 'spark'
+  | 'aqi'
+  | 'flows'
+  | 'sql'
+  | 'predict'
+  | 'terminal';
 
 interface HeaderProps {
   currentTab: TabKey;
@@ -29,10 +41,14 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, onTabChange }) => {
 
   const tabs: { key: TabKey; label: string; icon: React.FC<{ className?: string }> }[] = [
     { key: 'overview', label: 'Tổng quan', icon: Activity },
-    { key: 'hdfs', label: 'HDFS Cụm lưu trữ', icon: Database },
-    { key: 'kafka', label: 'Kafka Dòng dữ liệu', icon: Radio },
-    { key: 'spark', label: 'Spark Xử lý', icon: Zap },
-    { key: 'aqi', label: 'Phân tích CO & AQI', icon: Server },
+    { key: 'hdfs', label: 'HDFS', icon: Database },
+    { key: 'kafka', label: 'Kafka', icon: Radio },
+    { key: 'spark', label: 'Spark', icon: Zap },
+    { key: 'aqi', label: 'CO & AQI', icon: Server },
+    { key: 'flows', label: 'Sơ đồ luồng', icon: GitCommit },
+    { key: 'sql', label: 'SparkSQL', icon: Database },
+    { key: 'predict', label: 'Dự đoán CO', icon: Sparkles },
+    { key: 'terminal', label: 'Cửa sổ lệnh', icon: Terminal },
   ];
 
   return (
@@ -55,7 +71,7 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, onTabChange }) => {
           </div>
 
           {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center space-x-1">
+          <nav className="hidden xl:flex items-center space-x-1">
             {tabs.map((tab) => {
               const Icon = tab.icon;
               const isActive = currentTab === tab.key;
@@ -63,13 +79,13 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, onTabChange }) => {
                 <button
                   key={tab.key}
                   onClick={() => onTabChange(tab.key)}
-                  className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-all ${
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
                     isActive
                       ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30 shadow-sm'
                       : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
                   }`}
                 >
-                  <Icon className="w-4 h-4" />
+                  <Icon className="w-3.5 h-3.5" />
                   {tab.label}
                 </button>
               );
@@ -108,8 +124,8 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, onTabChange }) => {
             </div>
           </div>
 
-          {/* Mobile hamburger button */}
-          <div className="flex md:hidden items-center gap-2">
+          {/* Mobile/Tablet hamburger button */}
+          <div className="flex xl:hidden items-center gap-2">
             <div
               className={`w-2.5 h-2.5 rounded-full ${
                 status === 'connected'
@@ -132,7 +148,7 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, onTabChange }) => {
 
       {/* Mobile Drawer Navigation */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-t border-slate-800 bg-slate-900/95 px-4 pt-2 pb-4 space-y-1">
+        <div className="xl:hidden border-t border-slate-800 bg-slate-900/95 px-4 pt-2 pb-4 space-y-1">
           <div className="py-2 px-3 mb-2 rounded bg-slate-800/60 text-xs text-slate-400 flex items-center justify-between">
             <span>Trạng thái luồng:</span>
             <span

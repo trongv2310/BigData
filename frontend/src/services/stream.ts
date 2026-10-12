@@ -143,11 +143,23 @@ export class WebSocketSource implements StreamSource {
 
   start() {
     this.isExplicitlyStopped = false;
+    if (
+      this.ws &&
+      (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)
+    ) {
+      return;
+    }
     this.connect();
   }
 
   private connect() {
     if (this.isExplicitlyStopped) return;
+    if (
+      this.ws &&
+      (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)
+    ) {
+      return;
+    }
     this.setStatus('connecting');
 
     try {
@@ -184,13 +196,16 @@ export class WebSocketSource implements StreamSource {
       };
 
       this.ws.onclose = () => {
-        this.setStatus('disconnected');
-        this.scheduleReconnect();
+        if (!this.isExplicitlyStopped) {
+          this.setStatus('disconnected');
+          this.scheduleReconnect();
+        }
       };
 
       this.ws.onerror = () => {
-        this.setStatus('disconnected');
-        // onclose sẽ được gọi tiếp theo
+        if (!this.isExplicitlyStopped) {
+          this.setStatus('disconnected');
+        }
       };
     } catch {
       this.setStatus('disconnected');
@@ -220,11 +235,16 @@ export class WebSocketSource implements StreamSource {
       this.reconnectTimer = null;
     }
     if (this.ws) {
+      this.ws.onopen = null;
+      this.ws.onclose = null;
+      this.ws.onerror = null;
+      this.ws.onmessage = null;
       this.ws.close();
       this.ws = null;
     }
     this.setStatus('disconnected');
   }
+
 
   subscribe(listener: StreamEventListener): () => void {
     this.listeners.add(listener);

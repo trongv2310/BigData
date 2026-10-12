@@ -13,7 +13,7 @@ import {
   FileText,
 } from 'lucide-react';
 import { api } from '../services/api';
-import { useStream } from '../context/StreamContext';
+import { useStream } from '../context/useStream';
 import type {
   HdfsSummary,
   HdfsDataNodes,
@@ -67,8 +67,37 @@ export const HdfsTab: React.FC = () => {
   };
 
   useEffect(() => {
-    loadHdfsOverview();
-    loadPath('/');
+    let ignore = false;
+    Promise.all([api.getHdfsSummary(), api.getHdfsDataNodes()])
+      .then(([summaryRes, datanodesRes]) => {
+        if (!ignore) {
+          setSummary(summaryRes);
+          setDataNodes(datanodesRes);
+          setLoading(false);
+        }
+      })
+      .catch((err) => {
+        if (!ignore) {
+          const msg = err instanceof Error ? err.message : String(err);
+          setError(`Không thể tải thông tin cụm HDFS: ${msg}`);
+          setLoading(false);
+        }
+      });
+
+    api.getHdfsFiles('/')
+      .then((listingRes) => {
+        if (!ignore) {
+          setListing(listingRes);
+          setCurrentPath('/');
+        }
+      })
+      .catch((err) => {
+        if (!ignore) console.error('Lỗi duyệt thư mục /:', err);
+      });
+
+    return () => {
+      ignore = true;
+    };
   }, []);
 
   const handleOpenFileBlocks = async (filePath: string) => {
