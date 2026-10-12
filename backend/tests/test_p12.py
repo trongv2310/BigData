@@ -129,7 +129,7 @@ class LiveView(unittest.TestCase):
 
 
 class ExtraFlows(unittest.TestCase):
-    """Luồng kafka-produce và spark-streaming: chỉ có khi FLOWS_EXTRA; mặc định tắt để không làm sai FlowsTab chưa lọc theo flowId."""
+    """Luồng kafka-produce và spark-streaming: chỉ có khi FLOWS_EXTRA; mặc định tắt (chỉ có ý nghĩa khi STREAM_SOURCE=kafka)."""
 
     def setUp(self):
         self.old = config.FLOWS_EXTRA
