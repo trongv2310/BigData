@@ -11,14 +11,18 @@ SPARK_PID="$LOGDIR/spark_kafka.pid"
 alive() { [ -f "$1" ] && kill -0 "$(cat "$1")" 2>/dev/null; }
 
 start() {
+  # Mỗi tiến trình nền có đủ chuyển hướng ngay trên lệnh nền (không bọc trong subshell), để không giữ stdout của người gọi:
+  # nếu không, `bash live_stack.sh start | cut ...` hoặc công cụ chụp đầu ra sẽ treo mãi cho tới khi producer/Spark kết thúc.
   if alive "$PRODUCER_PID"; then echo "producer đã chạy (pid $(cat "$PRODUCER_PID"))"; else
-    (cd "$ROOT" && setsid nohup python3 infra/live_producer.py --interval "${LIVE_INTERVAL:-60}" > "$LOGDIR/live_producer.log" 2>&1 < /dev/null & echo $! > "$PRODUCER_PID")
+    setsid nohup bash -c 'cd "$1" && exec python3 infra/live_producer.py --interval "$2"' _ "$ROOT" "${LIVE_INTERVAL:-60}" \
+      > "$LOGDIR/live_producer.log" 2>&1 < /dev/null &
+    echo $! > "$PRODUCER_PID"
     echo "producer: đã khởi động, log $LOGDIR/live_producer.log"
   fi
   if alive "$SPARK_PID"; then echo "spark consumer đã chạy (pid $(cat "$SPARK_PID"))"; else
-    (cd "$ROOT" && setsid nohup spark-submit --driver-memory "${SPARK_DRIVER_MEMORY:-640m}" --conf spark.ui.port=4040 \
-      --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1 infra/spark_kafka_consumer.py \
-      > "$LOGDIR/spark_kafka.log" 2>&1 < /dev/null & echo $! > "$SPARK_PID")
+    setsid nohup bash -c 'cd "$1" && exec spark-submit --driver-memory "$2" --conf spark.ui.port=4040 --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1 infra/spark_kafka_consumer.py' \
+      _ "$ROOT" "${SPARK_DRIVER_MEMORY:-640m}" > "$LOGDIR/spark_kafka.log" 2>&1 < /dev/null &
+    echo $! > "$SPARK_PID"
     echo "spark consumer: đã khởi động (lần đầu tải connector Kafka ~1 phút), log $LOGDIR/spark_kafka.log"
   fi
 }

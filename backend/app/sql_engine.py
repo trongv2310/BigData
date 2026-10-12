@@ -6,6 +6,11 @@ Bảng duy nhất là view `aqi`, dựng từ HDFS /raw/Dataset.csv (cùng nội
   hour_vn, month_vn, year_vn   tách từ datetime_vn
   aqi_label, co, no, no2, o3, so2, pm2_5, pm10, nh3, temperature_C, humidity_pct, rain_mm, wind_speed_kmh, is_event_anomaly, o3_was_missing
 Cố ý bỏ các cột hour, month, dayofweek của file vì chúng tính theo UTC, dễ bị nhầm với giờ địa phương.
+
+View thứ hai `live` (nếu có) là dữ liệu SỐNG Spark đã ghi từ Kafka vào HDFS (config.SQL_LIVE_URI, Parquet), dựng lại mỗi lần chạy truy vấn để thấy dữ liệu mới:
+  datetime_vn timestamp (giờ Việt Nam, đúng như producer ghi), station, co, wind_speed_kmh, temperature_C, co_accumulation_index, canh_bao,
+  co_observed_at, weather_observed_at, provider (chuỗi), kafka_partition, kafka_offset, kafka_timestamp (UTC).
+Chưa có dữ liệu sống thì không có view này (truy vấn vào `live` trả lỗi SQL_ERROR như bảng không tồn tại).
 """
 import math
 import threading
@@ -66,6 +71,26 @@ def _session():
     return spark
 
 
+LIVE_COLUMNS = ["station", "co", "wind_speed_kmh", "temperature_C", "co_accumulation_index", "canh_bao", "provider", "kafka_timestamp"]
+
+
+def _refresh_live(spark) -> None:
+    """Dựng lại view `live` từ Parquet trong HDFS; chưa có dữ liệu hoặc thiếu cột chính thì gỡ view."""
+    from pyspark.sql import functions as F
+
+    try:
+        df = spark.read.parquet(config.SQL_LIVE_URI)
+        have = set(df.columns)
+        if not {"datetime", "co"} <= have:
+            raise ValueError("thiếu cột datetime/co")
+        cols = [F.to_timestamp("datetime").alias("datetime_vn")] + [F.col(c) for c in LIVE_COLUMNS if c in have]
+        cols += [F.col(src).alias(dst) for src, dst in (("coObservedAt", "co_observed_at"), ("weatherObservedAt", "weather_observed_at"),
+                                                         ("partition", "kafka_partition"), ("offset", "kafka_offset")) if src in have]
+        df.select(*cols).createOrReplaceTempView("live")
+    except Exception:  # đường dẫn chưa có, Parquet đang ghi dở, thiếu cột...
+        spark.catalog.dropTempView("live")
+
+
 def _json_value(v):
     if v is None or isinstance(v, (bool, str, int)):
         return v
@@ -98,6 +123,7 @@ def run(query: str, limit: int) -> dict:
         timer = threading.Timer(config.SQL_TIMEOUT_SECONDS, cancel)
         timer.start()
         try:
+            _refresh_live(spark)
             df = spark.sql(q)
             fields = df.schema.fields
             cols = [{"name": f.name, "type": f.dataType.simpleString()} for f in fields]
