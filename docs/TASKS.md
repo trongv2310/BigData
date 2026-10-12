@@ -23,6 +23,7 @@ Trạng thái: [ ] chưa, [~] đang làm, [x] xong. Người làm: C = Claude, A
 ## P2 — Dữ liệu thật của HDFS, Kafka, Spark
 - [x] C: `/api/hdfs/*` (JMX + WebHDFS), `/api/spark/applications` — đã so với `hdfs fsck`/`dfsadmin` trên cụm thật.
 - [x] C: `/api/kafka/topics` + `kafka.stats` đã thử với broker thật (2026-10-12 18:00, sau khi người dùng đồng ý `kafka-storage format --standalone`): liệt kê topic, partition, replication đúng; **chưa thử với tin nhắn và consumer group thật** (chưa có producer ghi vào Kafka).
+- [x] C: `spark.progress` trên `/ws/stream` (2026-10-12, P8): suy ra từ Spark REST vì REST không lộ tiến độ micro-batch; đã chạy với Spark Streaming thật (batch 280-296 khớp từng `reading`). Số liệu là suy ra, ghi rõ trong `events.md`.
 - [ ] A: trang HDFS (DataNode, cây thư mục, block của file), trang Kafka, trang Spark.
 - Xong khi: các số trên trang khớp NameNode UI `:9870`.
 
