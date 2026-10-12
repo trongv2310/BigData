@@ -15,6 +15,16 @@ Mẫu:
 
 ## Backend (Claude)
 
+### 2026-10-12 23:05 — P10: rà soát lại nhánh `feat/frontend-p9` (commit `0771594`), cả 4 điểm P9 đã được sửa
+- Kết luận: **gộp được**, không còn điểm chặn. Chỉ đụng `frontend/` (PredictTab, TerminalTab, StreamContext) và mục Frontend của HANDOFF; `npm ci`, `npm run lint` (0 cảnh báo), `npm run build` sạch.
+- Đã kiểm thật (bản của nhánh, Chrome, backend thật, `VITE_API_BASE=http://localhost:8000`):
+  1. **Token cửa sổ lệnh: đã sửa.** Gõ `tokAAA` bấm kết nối một lần, rồi gõ `tokBBB` bấm một lần: access log của backend có đúng hai request `ws/terminal?token=tokAAA` và `?token=tokBBB`, không còn dùng token của lần trước. `connect` chỉ còn một chỗ gọi (`connect(tokenInput)`), nên không có nguy cơ truyền nhầm sự kiện chuột làm tham số. Token đã chuyển sang `sessionStorage` (mở trang mới thì ô token trống).
+  2. **Khử trùng `seq`: đã bỏ, không sinh lại lỗi trùng dòng.** Chế độ WebSocket ở dev (StrictMode): 22 mục, `seq` #0-#21 mỗi số một lần. Chế độ `replay` (mặc định, `VITE_STREAM=replay`): nhật ký phát hết vòng đầu (#0-#10) và sang vòng hai, không còn đứng yên.
+  3. **Ngưỡng trong PredictTab: đã bỏ** (chỉ còn "SAFE (An toàn)", "WARNING (Cảnh báo)", "DANGER (Nguy hiểm)" theo `status` backend; đọc mã và grep, chưa xem lại trên màn hình).
+  4. **Ba điểm nhẹ:** `disconnect()` gỡ handler socket cũ; `flowStepsByRunId` giữ 20 run gần nhất (đọc mã; chưa kiểm số lượng lớn); token `sessionStorage`.
+- Chưa kiểm: gõ lệnh thật sau khi sửa token (đã kiểm ở P9 với bản trước, phần sửa không đụng đường gõ lệnh); `AqiTab.tsx` dòng ~442 vẫn viết sẵn "500 và 1000 µg/m³ ... không phải quy chuẩn WHO" bằng chữ cố định (không nằm trong diff lần này): chấp nhận được vì đã nói rõ đó là ngưỡng của pipeline, nhưng sẽ lệch nếu backend đổi ngưỡng (quyết định D3).
+- Lưu ý khi thử: ở chế độ cửa sổ lệnh tắt, backend đóng 4403 **trước khi kiểm token** (nên không phân biệt được token đúng sai); giao diện hiện đúng lời giải thích 4403 kèm lệnh bật `BACKEND_ALLOW_WRITES=1`.
+
 ### 2026-10-12 22:25 — P9: rà soát nhánh `feat/frontend-p4-p5` (commit `ab878c4`), chạy với backend thật
 - Kết luận: **gộp được, kèm các điểm sửa dưới đây** (không có lỗi chặn). Chỉ đụng `frontend/` và mục Frontend của HANDOFF; không có khóa API; `npm ci`, `npm run lint` (0 cảnh báo), `npm run build` sạch (bundle 853 kB vì xterm, trình báo chunk > 500 kB); `npm run generate:types` sinh lại `api.ts` giống hệt (chỉ khác ký tự xuống dòng), kiểu mới lấy từ `Schemas[...]`, không viết tay.
 - Đã chạy thật (bản của nhánh, `VITE_API_BASE=http://localhost:8000 VITE_STREAM=ws`, Chrome, backend thật + producer `infra/replay_producer.py` + Spark Streaming): 9 tab hiện đủ. **Sơ đồ luồng**: 4 thành phần, 9 bước với nhãn "Quan sát thật/Suy ra từ log/Tác vụ nền", các bước chuyển sang "Đã hoàn thành" khi `replay_*.json` được ghi, bảng `hdfs.op` cập nhật. **SparkSQL**: truy vấn mẫu theo tháng trả 49 dòng trong 10,3 giây, các trung bình CO khớp `/api/aqi/series`. **Dự đoán**: khoảng 163-697,2, trung vị 270,9, hiện `model.name`, `trainedOn`, cảnh báo "KHÔNG PHẢI ML". **Cửa sổ lệnh**: với `BACKEND_ALLOW_WRITES=1` gõ `echo`, `pwd`, `hdfs dfs -ls /raw` ra kết quả đúng; sai token hiện "Mã 4401"; (đã tắt lại sau khi thử). **Nhật ký sự kiện**: hết trùng dòng ở chế độ WebSocket (mỗi `seq` một lần).
