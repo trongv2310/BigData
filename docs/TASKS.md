@@ -39,3 +39,8 @@ Trạng thái: [ ] chưa, [~] đang làm, [x] xong. Người làm: C = Claude, A
 - [x] C: `/ws/terminal` (pty bash, bảo mật theo events.md, **tắt mặc định**, bật bằng `BACKEND_ALLOW_WRITES=1`), `/api/sql` (SparkSQL thật, chỉ SELECT, bảng `aqi` từ HDFS), `/api/predict` (heuristic, KHÔNG phải ML: thử nghiệm cho thấy giờ/tháng/nhiệt độ/gió gần như không dự đoán được CO).
 - [ ] A: xterm.js, ô nhập SQL, biểu mẫu dự đoán.
 - [ ] Cả hai: kịch bản demo, ảnh chụp cho báo cáo, kiểm tra cuối.
+
+## P6 — Rà soát và tích hợp (C, người dùng đặt ra sau P5)
+- [x] C: đọc diff PR #1 của frontend, chạy validator và build frontend, rebase `feat-backend` lên `origin/main`. Kết quả và yêu cầu sửa ở HANDOFF mục P6.
+- [ ] A: sửa các điểm ở HANDOFF mục P6 (hộp cảnh báo điểm gãy, ghi chú trạm, trạng thái rỗng của Spark), chuyển sang backend thật và xem trên trình duyệt.
+- [ ] C: mở PR của `feat-backend` vào `main` (chờ người dùng đồng ý), đọc lại frontend P4-P5 khi có.

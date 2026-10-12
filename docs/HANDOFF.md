@@ -15,6 +15,17 @@ Mẫu:
 
 ## Backend (Claude)
 
+### 2026-10-12 — P6: rà soát PR #1 của frontend (đã gộp vào main), rebase nhánh backend
+- Xong: đọc diff PR #1 (chỉ đụng `frontend/` và mục Frontend của HANDOFF, đúng quyền sở hữu); `npm ci`, `npm run generate:types` và `npm run build` trong một bản sao tạm đều sạch; validator OK; 87 test backend vẫn qua sau khi rebase `feat-backend` lên `origin/main` (5 commit backend nằm trên merge #1; mục Frontend của HANDOFF giữ nguyên văn). Chưa mở PR của backend.
+- Chưa làm: chưa mở giao diện trong trình duyệt với backend thật (không có công cụ trình duyệt trong phiên này), nên "không lỗi console, thu nhỏ vẫn dùng được" chưa được kiểm. Frontend mới làm P1-P3 nên chưa có gì để xem cho `/api/flows`, `/api/sql`, `/api/predict`, `/ws/terminal`.
+- **Cần frontend sửa (tôi không sửa `frontend/`):**
+  1. `AqiTab.tsx` dòng ~241, hộp cảnh báo điểm gãy viết các điều không có trong dữ liệu hoặc trong hợp đồng: "sụt giảm mạnh **đột ngột** kể từ 01/07/2025", "từ ~1500-2000 xuống ~250-350", và nguyên nhân "do sự thay đổi thuật toán / mô hình đo lường của nhà cung cấp". Số thật (theo giờ VN): CO đã giảm từ 03/2025 (trung bình tháng 02/2025: 1327, 03/2025: 657), đứng ~650 đến 06/2025, rồi còn ~266 vào 07/2025; trung bình cả giai đoạn trước 01/07/2025 là 1344, sau là 303; nguyên nhân chưa biết (AGENTS.md mục 8: đừng bịa). Đề nghị hiển thị chuỗi `note` của `/api/aqi/hourly-profile` (backend tính từ dữ liệu, không chép cứng) thay vì tự viết số và lý do. Phần tách đoạn biểu đồ tại 01/07/2025 làm đúng, giữ nguyên.
+  2. `OverviewTab.tsx` dòng ~134: câu giải thích "nhãn được gán luân phiên theo luồng phát lại" chỉ đúng khi `source = replay-dataset` có trạm luân phiên. Với `live-open-meteo` (trạm "TP.HCM (Open-Meteo)") hoặc dòng cuối bộ dữ liệu (`station: "Bộ dữ liệu Kaggle (không có trạm)"`) thì không phải. Đề nghị nội dung theo `source`, vẫn luôn hiện ghi chú "mô phỏng" vì `isSimulatedStation` luôn `true` (D2 tạm).
+  3. Chạy lại `npm run generate:types`: mô tả của `SqlRequest.query` và `PredictResponse.model.trainedOn` trong openapi đã đổi (chỉ chữ, không đổi cấu trúc).
+  4. Khi chuyển sang backend thật (`VITE_API_BASE=http://localhost:8000`, `VITE_STREAM=ws`): luồng live không phát `spark.progress` (chưa làm được, xem mục P2), nên thẻ Structured Streaming của `SparkTab` phải có trạng thái rỗng rõ ràng ("chưa có dữ liệu"), đừng để trống hay hiện số 0 như thật. `/api/aqi/latest` hiện trả dòng cuối bộ dữ liệu (datetime 2026-04-01) vì `/stream_input` đang trống: hiển thị `datetime` và `source`, đừng gọi là "trực tiếp". `/api/kafka/topics` trả 503 `KAFKA_UNREACHABLE` khi Kafka tắt (hiện đúng như vậy), nên hiện thông báo lỗi thay vì bảng trống.
+  5. Tên file `Dataset.csv` trong `/raw` có ký tự xuống dòng ở cuối; hiển thị an toàn (ví dụ thay bằng `` có thể thấy được), nhưng khi gọi `/api/hdfs/blocks` thì gửi nguyên tên đã mã hóa.
+- P4 và P5 của frontend: định nghĩa luồng, sự kiện `hdfs.op`/`flow.step` (chỉ có state `done`, một số bước là suy ra), SQL, dự đoán (heuristic, không phải ML), cửa sổ lệnh (tắt mặc định) đều đã sẵn ở backend; chi tiết ở các mục P4, P5 bên dưới.
+
 ### 2026-10-12 — P5: /api/predict, /api/sql, /ws/terminal
 - Xong: ba tính năng, đúng hợp đồng (87 test qua, `check_live.py` OK mọi route trừ Kafka vì Kafka chưa chạy). Chạy thật trên máy: SparkSQL đọc `/raw/Dataset.csv` trên HDFS và trung bình CO theo tháng khớp từng số với `/api/aqi/series`; cửa sổ lệnh qua uvicorn thật chạy được `hdfs dfs -ls /raw`, token sai bị đóng 4401, Origin sai bị 403.
 - **`/api/predict` là heuristic, không phải ML, và gần như không có khả năng dự đoán.** Tôi đã thử trên dữ liệu từ 01/07/2025 (giờ VN): hồi quy log-tuyến tính theo giờ + nhiệt độ + gió cho R² ≈ 0 trên 60 ngày cuối; kiểm tra xen kẽ theo tuần cho thấy trung bình theo tháng, theo giờ, và cả tích tháng×giờ×gió×nhiệt độ đều không tốt hơn lấy trung bình chung (R² từ -0,15 đến 0). Gió và nhiệt độ gần như không tương quan với CO ở giai đoạn này (log gió: -0,10; nhiệt độ: 0,03). Vì vậy endpoint trả **trung vị và khoảng 10%-90% thật của CO quanh giờ được hỏi (±1 giờ), chỉ lấy từ giai đoạn sau 01/07/2025**; tháng, thứ, nhiệt độ, gió được kiểm hợp lệ nhưng KHÔNG dùng. Dùng cả dữ liệu trước điểm gãy sẽ cho số gấp 3-4 lần, nên không dùng. `model.kind = "heuristic"`, `model.trainedOn` mang chuỗi giải thích đầy đủ (kể cả sai số kiểm tra); tôi đã sửa mô tả trường này trong openapi từ "null với heuristic" thành "mô tả dữ liệu mô hình dựa vào". Giao diện nên hiển thị `trainedOn`, nhấn mạnh khoảng chứ không phải con số đơn, và ghi rõ nhiệt độ/gió chưa được dùng. Nếu người dùng vẫn muốn một mô hình ML để báo cáo, cần nói rõ kết quả thử nghiệm này; đó là quyết định của người dùng.
@@ -90,4 +101,16 @@ Mẫu:
 
 ## Frontend (Antigravity)
 
-(chưa có)
+### 2026-10-12 15:30 — Hoàn tất P1, P2, P3 Frontend
+- Xong:
+  + P1: Dự án Vite + React 19 + TypeScript + Tailwind CSS; sinh kiểu tự động từ `docs/contract/openapi.yaml` (`npm run generate:types`); khung điều hướng responsive hỗ trợ di động; lớp `StreamSource` với `ReplaySource` (đọc `mock/stream-events.ndjson`) và `WebSocketSource` (kết nối `/ws/stream` với backoff tái kết nối 1-15s); thanh Ticker sự kiện trực tiếp; trang Tổng quan đọc `/api/services`, cập nhật `service.state`, thẻ số liệu CO trực tiếp, cảnh báo trạm mô phỏng, nguồn dữ liệu và trạng thái CO từ backend.
+  + P2: Trang HDFS (tóm tắt cụm `/api/hdfs/summary`, danh sách `/api/hdfs/datanodes`, duyệt cây tệp tin `/api/hdfs/files`, modal xem blocks `/api/hdfs/blocks`, lịch sử `hdfs.op`); trang Kafka (`/api/kafka/topics`, theo dõi `kafka.stats`); trang Spark (`/api/spark/applications`, theo dõi `spark.progress`).
+  + P3: Trang Phân tích CO & AQI: Biểu đồ chuỗi thời gian theo giờ/ngày/tháng (`/api/aqi/series`), biểu đồ nhịp sinh học 24 giờ (`/api/aqi/hourly-profile`); ĐẶC BIỆT: Tách rời và đánh dấu điểm gãy dữ liệu ngày 01/07/2025, tuyệt đối không nối mượt qua điểm này; ghi chú cảnh báo trạm mô phỏng luân phiên; hiển thị nguồn dữ liệu (`source`).
+- Chạy thế nào:
+  + Mock server: `python mock/serve.py` (cổng 8010)
+  + Frontend: `cd frontend && npm install && npm run dev` (truy cập `http://localhost:5173`)
+  + Build production: `cd frontend && npm run build`
+- Chưa làm / đang giả lập: P4 (Sơ đồ luồng sống) và P5 (Terminal xterm.js, SQL, dự đoán CO). Đang chạy với mock server 8010 và ReplaySource phát lại luồng sự kiện.
+- Cần bên kia: Backend thật (FastAPI) triển khai các route REST và `/ws/stream`. Frontend đã sẵn sàng chuyển sang backend thật qua `VITE_API_BASE=http://localhost:8000` và `VITE_STREAM=ws`.
+- Vấn đề phát hiện: Không có. Schema và contract hoàn toàn khớp, build TypeScript sạch sẽ không có lỗi.
+
