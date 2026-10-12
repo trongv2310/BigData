@@ -10,7 +10,7 @@ import {
   Cpu,
 } from 'lucide-react';
 import { api } from '../services/api';
-import { useStream } from '../context/StreamContext';
+import { useStream } from '../context/useStream';
 import type { KafkaTopics } from '../types';
 
 export const KafkaTab: React.FC = () => {
@@ -34,7 +34,24 @@ export const KafkaTab: React.FC = () => {
   };
 
   useEffect(() => {
-    loadData();
+    let ignore = false;
+    api.getKafkaTopics()
+      .then((res) => {
+        if (!ignore) {
+          setData(res);
+          setLoading(false);
+        }
+      })
+      .catch((err) => {
+        if (!ignore) {
+          const msg = err instanceof Error ? err.message : String(err);
+          setError(`Không thể tải thông tin Kafka: ${msg}`);
+          setLoading(false);
+        }
+      });
+    return () => {
+      ignore = true;
+    };
   }, []);
 
   return (

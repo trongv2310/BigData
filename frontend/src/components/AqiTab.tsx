@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -47,7 +47,7 @@ export const AqiTab: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -63,10 +63,32 @@ export const AqiTab: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [granularity, metric]);
 
   useEffect(() => {
-    loadData();
+    let ignore = false;
+    Promise.all([
+      api.getAqiSeries({ metric, granularity }),
+      api.getAqiHourlyProfile(),
+    ])
+      .then(([seriesRes, profileRes]) => {
+        if (!ignore) {
+          setSeries(seriesRes);
+          setHourlyProfile(profileRes);
+          setLoading(false);
+        }
+      })
+      .catch((err) => {
+        if (!ignore) {
+          const msg = err instanceof Error ? err.message : String(err);
+          setError(`Không thể nạp chuỗi dữ liệu CO: ${msg}`);
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      ignore = true;
+    };
   }, [granularity, metric]);
 
   // Chuẩn bị dữ liệu cho biểu đồ Chuỗi Thời gian (AqiSeries)

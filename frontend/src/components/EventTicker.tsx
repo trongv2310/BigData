@@ -1,5 +1,5 @@
 import React from 'react';
-import { useStream } from '../context/StreamContext';
+import { useStream } from '../context/useStream';
 import { formatTimeOnly } from '../utils/format';
 import { Radio, Database, Zap, Cpu, Bell } from 'lucide-react';
 

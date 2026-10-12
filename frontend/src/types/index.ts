@@ -26,4 +26,16 @@ export type SparkProgressEvent = Schemas['SparkProgressEvent'];
 export type KafkaStatsEvent = Schemas['KafkaStatsEvent'];
 export type ServiceStateEvent = Schemas['ServiceStateEvent'];
 
+// P4: Sơ đồ luồng
+export type FlowSummary = Schemas['FlowSummary'];
+export type FlowList = Schemas['FlowList'];
+export type FlowDefinition = Schemas['FlowDefinition'];
+
+// P5: SQL, Predict
+export type SqlRequest = Schemas['SqlRequest'];
+export type SqlResponse = Schemas['SqlResponse'];
+export type PredictRequest = Schemas['PredictRequest'];
+export type PredictResponse = Schemas['PredictResponse'];
+
+
 export type { paths, components };

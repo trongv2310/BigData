@@ -16,7 +16,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { api } from '../services/api';
-import { useStream } from '../context/StreamContext';
+import { useStream } from '../context/useStream';
 import type { ServiceStatus, AqiReading } from '../types';
 import { formatDateTime, formatTimeOnly, getCoStatusBadge, getSourceLabel } from '../utils/format';
 
@@ -46,7 +46,25 @@ export const OverviewTab: React.FC = () => {
   };
 
   useEffect(() => {
-    loadData();
+    let ignore = false;
+    Promise.all([api.getServices(), api.getAqiLatest()])
+      .then(([servicesData, latestData]) => {
+        if (!ignore) {
+          setServices(servicesData.services);
+          setInitialReading(latestData);
+          setLoading(false);
+        }
+      })
+      .catch((err) => {
+        if (!ignore) {
+          const msg = err instanceof Error ? err.message : String(err);
+          setError(`Không thể tải dữ liệu: ${msg}`);
+          setLoading(false);
+        }
+      });
+    return () => {
+      ignore = true;
+    };
   }, []);
 
   // Ưu tiên reading từ luồng thời gian thực nếu có, nếu chưa có thì dùng initial reading từ REST

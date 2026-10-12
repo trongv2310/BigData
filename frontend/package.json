@@ -11,6 +11,8 @@
     "generate:types": "openapi-typescript ../docs/contract/openapi.yaml -o src/types/api.ts"
   },
   "dependencies": {
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
     "chart.js": "^4.5.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.55.0",
@@ -31,4 +33,3 @@
     "vite": "^8.3.0"
   }
 }
-
