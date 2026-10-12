@@ -3,7 +3,7 @@ import asyncio
 import logging
 import time
 
-from . import config, hadoop_logs, hdfs_flow, services, stream_input
+from . import config, hadoop_logs, hdfs_flow, services, spark_progress, stream_input
 from .clients import hdfs, kafka
 
 log = logging.getLogger("hub")
@@ -11,6 +11,7 @@ log = logging.getLogger("hub")
 STREAM_POLL_SECONDS = 1.0
 SERVICE_POLL_SECONDS = 5.0
 KAFKA_POLL_SECONDS = 5.0
+SPARK_POLL_SECONDS = 3.0
 LOG_POLL_SECONDS = 0.3
 QUEUE_MAX = 200
 
@@ -26,7 +27,8 @@ class Hub:
         self._subs.add(q)
         if not self._tasks:
             self._tasks = [asyncio.create_task(self._poll_stream_input()), asyncio.create_task(self._poll_services()),
-                           asyncio.create_task(self._poll_kafka()), asyncio.create_task(self._poll_hdfs_logs())]
+                           asyncio.create_task(self._poll_kafka()), asyncio.create_task(self._poll_hdfs_logs()),
+                           asyncio.create_task(self._poll_spark())]
         return q
 
     def unsubscribe(self, q: asyncio.Queue) -> None:
@@ -75,6 +77,17 @@ class Hub:
             except Exception:
                 log.exception("lỗi khi đọc log NameNode")
             await asyncio.sleep(LOG_POLL_SECONDS)
+
+    async def _poll_spark(self):
+        """spark.progress cho mỗi micro-batch mới của Structured Streaming (số suy ra từ Spark REST, xem spark_progress.py)."""
+        tracker = spark_progress.ProgressTracker()
+        while True:
+            try:
+                for data in await tracker.poll():
+                    self.publish("spark.progress", data)
+            except Exception:
+                log.exception("lỗi khi đọc tiến độ Spark")
+            await asyncio.sleep(SPARK_POLL_SECONDS)
 
     async def _poll_kafka(self):
         """kafka.stats mỗi KAFKA_POLL_SECONDS: tốc độ tin/giây (từ độ tăng offset giữa hai lần hỏi) và tổng lag. Lần hỏi đầu chỉ lấy mốc."""

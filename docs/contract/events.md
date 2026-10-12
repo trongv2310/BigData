@@ -15,7 +15,7 @@ Mỗi tin là một JSON:
 | `reading` | Có bản ghi đo mới trong luồng | `AqiReading` |
 | `hdfs.op` | Có thao tác ghi trên HDFS (mkdir, create, addBlock, close, rename, delete) | op, path, blockId, datanode, bytes |
 | `flow.step` | Một bước của luồng (xem `/api/flows/{id}`) bắt đầu, xong hoặc lỗi | flowId, runId, step, state |
-| `spark.progress` | Mỗi micro-batch của Structured Streaming | queryName, batchId, numInputRows, tốc độ |
+| `spark.progress` | Mỗi micro-batch của Structured Streaming | queryName, batchId, numInputRows, tốc độ. Backend thật không có số của Spark (REST không lộ StreamingQueryProgress) nên **suy ra** từ job/stage: `queryName` là tên ứng dụng, tốc độ xử lý chưa tính lập kế hoạch và commit, tốc độ vào = 0 khi chưa có batch trước (xem `backend/app/spark_progress.py`) |
 | `kafka.stats` | Định kỳ vài giây | topic, messagesPerSecond, lagTotal |
 | `service.state` | Một dịch vụ đổi trạng thái up/down | `ServiceStatus` |
 

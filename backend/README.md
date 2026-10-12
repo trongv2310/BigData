@@ -40,4 +40,4 @@ python3 backend/tools/check_live.py http://127.0.0.1:8000       # backend đang 
 | `/api/sql` | SparkSQL `local[2]` trong tiến trình backend, view `aqi` từ HDFS `/raw/Dataset.csv` |
 | `/ws/terminal` | pty bash; TẮT mặc định, bật bằng `BACKEND_ALLOW_WRITES=1`; token in ra console lúc khởi động |
 | `/api/flows` | định nghĩa trong `app/flows.py` (trùng mock) |
-| `/ws/stream` | `live`: file mới trong `/stream_input`, đổi trạng thái dịch vụ, `kafka.stats`, `hdfs.op` + `flow.step` từ log NameNode; `replay`: phát lại `mock/stream-events.ndjson` (giả lập) |
+| `/ws/stream` | `live`: file mới trong `/stream_input`, đổi trạng thái dịch vụ, `kafka.stats`, `hdfs.op` + `flow.step` từ log NameNode, `spark.progress` suy ra từ Spark REST (job/stage của từng micro-batch, xem `app/spark_progress.py`); `replay`: phát lại `mock/stream-events.ndjson` (giả lập) |
