@@ -72,6 +72,7 @@ def _snapshot_sync() -> list[dict]:
                     "replicationFactor": max(len(metas[name]["partitions"][0]["replicas"]), 1) if parts else 1,
                     "approxMessages": sum(end[tp] - begin[tp] for tp in parts),
                     "endOffsetTotal": sum(end[tp] for tp in parts),
+                    "endOffsets": {tp.partition: end[tp] for tp in parts},
                     "consumerGroups": lags,
                 })
             return topics

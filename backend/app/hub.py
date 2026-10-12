@@ -3,7 +3,7 @@ import asyncio
 import logging
 import time
 
-from . import config, hadoop_logs, hdfs_flow, kafka_stream, services, spark_progress, stream_input
+from . import config, flows, hadoop_logs, hdfs_flow, kafka_lag, kafka_stream, services, spark_progress, stream_input
 from .clients import hdfs, kafka
 
 log = logging.getLogger("hub")
@@ -12,6 +12,7 @@ STREAM_POLL_SECONDS = 1.0
 SERVICE_POLL_SECONDS = 5.0
 KAFKA_POLL_SECONDS = 5.0
 KAFKA_READ_POLL_SECONDS = 1.0
+FLOW_BURST_MAX = 5  # đọc bù nhiều tin cùng lúc thì chỉ phát flow.step cho ngần này tin mới nhất (events.md: không quá ~20 tin/giây)
 SPARK_POLL_SECONDS = 3.0
 LOG_POLL_SECONDS = 0.3
 QUEUE_MAX = 200
@@ -92,6 +93,9 @@ class Hub:
             try:
                 for data in await tracker.poll():
                     self.publish("spark.progress", data)
+                    if config.FLOWS_EXTRA:
+                        for step in flows.spark_batch_steps(data["batchId"]):
+                            self.publish("flow.step", step)
             except Exception:
                 log.exception("lỗi khi đọc tiến độ Spark")
             await asyncio.sleep(SPARK_POLL_SECONDS)
@@ -104,7 +108,13 @@ class Hub:
                 if pos is None:
                     pos = await kafka_stream.end_offsets()
                 else:
+                    before = pos
                     readings, pos = await kafka_stream.read_new(pos)
+                    if config.FLOWS_EXTRA:
+                        for p, end in pos.items():
+                            for offset in range(max(before.get(p, end), end - FLOW_BURST_MAX), end):
+                                for step in flows.kafka_produce_steps(p, offset):
+                                    self.publish("flow.step", step)
                     for r in readings:
                         self.publish("reading", r)
             except kafka.KafkaUnreachable:
@@ -118,7 +128,7 @@ class Hub:
         prev: tuple[float, int] | None = None
         while True:
             try:
-                topic = next((t for t in await kafka.snapshot() if t["name"] == config.KAFKA_TOPIC), None)
+                topic = next((t for t in await kafka_lag.snapshot() if t["name"] == config.KAFKA_TOPIC), None)
                 now = time.monotonic()
                 if topic is not None:
                     total = topic["endOffsetTotal"]

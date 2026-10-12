@@ -32,6 +32,19 @@ Cũng làm (HANDOFF P7, P8): chuyển thẻ Spark sang ghi "ước tính" cho t�
 Không bịa số liệu; dữ liệu mô phỏng phải có nhãn. Cuối phiên: npm run build sạch, xem trên trình duyệt với VITE_API_BASE=http://localhost:8000 VITE_STREAM=ws (backend thật trong WSL), ghi docs/HANDOFF.md và mở PR.
 ```
 
+## Antigravity (frontend) — P11-P12: dữ liệu sống qua Kafka (backend đã sẵn sàng và đã chạy thật)
+
+```
+Bạn là agent frontend. Đọc lại AGENTS.md, docs/HANDOFF.md (mục Backend P11 và P12), docs/contract/openapi.yaml và events.md. Chỉ sửa frontend/ và mục "Frontend" của HANDOFF; thiếu trường thì ghi yêu cầu, đừng tự suy ra. Sau khi sửa: npm run generate:types, lint và build sạch, xem trên trình duyệt với backend thật (VITE_API_BASE=http://localhost:8000 VITE_STREAM=ws), rồi mở PR.
+Backend đã đưa Kafka vào luồng thật: Open-Meteo -> Kafka -> backend/Spark -> HDFS. Việc cho giao diện:
+1. FlowsTab phải LỌC flow.step theo flowId: hiện context gom mọi flow.step theo runId rồi gắn vào các bước của hdfs-write, nên khi backend phát luồng khác thì sơ đồ HDFS sáng sai. Lưu (flowId, runId) và chỉ dùng các run của luồng đang chọn. Sau khi xong, ghi vào HANDOFF để lead bật FLOWS_EXTRA=1 ở backend.
+2. Vẽ hai luồng mới (GET /api/flows/kafka-produce và /api/flows/spark-streaming khi status là available; kind mới: kafka-broker, spark, storage): kafka-produce có 2 bước (bước 2 ACK kèm offset là quan sát thật, bước 1 gửi là suy ra), spark-streaming có 4 bước và tất cả đều SUY RA từ việc micro-batch (job Spark) thành công. runId có dạng "kafka-p0-o7" và "spark-batch-12". Ghi chú rõ thật/suy ra như hdfs-write.
+3. Tổng quan: với source = live-open-meteo, hiện tuổi của dữ liệu ("quan sát cách đây N phút") và nhắc rằng nguồn cập nhật tối đa 15 phút một lần (CO mỗi giờ, thời tiết mỗi 15 phút) và là số của mô hình; đừng gọi là "đo trực tiếp từng giây". Tiêu đề thẻ chỉ nên là "thời gian thực" khi vừa có sự kiện reading mới.
+4. SqlTab: thêm bảng `live` (dữ liệu sống Spark ghi từ Kafka, các cột trong mô tả SqlRequest.query của openapi) vào thẻ tham khảo và vài truy vấn mẫu; ghi chú không trộn với bảng aqi (khác nguồn: Open-Meteo đo được 1678-2508 µg/m³ ngày 12-13/10/2026, trung bình Kaggle từ 07/2025 là ~300). Bảng live có thể chưa tồn tại: lỗi SQL_ERROR 400 khi đó là bình thường, hiện thông báo dễ hiểu.
+5. KafkaTab: consumerGroups giờ có thể có mục tên "spark:co_stream" (độ trễ lấy từ checkpoint của Spark, không phải consumer group thật): ghi chú như vậy.
+Không bịa số liệu; dữ liệu mô phỏng hoặc suy ra phải có nhãn.
+```
+
 ## Lead duyệt PR của frontend
 
 ```
