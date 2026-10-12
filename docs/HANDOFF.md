@@ -15,6 +15,14 @@ Mẫu:
 
 ## Backend (Claude)
 
+### 2026-10-13 06:20 — P13: rà soát `feat/frontend-p11-p12` (commit `c2b6384`), gộp PR #11 (`494d711`)
+- Diff: chỉ `frontend/` và mục Frontend của HANDOFF; `npm run lint` và `npm run build` sạch; không có khóa API.
+- Chạy thật: backend `STREAM_SOURCE=kafka FLOWS_EXTRA=1` + frontend ở cổng 5174 (`VITE_STREAM=ws`). Lúc 06:01 ngày 13/10/2026 producer gửi offset 28 (quan sát CO 06:00, CO=1292 µg/m³): `kafka-produce` sáng cả 2 bước (bước 2 là quan sát thật), `spark-batch-26` sáng 4 bước của `spark-streaming` (suy ra). Chọn từng luồng thì run ID chỉ của luồng đó. Tổng quan hiện "cách đây N phút" và ghi chú nguồn mô hình; KafkaTab ghi chú `spark:co_stream`; console không lỗi.
+- Phát hiện (không phải lỗi): khi Spark ghi vào `/live`, NameNode log sinh `hdfs.op` và vài run `hdfs-write` thật (bước 1, 2, 3, 7), nên sơ đồ HDFS có run mới dù không chạy `replay_producer.py`. Ghi trong `infra/README.md`.
+- Chưa kiểm: chạy truy vấn bảng `live` từ SqlTab trên giao diện (WSL còn ~230 MB RAM trống, phiên SQL cần ~1 GB). Các nhãn tuổi dữ liệu tính từ `reading.datetime` (giờ quan sát thời tiết), còn CO của Open-Meteo có thể cũ hơn tới 1 giờ (`coObservedAt`; hợp đồng chưa đưa trường này vào `reading`).
+- Điểm nhẹ cho frontend (không chặn, đã ghi ở TASKS "Còn lại"): câu "đo quan sát thực tế" mâu thuẫn với "mô hình" trong SqlTab; số 1678-2508 và 35 064 viết cứng; giải thích lỗi `live` hiện khi truy vấn aqi có chữ "live"; `hasStreamReading` không reset khi kết nối lại.
+- Cấu hình: `FLOWS_EXTRA=1` vẫn là tùy chọn (mặc định tắt vì chỉ có nghĩa với `STREAM_SOURCE=kafka`). Backend đang chạy trên máy với cờ này bật.
+
 ### 2026-10-13 00:30 — P12: các việc còn lại sau P11 (Kafka không còn trong `/tmp`, độ trễ Spark, SQL trên dữ liệu sống, luồng Kafka/Spark)
 - **Kafka không còn mất dữ liệu khi WSL khởi động lại:** `log.dirs` đã chuyển từ `/tmp/kraft-combined-logs` sang `/home/trong/kafka-data/kraft-combined-logs` bằng cách dừng Kafka sạch, sao chép nguyên thư mục (`cp -a`, giữ cluster id `HO56Z0x…`, topic, 4 tin lúc đó), sửa `config/server.properties` (bản sao lưu `server.properties.bak-20261012`) rồi khởi động lại. Đã kiểm: topic còn, end offset 4, producer/Spark/backend tự hồi phục. Thư mục cũ trong `/tmp` để nguyên (vô hại). Kafka vẫn phải được khởi động bằng tay sau khi WSL khởi động lại.
 - **`lagTotal` thật cho Spark:** `app/kafka_lag.py` đọc checkpoint `/live/_checkpoints/co_stream` trên HDFS (chỉ đọc; `commits/N` mới nhất + dòng cuối `offsets/N`) rồi trừ cho end offset của Kafka; hiện ở `/api/kafka/topics` thành mục `consumerGroups` tên `spark:co_stream` và trong `kafka.stats.lagTotal`. Trên máy thật: lag = 1 ngay sau khi producer gửi tin offset 4 (00:00:43), về 0 sau khi Spark commit. Lưu ý: đây KHÔNG phải consumer group thật của Kafka.

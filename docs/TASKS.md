@@ -19,31 +19,36 @@ Trạng thái: [ ] chưa, [~] đang làm, [x] xong. Người làm: C = Claude, A
 
 ## P1 — Có thể chạy từ đầu đến cuối với dữ liệu mẫu
 - [x] C: FastAPI chạy, `/api/services` kiểm tra thật các cổng, `/ws/stream` (live: bản ghi mới trong `/stream_input` + đổi trạng thái dịch vụ; `STREAM_MODE=replay` phát lại `stream-events.ndjson`, giả lập). Xem `backend/README.md`.
-- [ ] A: Vite + React + TS, kiểu sinh từ openapi, khung điều hướng, trang Tổng quan đọc mock.
+- [x] A: Vite + React + TS, kiểu sinh từ openapi, khung điều hướng, trang Tổng quan đọc mock (đã gộp, đã chạy với backend thật).
 - Xong khi: mở `localhost:5173` thấy trạng thái dịch vụ từ backend thật và một tin `reading` chạy trên màn hình.
 
 ## P2 — Dữ liệu thật của HDFS, Kafka, Spark
 - [x] C: `/api/hdfs/*` (JMX + WebHDFS), `/api/spark/applications` — đã so với `hdfs fsck`/`dfsadmin` trên cụm thật.
 - [x] C: `/api/kafka/topics` + `kafka.stats` đã thử với broker thật (2026-10-12 18:00, sau khi người dùng đồng ý `kafka-storage format --standalone`): liệt kê topic, partition, replication đúng; **chưa thử với tin nhắn và consumer group thật** (chưa có producer ghi vào Kafka).
 - [x] C: `spark.progress` trên `/ws/stream` (2026-10-12, P8): suy ra từ Spark REST vì REST không lộ tiến độ micro-batch; đã chạy với Spark Streaming thật (batch 280-296 khớp từng `reading`). Số liệu là suy ra, ghi rõ trong `events.md`.
-- [ ] A: trang HDFS (DataNode, cây thư mục, block của file), trang Kafka, trang Spark.
+- [x] A: trang HDFS (DataNode, cây thư mục, block của file), trang Kafka, trang Spark (đã gộp; KafkaTab có thêm mục `spark:co_stream` ở PR #11).
 - Xong khi: các số trên trang khớp NameNode UI `:9870`.
 
 ## P3 — Dữ liệu CO
 - [x] C: `/api/aqi/series`, `/hourly-profile`, `/latest` (bộ Kaggle theo D4 tạm, đã +7 giờ; xác nhận UTC bằng tương quan với bản thô OpenWeather). Mock hai route đầu được sinh lại từ backend.
-- [ ] A: biểu đồ theo tháng/ngày/giờ, nhịp theo giờ, đánh dấu điểm gãy 01/07/2025, nhãn "mô phỏng" cho trạm.
+- [x] A: biểu đồ theo tháng/ngày/giờ, nhịp theo giờ, đánh dấu điểm gãy 01/07/2025, nhãn "mô phỏng" cho trạm (đã gộp, sửa theo rà soát P6).
 
 ## P4 — Sơ đồ luồng sống
 - [x] C: `/api/flows` (hdfs-write có định nghĩa; các luồng khác `planned`), `hdfs.op` và `flow.step` của hdfs-write từ log NameNode thật. Luồng Kafka để `planned` vì D1 (tạm) giữ file-stream. **Chưa thấy chạy với một lệnh `hdfs dfs -put` thật** (tôi không được ghi lên HDFS): chỉ chạy lại dòng log thật cũ qua bộ theo dõi nối NameNode thật. Người dùng chạy thử: `python3 backend/tools/watch_stream.py` rồi `hdfs dfs -put` ở cửa sổ khác.
-- [ ] A: màn hình sơ đồ luồng: vẽ thành phần, chạy các bước theo sự kiện, phân biệt kênh data/control/background.
+- [x] A: màn hình sơ đồ luồng: vẽ thành phần, chạy các bước theo sự kiện, phân biệt kênh data/control/background. PR #11 lọc `flow.step` theo `flowId` và vẽ thêm `kafka-produce`, `spark-streaming`; đã xem thật 13/10/2026 06:01 (HANDOFF P13).
 - Xong khi: chạy `hdfs dfs -put` trong WSL và thấy các bước sáng lên đúng thứ tự.
 
 ## P5 — Cửa sổ lệnh, SQL, dự đoán, hoàn thiện
 - [x] C: `/ws/terminal` (pty bash, bảo mật theo events.md, **tắt mặc định**, bật bằng `BACKEND_ALLOW_WRITES=1`), `/api/sql` (SparkSQL thật, chỉ SELECT, bảng `aqi` từ HDFS), `/api/predict` (heuristic, KHÔNG phải ML: thử nghiệm cho thấy giờ/tháng/nhiệt độ/gió gần như không dự đoán được CO).
-- [ ] A: xterm.js, ô nhập SQL, biểu mẫu dự đoán.
+- [x] A: xterm.js, ô nhập SQL (có bảng `live`), biểu mẫu dự đoán (đã gộp). Truy vấn `live` từ SqlTab chưa chạy trên giao diện (thiếu RAM), API đã kiểm ở P12.
 - [ ] Cả hai: kịch bản demo, ảnh chụp cho báo cáo, kiểm tra cuối.
 
 ## P6 — Rà soát và tích hợp (C, người dùng đặt ra sau P5)
 - [x] C: đọc diff PR #1 của frontend, chạy validator và build frontend, rebase `feat-backend` lên `origin/main`. Kết quả và yêu cầu sửa ở HANDOFF mục P6.
-- [ ] A: sửa các điểm ở HANDOFF mục P6 (hộp cảnh báo điểm gãy, ghi chú trạm, trạng thái rỗng của Spark), chuyển sang backend thật và xem trên trình duyệt.
-- [ ] C: mở PR của `feat-backend` vào `main` (chờ người dùng đồng ý), đọc lại frontend P4-P5 khi có.
+- [x] A: sửa các điểm ở HANDOFF mục P6 (hộp cảnh báo điểm gãy, ghi chú trạm, trạng thái rỗng của Spark), chuyển sang backend thật và xem trên trình duyệt.
+- [x] C: PR của backend đã gộp vào `main`; đã đọc lại frontend P4-P5, P9, P11-P12 (HANDOFF P9, P10, P13).
+
+## Còn lại
+- [ ] Cả hai: kịch bản demo, ảnh chụp cho báo cáo, kiểm tra cuối (console, thu nhỏ/điện thoại).
+- [ ] A (nhẹ, từ rà soát P13): bỏ số viết cứng 1678-2508 và 35 064 trong SqlTab, sửa câu "đo quan sát thực tế" (nguồn là mô hình), chỉ giải thích lỗi `live` khi truy vấn thật sự dùng bảng `live`, reset `hasStreamReading` khi kết nối lại.
+- [ ] Người dùng: chốt D2, D3 (mọi giá trị Open-Meteo hiện bị gắn DANGER theo ngưỡng tạm), D4; Airflow (không đủ RAM, xem `infra/README.md`).
