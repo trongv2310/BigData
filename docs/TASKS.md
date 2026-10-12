@@ -27,7 +27,7 @@ Trạng thái: [ ] chưa, [~] đang làm, [x] xong. Người làm: C = Claude, A
 - Xong khi: các số trên trang khớp NameNode UI `:9870`.
 
 ## P3 — Dữ liệu CO
-- [ ] C: `/api/aqi/series`, `/hourly-profile`, `/latest` (sau khi chốt D4; nhớ +7 giờ).
+- [x] C: `/api/aqi/series`, `/hourly-profile`, `/latest` (bộ Kaggle theo D4 tạm, đã +7 giờ; xác nhận UTC bằng tương quan với bản thô OpenWeather). Mock hai route đầu được sinh lại từ backend.
 - [ ] A: biểu đồ theo tháng/ngày/giờ, nhịp theo giờ, đánh dấu điểm gãy 01/07/2025, nhãn "mô phỏng" cho trạm.
 
 ## P4 — Sơ đồ luồng sống
