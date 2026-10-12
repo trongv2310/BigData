@@ -36,6 +36,6 @@ Trạng thái: [ ] chưa, [~] đang làm, [x] xong. Người làm: C = Claude, A
 - Xong khi: chạy `hdfs dfs -put` trong WSL và thấy các bước sáng lên đúng thứ tự.
 
 ## P5 — Cửa sổ lệnh, SQL, dự đoán, hoàn thiện
-- [ ] C: `/ws/terminal` (pty, bảo mật theo events.md), `/api/sql` (chỉ SELECT), `/api/predict` (ghi rõ heuristic hay ML).
+- [x] C: `/ws/terminal` (pty bash, bảo mật theo events.md, **tắt mặc định**, bật bằng `BACKEND_ALLOW_WRITES=1`), `/api/sql` (SparkSQL thật, chỉ SELECT, bảng `aqi` từ HDFS), `/api/predict` (heuristic, KHÔNG phải ML: thử nghiệm cho thấy giờ/tháng/nhiệt độ/gió gần như không dự đoán được CO).
 - [ ] A: xterm.js, ô nhập SQL, biểu mẫu dự đoán.
 - [ ] Cả hai: kịch bản demo, ảnh chụp cho báo cáo, kiểm tra cuối.

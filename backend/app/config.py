@@ -36,6 +36,14 @@ STREAM_MODE = _env("STREAM_MODE", "live")
 STREAM_REPLAY_FILE = Path(_env("STREAM_REPLAY_FILE", str(REPO_ROOT / "mock" / "stream-events.ndjson")))
 STREAM_MAX_EVENTS_PER_SECOND = 20  # events.md
 
+# /api/sql: SparkSQL đọc bộ dữ liệu từ HDFS
+SQL_DATASET_URI = _env("SQL_DATASET_URI", f"hdfs://localhost:9000{HDFS_DATASET_PATH}")
+SQL_TIMEOUT_SECONDS = int(_env("SQL_TIMEOUT_SECONDS", "60"))
+
+# Cửa sổ lệnh /ws/terminal (events.md mục 2): chạy lệnh thật, nên tắt cho đến khi BACKEND_ALLOW_WRITES=1
+TERMINAL_ORIGINS = _env("ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(",")
+TERMINAL_IDLE_SECONDS = int(_env("TERMINAL_IDLE_SECONDS", "1800"))
+
 # Log của NameNode (backend chỉ đọc) để phát hdfs.op / flow.step
 HADOOP_LOG_DIR = _env("HADOOP_LOG_DIR", "/home/trong/hadoop/logs")
 

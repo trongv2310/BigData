@@ -1,29 +1,43 @@
 {
   "columns": [
     {
-      "name": "month",
-      "type": "string"
+      "name": "year_vn",
+      "type": "int"
+    },
+    {
+      "name": "month_vn",
+      "type": "int"
     },
     {
       "name": "avg_co",
       "type": "double"
+    },
+    {
+      "name": "n",
+      "type": "bigint"
     }
   ],
   "rows": [
     [
-      "2025-05",
-      1322.6
+      2025,
+      5,
+      673.19,
+      744
     ],
     [
-      "2025-06",
-      657.3
+      2025,
+      6,
+      653.68,
+      720
     ],
     [
-      "2025-07",
-      399.4
+      2025,
+      7,
+      265.69,
+      744
     ]
   ],
   "rowCount": 3,
   "truncated": false,
-  "elapsedMs": 412
+  "elapsedMs": 122
 }

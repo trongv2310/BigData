@@ -8,6 +8,7 @@ FastAPI + uvicorn, chạy **trong WSL Ubuntu** (cùng Hadoop/Kafka/Spark để g
 # trong WSL; HDFS phải đang chạy (bash ~/start-4nodes.sh)
 cd /mnt/c/Users/Trong/orca/workspaces/co-hcmc-dashboard/feat-backend/backend    # hoặc đường dẫn repo của bạn
 python3 -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+# bật cửa sổ lệnh (chạy lệnh thật!): BACKEND_ALLOW_WRITES=1 python3 -m uvicorn ... rồi chép token in ra console
 # giả lập luồng khi chưa có producer (để dev giao diện): STREAM_MODE=replay python3 -m uvicorn ...
 ```
 
@@ -35,5 +36,8 @@ python3 backend/tools/check_live.py http://127.0.0.1:8000       # backend đang 
 | `/api/kafka/topics` | kafka-python (admin + offset), chỉ đọc |
 | `/api/spark/applications` | Spark REST `:4040/api/v1` |
 | `/api/aqi/*` | bộ Kaggle (D4), cộng 7 giờ vì cột `datetime` gốc là UTC |
+| `/api/predict` | heuristic từ bộ Kaggle (`app/predict.py`), không phải ML |
+| `/api/sql` | SparkSQL `local[2]` trong tiến trình backend, view `aqi` từ HDFS `/raw/Dataset.csv` |
+| `/ws/terminal` | pty bash; TẮT mặc định, bật bằng `BACKEND_ALLOW_WRITES=1`; token in ra console lúc khởi động |
 | `/api/flows` | định nghĩa trong `app/flows.py` (trùng mock) |
 | `/ws/stream` | `live`: file mới trong `/stream_input`, đổi trạng thái dịch vụ, `kafka.stats`, `hdfs.op` + `flow.step` từ log NameNode; `replay`: phát lại `mock/stream-events.ndjson` (giả lập) |

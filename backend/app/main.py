@@ -4,14 +4,19 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from . import config, errors
+from . import config, errors, sql_engine
 from .clients import hdfs
-from .routes import aqi, core, flows, hdfs as hdfs_routes, infra, stream
+from .routes import aqi, core, flows, hdfs as hdfs_routes, infra, predict, sql, stream, terminal
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    if config.ALLOW_WRITES:
+        print(f"[backend] Token cửa sổ lệnh (dán vào giao diện một lần): {terminal.TOKEN}", flush=True)
+    else:
+        print("[backend] Cửa sổ lệnh /ws/terminal đang TẮT (đặt BACKEND_ALLOW_WRITES=1 để bật).", flush=True)
     yield
+    sql_engine.stop()
     await hdfs.aclose()
 
 
@@ -24,6 +29,9 @@ def create_app() -> FastAPI:
     app.include_router(infra.router)
     app.include_router(aqi.router)
     app.include_router(flows.router)
+    app.include_router(predict.router)
+    app.include_router(sql.router)
+    app.include_router(terminal.router)
     app.include_router(stream.router)
     return app
 
