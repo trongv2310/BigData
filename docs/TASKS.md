@@ -22,7 +22,7 @@ Trạng thái: [ ] chưa, [~] đang làm, [x] xong. Người làm: C = Claude, A
 
 ## P2 — Dữ liệu thật của HDFS, Kafka, Spark
 - [x] C: `/api/hdfs/*` (JMX + WebHDFS), `/api/spark/applications` — đã so với `hdfs fsck`/`dfsadmin` trên cụm thật.
-- [~] C: `/api/kafka/topics` + `kafka.stats` đã viết và test giả lập, **chưa thử với broker thật** (Kafka không khởi động được: mất `/tmp/kraft-combined-logs`, cần `kafka-storage format`, chờ người dùng đồng ý).
+- [x] C: `/api/kafka/topics` + `kafka.stats` đã thử với broker thật (2026-10-12 18:00, sau khi người dùng đồng ý `kafka-storage format --standalone`): liệt kê topic, partition, replication đúng; **chưa thử với tin nhắn và consumer group thật** (chưa có producer ghi vào Kafka).
 - [ ] A: trang HDFS (DataNode, cây thư mục, block của file), trang Kafka, trang Spark.
 - Xong khi: các số trên trang khớp NameNode UI `:9870`.
 
