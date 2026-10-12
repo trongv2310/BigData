@@ -64,19 +64,19 @@ export const PredictTab: React.FC = () => {
       case 'SAFE':
         return (
           <span className="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-            SAFE (An toàn &lt; 500)
+            SAFE (An toàn)
           </span>
         );
       case 'WARNING':
         return (
           <span className="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-500/20 text-amber-400 border border-amber-500/30">
-            WARNING (Cảnh báo 500–1000)
+            WARNING (Cảnh báo)
           </span>
         );
       case 'DANGER':
         return (
           <span className="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-rose-500/20 text-rose-400 border border-rose-500/30">
-            DANGER (Nguy hiểm &gt; 1000)
+            DANGER (Nguy hiểm)
           </span>
         );
     }
