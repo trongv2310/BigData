@@ -4,9 +4,11 @@ Trạng thái: [ ] chưa, [~] đang làm, [x] xong. Người làm: C = Claude, A
 
 ## Quyết định đang chờ người dùng
 
-Đang áp dụng TẠM (người dùng chưa chốt, 2026-10-12): D1 = (a) giữ file-stream qua HDFS `/stream_input`, Kafka chỉ hiển thị trạng thái; D2 = giữ nhãn trạm luân phiên nhưng luôn `isSimulatedStation=true`, không trộn Open-Meteo và OpenWeather vào một chuỗi; D3 = giữ 500/1000; D4 = bộ Kaggle cho `/api/aqi/*`.
+**D1 đã chốt = (b) (người dùng yêu cầu 2026-10-12): luồng thật đi qua Kafka với dữ liệu sống Open-Meteo** (xem HANDOFF P11, `infra/README.md`); luồng file-stream `/stream_input` và producer cũ vẫn chạy được với `STREAM_SOURCE=hdfs`.
 
-- **D1. Luồng thật là gì?** Hiện hai producer ghi file JSON thẳng vào HDFS `/stream_input`, còn Kafka chỉ mới được kiểm thử. Muốn trình diễn "Producer → Kafka → Spark" thì phải đổi producer hoặc thêm cầu nối. Chọn: (a) giữ file-stream, Kafka chỉ minh họa; (b) sửa thành Kafka thật.
+Đang áp dụng TẠM (người dùng chưa chốt, 2026-10-12): D2 = giữ nhãn trạm luân phiên nhưng luôn `isSimulatedStation=true`, không trộn Open-Meteo và OpenWeather vào một chuỗi; D3 = giữ 500/1000; D4 = bộ Kaggle cho `/api/aqi/*`.
+
+- ~~**D1. Luồng thật là gì?**~~ Đã chốt (b): Producer → Kafka → Spark/backend, xem trên.
 - **D2. Trạm giả và nguồn trộn.** Giữ nhãn trạm luân phiên (gắn nhãn "mô phỏng") hay bỏ; và có tách luồng Open-Meteo khỏi dữ liệu OpenWeather không.
 - **D3. Ngưỡng CO.** 500 và 1000 µg/m³ chưa có căn cứ. Cần tra băng mức của OpenWeather/AQI chuẩn rồi chọn.
 - **D4. Dữ liệu nền cho dashboard.** Bản Kaggle hay bản tự cào `owm_air_pollution_raw.csv` (CO tương quan 0,71 với Kaggle; Kaggle thấp hơn khoảng 13 %).

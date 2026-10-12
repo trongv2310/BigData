@@ -1,0 +1,2 @@
+# Script chạy trong WSL phải luôn dùng LF: CRLF làm bash lỗi và còn sinh tên file có ký tự \r (ví dụ /raw/Dataset.csv\r).
+*.sh text eol=lf

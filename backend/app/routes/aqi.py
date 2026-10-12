@@ -3,8 +3,9 @@ from typing import Literal
 
 from fastapi import APIRouter, Query
 
-from .. import aqi_data, stream_input, timeutil
+from .. import aqi_data, config, kafka_stream, stream_input, timeutil
 from ..clients import hdfs
+from ..clients.kafka import KafkaUnreachable
 from ..errors import ApiError
 
 router = APIRouter()
@@ -28,11 +29,18 @@ def _time(name: str, value: str | None):
 
 @router.get("/api/aqi/latest")
 async def aqi_latest():
-    """Bản ghi mới nhất của luồng /stream_input; luồng trống hoặc HDFS tắt thì lấy dòng cuối bộ dữ liệu (source=replay-dataset, datetime cũ)."""
-    try:
-        r = await stream_input.latest_reading()
-    except (hdfs.HdfsUnreachable, hdfs.HdfsError):
-        r = None
+    """Bản ghi mới nhất của luồng (theo STREAM_SOURCE: tin Kafka và/hoặc file /stream_input); luồng trống hoặc nguồn tắt thì lấy dòng cuối bộ dữ liệu (source=replay-dataset, datetime cũ)."""
+    r = None
+    if config.STREAM_SOURCE in ("kafka", "both"):
+        try:
+            r = await kafka_stream.latest_reading()
+        except KafkaUnreachable:
+            r = None
+    if r is None and config.STREAM_SOURCE in ("hdfs", "both"):
+        try:
+            r = await stream_input.latest_reading()
+        except (hdfs.HdfsUnreachable, hdfs.HdfsError):
+            r = None
     return r or aqi_data.last_reading(await _dataset())
 
 

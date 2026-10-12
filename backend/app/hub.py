@@ -3,7 +3,7 @@ import asyncio
 import logging
 import time
 
-from . import config, hadoop_logs, hdfs_flow, services, spark_progress, stream_input
+from . import config, hadoop_logs, hdfs_flow, kafka_stream, services, spark_progress, stream_input
 from .clients import hdfs, kafka
 
 log = logging.getLogger("hub")
@@ -11,6 +11,7 @@ log = logging.getLogger("hub")
 STREAM_POLL_SECONDS = 1.0
 SERVICE_POLL_SECONDS = 5.0
 KAFKA_POLL_SECONDS = 5.0
+KAFKA_READ_POLL_SECONDS = 1.0
 SPARK_POLL_SECONDS = 3.0
 LOG_POLL_SECONDS = 0.3
 QUEUE_MAX = 200
@@ -26,9 +27,12 @@ class Hub:
         q: asyncio.Queue = asyncio.Queue(QUEUE_MAX)
         self._subs.add(q)
         if not self._tasks:
-            self._tasks = [asyncio.create_task(self._poll_stream_input()), asyncio.create_task(self._poll_services()),
-                           asyncio.create_task(self._poll_kafka()), asyncio.create_task(self._poll_hdfs_logs()),
-                           asyncio.create_task(self._poll_spark())]
+            self._tasks = [asyncio.create_task(self._poll_services()), asyncio.create_task(self._poll_kafka()),
+                           asyncio.create_task(self._poll_hdfs_logs()), asyncio.create_task(self._poll_spark())]
+            if config.STREAM_SOURCE in ("hdfs", "both"):
+                self._tasks.append(asyncio.create_task(self._poll_stream_input()))
+            if config.STREAM_SOURCE in ("kafka", "both"):
+                self._tasks.append(asyncio.create_task(self._poll_kafka_readings()))
         return q
 
     def unsubscribe(self, q: asyncio.Queue) -> None:
@@ -44,20 +48,23 @@ class Hub:
                 q.get_nowait()  # chậm quá thì bỏ tin cũ nhất, không để hàng đợi phình
             q.put_nowait((type_, data))
 
+    async def _refresh_services(self) -> None:
+        """Đo lại mọi dịch vụ, lưu lại và báo service.state cho dịch vụ đổi trạng thái."""
+        for s in await services.check_all():
+            old = self.service_states.get(s["name"])
+            self.service_states[s["name"]] = s
+            if old is not None and old["state"] != s["state"]:
+                self.publish("service.state", s)
+
     async def snapshot_services(self) -> list[dict]:
-        if not self.service_states:
-            for s in await services.check_all():
-                self.service_states[s["name"]] = s
+        # Luôn đo lại: khi không ai nghe thì các vòng thăm dò dừng, bản lưu cũ có thể sai (ví dụ ứng dụng Spark đã đổi) lúc client mới nối.
+        await self._refresh_services()
         return list(self.service_states.values())
 
     async def _poll_services(self):
         while True:
             try:
-                for s in await services.check_all():
-                    old = self.service_states.get(s["name"])
-                    self.service_states[s["name"]] = s
-                    if old is not None and old["state"] != s["state"]:
-                        self.publish("service.state", s)
+                await self._refresh_services()
             except Exception:
                 log.exception("lỗi khi kiểm tra dịch vụ")
             await asyncio.sleep(SERVICE_POLL_SECONDS)
@@ -88,6 +95,23 @@ class Hub:
             except Exception:
                 log.exception("lỗi khi đọc tiến độ Spark")
             await asyncio.sleep(SPARK_POLL_SECONDS)
+
+    async def _poll_kafka_readings(self):
+        """Báo `reading` cho mỗi tin mới trong topic Kafka (tin đã có lúc bắt đầu nghe thì bỏ qua). Chỉ đọc, không commit offset."""
+        pos: dict[int, int] | None = None
+        while True:
+            try:
+                if pos is None:
+                    pos = await kafka_stream.end_offsets()
+                else:
+                    readings, pos = await kafka_stream.read_new(pos)
+                    for r in readings:
+                        self.publish("reading", r)
+            except kafka.KafkaUnreachable:
+                pos = None  # Kafka tắt rồi bật lại: đặt mốc mới, không phát lại cả đống tin cũ
+            except Exception:
+                log.exception("lỗi khi đọc luồng reading từ Kafka")
+            await asyncio.sleep(KAFKA_READ_POLL_SECONDS)
 
     async def _poll_kafka(self):
         """kafka.stats mỗi KAFKA_POLL_SECONDS: tốc độ tin/giây (từ độ tăng offset giữa hai lần hỏi) và tổng lag. Lần hỏi đầu chỉ lấy mốc."""

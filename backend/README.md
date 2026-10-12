@@ -10,6 +10,7 @@ cd /mnt/c/Users/Trong/orca/workspaces/co-hcmc-dashboard/feat-backend/backend    
 python3 -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 # bật cửa sổ lệnh (chạy lệnh thật!): BACKEND_ALLOW_WRITES=1 python3 -m uvicorn ... rồi chép token in ra console
 # giả lập luồng khi chưa có producer (để dev giao diện): STREAM_MODE=replay python3 -m uvicorn ...
+# dữ liệu SỐNG qua Kafka (producer: infra/live_producer.py): STREAM_SOURCE=kafka python3 -m uvicorn ...   (mặc định hdfs)
 ```
 
 Biến môi trường: xem `config.py` và `.env.example` (uvicorn đọc bằng `--env-file ../.env`).
@@ -35,7 +36,7 @@ python3 backend/tools/check_live.py http://127.0.0.1:8000       # backend đang 
 | `/api/hdfs/*` | NameNode JMX (`/jmx`) và WebHDFS (`/webhdfs/v1`) |
 | `/api/kafka/topics` | kafka-python (admin + offset), chỉ đọc |
 | `/api/spark/applications` | Spark REST `:4040/api/v1` |
-| `/api/aqi/*` | bộ Kaggle (D4), cộng 7 giờ vì cột `datetime` gốc là UTC |
+| `/api/aqi/*` | bộ Kaggle (D4), cộng 7 giờ vì cột `datetime` gốc là UTC; riêng `/api/aqi/latest` lấy tin mới nhất của luồng theo `STREAM_SOURCE` (Kafka và/hoặc `/stream_input`), không có thì dòng cuối bộ Kaggle (`source: replay-dataset`) |
 | `/api/predict` | heuristic từ bộ Kaggle (`app/predict.py`), không phải ML |
 | `/api/sql` | SparkSQL `local[2]` trong tiến trình backend, view `aqi` từ HDFS `/raw/Dataset.csv` |
 | `/ws/terminal` | pty bash; TẮT mặc định, bật bằng `BACKEND_ALLOW_WRITES=1`; token in ra console lúc khởi động |

@@ -30,6 +30,12 @@ AQI_CSV_PATH = _env("AQI_CSV_PATH", "/mnt/f/HK1_Nam04/BigData/Data/hcmc_aqi_data
 # Thời gian chờ khi kiểm tra từng dịch vụ (giây)
 PROBE_TIMEOUT = float(_env("PROBE_TIMEOUT", "1.5"))
 
+# Nguồn của luồng `reading` và /api/aqi/latest (quyết định D1): "hdfs" = file JSON trong HDFS /stream_input (mặc định, như trước);
+# "kafka" = tin trong topic KAFKA_TOPIC (producer thật: infra/live_producer.py); "both" = cả hai.
+STREAM_SOURCE = _env("STREAM_SOURCE", "hdfs").strip().lower()
+if STREAM_SOURCE not in ("hdfs", "kafka", "both"):
+    raise SystemExit(f"STREAM_SOURCE phải là hdfs, kafka hoặc both (nhận: {STREAM_SOURCE!r})")
+
 # /ws/stream: "live" = chỉ phát cái thật (bản ghi mới trong /stream_input, đổi trạng thái dịch vụ, kafka);
 #             "replay" = phát lại mock/stream-events.ndjson (GIẢ LẬP, chỉ để dev giao diện).
 STREAM_MODE = _env("STREAM_MODE", "live")
