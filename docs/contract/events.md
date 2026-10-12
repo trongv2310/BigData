@@ -54,4 +54,7 @@ Frontend dùng xterm.js, gửi `resize` khi khung đổi kích thước, và ch�
 3. Khi khởi động backend tạo một token ngẫu nhiên, in ra console. Frontend gửi `?token=...` khi nối; sai thì đóng với mã 4401. Người dùng dán token vào giao diện một lần.
 4. Không ghi lệnh người dùng gõ vào log công khai và không đưa vào repo.
 5. Giới hạn: một phiên tại một thời điểm, tự đóng sau 30 phút không hoạt động.
-6. Không có endpoint REST chạy lệnh tùy ý. `POST /api/sql` chỉ nhận một câu SELECT.
+6. Không có endpoint REST chạy lệnh tùy ý.
+7. Vì shell ghi được lên HDFS/Kafka/Spark, cửa sổ lệnh **tắt mặc định**; chỉ bật khi chạy backend với `BACKEND_ALLOW_WRITES=1`.
+
+Mã đóng kết nối: sai Origin hoặc client không phải loopback bị từ chối ngay lúc bắt tay (HTTP 403, trình duyệt thấy mã 1006); sau khi nối được thì `4401` sai hoặc thiếu token, `4403` cửa sổ lệnh đang tắt, `4409` đã có phiên khác đang mở, `4408` hết hạn vì không hoạt động. Lý do bằng chữ nằm trong `reason`. Lúc backend khởi động token được in ra console (`[backend] Token cửa sổ lệnh ...`). `POST /api/sql` chỉ nhận một câu SELECT.

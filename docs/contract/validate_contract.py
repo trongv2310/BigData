@@ -14,6 +14,9 @@ Thoát mã 1 nếu có lỗi.
 import json, sys
 from pathlib import Path
 
+if hasattr(sys.stdout, "reconfigure"):  # Windows mặc định cp1252, không in được tiếng Việt
+    sys.stdout.reconfigure(encoding="utf-8")
+
 import yaml
 try:
     from jsonschema import Draft202012Validator

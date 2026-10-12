@@ -16,9 +16,9 @@
     },
     {
       "id": "datanode-1",
-      "label": "DataNode 1",
+      "label": "DataNode",
       "kind": "datanode",
-      "note": "Giữ block thật"
+      "note": "Giữ block thật. Đây là DataNode đầu pipeline; tên thật có trong hdfs.op.datanode"
     },
     {
       "id": "secondary",
@@ -56,7 +56,7 @@
       "order": 4,
       "from": "client",
       "to": "datanode-1",
-      "label": "Gửi dữ liệu theo packet 64 KB (cổng 9866)",
+      "label": "Gửi dữ liệu theo packet 64 KB (cổng truyền dữ liệu của DataNode, ví dụ 9866)",
       "channel": "data",
       "repeats": "mỗi block"
     },
