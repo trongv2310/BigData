@@ -31,13 +31,8 @@ export const StreamProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     });
 
     const unsubEvents = source.subscribe((event) => {
-      // Deduplicate theo seq để tránh sự kiện bị nhân đôi khi re-mount hoặc StrictMode
-      setEvents((prev) => {
-        if (prev.some((e) => e.seq === event.seq)) {
-          return prev;
-        }
-        return [event, ...prev.slice(0, 49)];
-      });
+      // Luu su kien moi vao nhat ky (giu toi da 50 su kien gan nhat)
+      setEvents((prev) => [event, ...prev.slice(0, 49)]);
 
       if (event.type === 'reading') {
         setLatestReading(event.data);
@@ -59,10 +54,21 @@ export const StreamProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           if (currentList.some((s) => s.step === event.data.step)) {
             return prev;
           }
-          return {
+          const updated = {
             ...prev,
             [runId]: [...currentList, event.data].sort((a, b) => a.step - b.step),
           };
+          // Giới hạn giữ tối đa 20 run gần nhất để tránh phình bộ nhớ
+          const keys = Object.keys(updated);
+          if (keys.length > 20) {
+            const trimmed: Record<string, FlowStepEvent['data'][]> = {};
+            const recentKeys = keys.slice(keys.length - 20);
+            for (const k of recentKeys) {
+              trimmed[k] = updated[k];
+            }
+            return trimmed;
+          }
+          return updated;
         });
         setLatestFlowRunId(event.data.runId);
       }

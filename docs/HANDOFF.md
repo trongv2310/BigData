@@ -134,6 +134,23 @@ Mẫu:
 
 ## Frontend (Antigravity)
 
+### 2026-10-12 22:50 — Sửa 4 điểm theo rà soát P9 của Claude
+- Xong:
+  + 1. `TerminalTab`: Nút "Kết nối Terminal" giờ đây truyền trực tiếp `tokenInput` (`connect(tokenInput)`) thay vì chỉ dựa vào state `token` bất đồng bộ, sửa lỗi phải bấm hai lần mới kết nối được token mới.
+  + 2. `StreamContext`: Bỏ cơ chế khử trùng sự kiện theo `seq` trong `setEvents` (nguyên nhân gây đứng yên nhật ký ở chế độ `replay` sau vòng phát lặp đầu tiên 11 tin); việc chống lặp tin đã được đảm bảo sạch sẽ bằng việc dọn dẹp socket `source.stop()` trong unmount cleanup.
+  + 3. `PredictTab`: Bỏ hoàn toàn các chuỗi ngưỡng số tự tính như `< 500`, `500–1000`, `> 1000` khỏi nhãn `getStatusBadge`, tuân thủ nghiêm ngặt AGENTS.md mục 5 (chỉ hiển thị nhãn `SAFE (An toàn)`, `WARNING (Cảnh báo)`, `DANGER (Nguy hiểm)` do backend trả về).
+  + 4. Ba điểm nhẹ:
+    - `TerminalTab`: Đổi vị trí lưu token sang `sessionStorage` (tự động giải phóng khi đóng phiên tab, tránh lưu thừa lâu dài trong `localStorage`).
+    - `TerminalTab.disconnect()`: Gỡ sạch toàn bộ event handlers (`onopen`, `onmessage`, `onerror`, `onclose` = null) trước khi gọi `close()` để tránh handler của socket cũ bắn sự kiện ngắt kết nối đè lên phiên kết nối mới.
+    - `StreamContext`: Bổ sung cơ chế giới hạn kích thước cho `flowStepsByRunId` (chỉ giữ tối đa 20 run gần nhất), tránh tích lũy bộ nhớ vô hạn khi producer phát liên tục hàng trăm file.
+- Chạy thế nào:
+  + `npm run lint` (0 warnings, 0 errors)
+  + `npm run build` (sạch sẽ, 0 lỗi, ~1.63s)
+  + `python docs/contract/validate_contract.py` (OK)
+- Chưa làm / chưa kiểm với backend thật:
+  + Kết nối gõ lệnh terminal thật vẫn cần backend chạy với `BACKEND_ALLOW_WRITES=1` trong WSL.
+- Cần bên kia: Không có.
+
 ### 2026-10-12 22:15 — Hoàn tất P4 và P5 Frontend, xử lý phản hồi P7 & P8
 - Xong:
   + P4 (Sơ đồ luồng - `FlowsTab`): Lấy danh sách luồng `/api/flows` (đánh dấu "Sẵn sàng" cho `available`, "Chưa có" cho `planned`); hiển thị chi tiết luồng `/api/flows/hdfs-write` gồm 4 thành phần (Client, NameNode, DataNode đầu pipeline, Secondary NameNode) và 9 bước thực thi; phân biệt trực quan rõ ràng bước "Quan sát thật" (bước 2, 7, 8 từ NameNode log) vs "Suy ra từ log" (bước 1, 3, 4, 5, 6) vs "Tác vụ nền" (bước 9 checkpoint fsimage); theo dõi tiến trình thực thi thời gian thực từ sự kiện `flow.step` (trạng thái `done`, gom theo `runId`, hiển thị các bước sáng lên khi hoàn thành); không giả định `reading` đến sau bước 8; hiển thị bảng lịch sử thao tác HDFS (`hdfs.op` với `op`, `path`, `blockId`, `datanode`, `bytes`).

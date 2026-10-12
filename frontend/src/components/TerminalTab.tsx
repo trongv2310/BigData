@@ -46,28 +46,38 @@ export const TerminalTab: React.FC = () => {
   const wsRef = useRef<WebSocket | null>(null);
 
   const [token, setToken] = useState<string>(() => {
-    return localStorage.getItem('terminal_token') || '';
+    return sessionStorage.getItem('terminal_token') || '';
   });
   const [tokenInput, setTokenInput] = useState<string>(token);
   const [status, setStatus] = useState<'idle' | 'connecting' | 'connected' | 'disconnected'>('idle');
   const [closeInfo, setCloseInfo] = useState<{ code: number; reason: string } | null>(null);
 
-  // Lưu token vào localStorage khi thay đổi
+  // Lưu token vào sessionStorage khi thay đổi
   const saveToken = (newToken: string) => {
     setToken(newToken);
-    localStorage.setItem('terminal_token', newToken);
+    if (newToken) {
+      sessionStorage.setItem('terminal_token', newToken);
+    } else {
+      sessionStorage.removeItem('terminal_token');
+    }
   };
 
   const disconnect = useCallback(() => {
     if (wsRef.current) {
-      wsRef.current.close();
+      const socket = wsRef.current;
+      socket.onopen = null;
+      socket.onmessage = null;
+      socket.onerror = null;
+      socket.onclose = null;
+      socket.close();
       wsRef.current = null;
     }
     setStatus('disconnected');
   }, []);
 
-  const connect = useCallback(() => {
-    if (!token.trim()) {
+  const connect = useCallback((tokenOverride?: string) => {
+    const activeToken = (tokenOverride !== undefined ? tokenOverride : token).trim();
+    if (!activeToken) {
       setCloseInfo({
         code: 4401,
         reason: 'Vui lòng nhập Token xác thực của backend trước khi kết nối.',
@@ -82,7 +92,7 @@ export const TerminalTab: React.FC = () => {
     // Xác định URL WebSocket terminal từ VITE_API_BASE
     const apiBase = import.meta.env.VITE_API_BASE || 'http://localhost:8000';
     const wsBase = apiBase.replace(/^http/, 'ws');
-    const wsUrl = `${wsBase}/ws/terminal?token=${encodeURIComponent(token.trim())}`;
+    const wsUrl = `${wsBase}/ws/terminal?token=${encodeURIComponent(activeToken)}`;
 
     try {
       const socket = new WebSocket(wsUrl);
@@ -308,7 +318,7 @@ export const TerminalTab: React.FC = () => {
               <button
                 onClick={() => {
                   saveToken(tokenInput);
-                  connect();
+                  connect(tokenInput);
                 }}
                 disabled={status === 'connecting'}
                 className="inline-flex items-center gap-2 px-5 py-2 bg-sky-500 hover:bg-sky-400 text-slate-950 text-xs font-bold rounded-xl transition shadow-lg shadow-sky-500/20 disabled:opacity-50"
