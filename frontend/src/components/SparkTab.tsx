@@ -73,50 +73,56 @@ export const SparkTab: React.FC = () => {
       <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-4 shadow-xl">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Activity className="w-5 h-5 text-amber-400 animate-pulse" />
+            <Activity className="w-5 h-5 text-amber-400" />
             <h3 className="text-base font-bold text-white">
               Spark Structured Streaming — Tiến trình Micro-batch
             </h3>
           </div>
           <span className="text-xs font-mono text-slate-400">
-            {latestSparkProgress ? `Query: ${latestSparkProgress.queryName}` : 'Đang chờ luồng...'}
+            {latestSparkProgress ? `Query: ${latestSparkProgress.queryName}` : 'Chưa có sự kiện spark.progress'}
           </span>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="p-3 bg-slate-800/40 rounded-xl border border-slate-800">
-            <span className="text-xs text-slate-400 block mb-1">Batch ID Hiện tại</span>
-            <span className="text-xl font-bold text-amber-400 font-mono">
-              {latestSparkProgress ? `#${latestSparkProgress.batchId}` : '—'}
-            </span>
-          </div>
+        {latestSparkProgress ? (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="p-3 bg-slate-800/40 rounded-xl border border-slate-800">
+              <span className="text-xs text-slate-400 block mb-1">Batch ID Hiện tại</span>
+              <span className="text-xl font-bold text-amber-400 font-mono">
+                #{latestSparkProgress.batchId}
+              </span>
+            </div>
 
-          <div className="p-3 bg-slate-800/40 rounded-xl border border-slate-800">
-            <span className="text-xs text-slate-400 block mb-1">Số dòng nhập (Rows)</span>
-            <span className="text-xl font-bold text-white font-mono">
-              {latestSparkProgress ? latestSparkProgress.numInputRows : '—'}
-            </span>
-          </div>
+            <div className="p-3 bg-slate-800/40 rounded-xl border border-slate-800">
+              <span className="text-xs text-slate-400 block mb-1">Số dòng nhập (Rows)</span>
+              <span className="text-xl font-bold text-white font-mono">
+                {latestSparkProgress.numInputRows}
+              </span>
+            </div>
 
-          <div className="p-3 bg-slate-800/40 rounded-xl border border-slate-800">
-            <span className="text-xs text-slate-400 block mb-1">Tốc độ nạp vào</span>
-            <span className="text-xl font-bold text-sky-400 font-mono">
-              {latestSparkProgress
-                ? `${latestSparkProgress.inputRowsPerSecond.toFixed(1)} rows/s`
-                : '—'}
-            </span>
-          </div>
+            <div className="p-3 bg-slate-800/40 rounded-xl border border-slate-800">
+              <span className="text-xs text-slate-400 block mb-1">Tốc độ nạp vào</span>
+              <span className="text-xl font-bold text-sky-400 font-mono">
+                {latestSparkProgress.inputRowsPerSecond.toFixed(1)} rows/s
+              </span>
+            </div>
 
-          <div className="p-3 bg-slate-800/40 rounded-xl border border-slate-800">
-            <span className="text-xs text-slate-400 block mb-1">Tốc độ xử lý</span>
-            <span className="text-xl font-bold text-emerald-400 font-mono">
-              {latestSparkProgress
-                ? `${latestSparkProgress.processedRowsPerSecond.toFixed(1)} rows/s`
-                : '—'}
-            </span>
+            <div className="p-3 bg-slate-800/40 rounded-xl border border-slate-800">
+              <span className="text-xs text-slate-400 block mb-1">Tốc độ xử lý</span>
+              <span className="text-xl font-bold text-emerald-400 font-mono">
+                {latestSparkProgress.processedRowsPerSecond.toFixed(1)} rows/s
+              </span>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="p-6 rounded-xl bg-slate-800/20 border border-dashed border-slate-800 text-center space-y-1">
+            <p className="text-sm font-medium text-slate-300">Chưa có dữ liệu tiến trình Streaming</p>
+            <p className="text-xs text-slate-500">
+              Luồng thời gian thực hiện chưa phát sự kiện <code>spark.progress</code> (chỉ phát khi có ứng dụng Structured Streaming đang chạy và phát tiến trình).
+            </p>
+          </div>
+        )}
       </div>
+
 
       {/* Danh sách Ứng dụng Spark */}
       <div className="rounded-2xl bg-slate-900 border border-slate-800 p-5 space-y-4">

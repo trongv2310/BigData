@@ -235,15 +235,17 @@ export const AqiTab: React.FC = () => {
       <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/15 via-rose-500/15 to-transparent border border-amber-500/30 text-amber-200 text-xs sm:text-sm space-y-1.5 shadow-lg">
         <div className="flex items-center gap-2 font-bold text-amber-300 text-sm sm:text-base">
           <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0" />
-          <span>Lưu ý đặc biệt: Điểm gãy dữ liệu ngày 01/07/2025</span>
+          <span>Lưu ý: Điểm gãy dữ liệu ngày 01/07/2025</span>
         </div>
         <p className="text-slate-300 leading-relaxed">
-          Nồng độ khí CO ghi nhận mức <strong>sụt giảm mạnh đột ngột</strong> kể từ ngày <strong>01/07/2025</strong> (giảm từ mức trung bình ~1500–2000 µg/m³ xuống chỉ còn ~250–350 µg/m³). Hiện tượng này tồn tại trên cả bộ dữ liệu Kaggle và dữ liệu thô OpenWeather do sự thay đổi thuật toán / mô hình đo lường của nhà cung cấp.
+          {hourlyProfile?.note ||
+            'Mức CO giảm mạnh sau 01/07/2025 (điểm gãy có trong cả bản Kaggle lẫn bản thô OpenWeather).'}
         </p>
         <div className="font-semibold text-amber-400 pt-1">
-          Biểu đồ dưới đây được tách đoạn rõ ràng và tuyệt đối KHÔNG nối mượt qua mốc 01/07/2025 nhằm đảm bảo tính trung thực khoa học.
+          Biểu đồ dưới đây được tách đoạn rõ ràng và tuyệt đối KHÔNG nối mượt qua mốc 01/07/2025 nhằm đảm bảo tính trung thực dữ liệu.
         </div>
       </div>
+
 
       {/* Biểu đồ Chuỗi thời gian (AqiSeries) */}
       <div className="p-5 sm:p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-4 shadow-xl">
