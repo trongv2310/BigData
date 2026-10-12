@@ -165,6 +165,22 @@ Mẫu:
 
 ## Frontend (Antigravity)
 
+### 2026-10-13 01:15 — Hoàn tất P11 & P12 Frontend (Kafka luồng sống, lọc flowId, bảng live trong SQL)
+- Xong:
+  + 1. `FlowsTab` & `StreamContext`: Lọc sự kiện `flow.step` chặt chẽ theo `flowId` (`flowStepsByFlow[flowId][runId]`, `latestRunIdByFlow`), chỉ hiển thị danh sách run và bước thực thi của luồng đang chọn. Đã loại bỏ hoàn toàn hiện tượng sơ đồ HDFS sáng nhầm bước khi backend phát luồng khác. Sẵn sàng hỗ trợ hai luồng mới `kafka-produce` (2 bước: bước 2 ACK kèm offset là quan sát thật, bước 1 suy ra) và `spark-streaming` (4 bước: tất cả suy ra từ micro-batch job Spark thành công); hỗ trợ các `kind` thành phần mới (`kafka-broker`, `spark`, `storage`) và định dạng runId (`kafka-p0-o7`, `spark-batch-12`). **Backend lead có thể an tâm bật `FLOWS_EXTRA=1`**.
+  + 2. `OverviewTab`: Với nguồn `source = live-open-meteo`, hiển thị thời điểm và tuổi của dữ liệu ("quan sát cách đây N phút / giờ"), kèm ghi chú minh bạch chu kỳ cập nhật ~15 phút/lần (thời tiết 15 phút, CO mỗi giờ từ mô hình dự báo khí quyển CAMS, không phải cảm biến đo từng giây). Tiêu đề thẻ CO chỉ đổi sang "Bản ghi đo thời gian thực" khi có sự kiện `reading` mới phát trong phiên (`hasStreamReading`), ngược lại hiển thị "Bản ghi đo gần nhất" (đọc từ REST `/api/aqi/latest`).
+  + 3. `SqlTab`: Bổ sung cấu trúc bảng `live` (Parquet `/live/co_stream` do Spark Structured Streaming ghi từ Kafka) vào thẻ tham khảo schema và các truy vấn mẫu (`SELECT ... FROM live`). Bổ sung hộp cảnh báo nổi bật: Tuyệt đối không trộn (JOIN / UNION) bảng `live` với bảng `aqi` vào một chuỗi phân tích do khác nguồn và chuẩn gốc (Open-Meteo đo 1678–2508 µg/m³ ngày 12–13/10/2026 trong khi trung bình Kaggle sau 01/07/2025 là ~300 µg/m³). Bắt và hiển thị thông báo dễ hiểu khi gặp 400 `SQL_ERROR` (giải thích rõ bảng `live` chưa tồn tại là bình thường nếu Spark Streaming chưa ghi micro-batch đầu tiên).
+  + 4. `KafkaTab`: Gắn huy hiệu "Spark Checkpoint" và ghi chú giải thích rõ ràng cho consumer group `spark:co_stream` (độ trễ lag do backend tính từ Spark HDFS checkpoint `/live/_checkpoints/co_stream`, không phải consumer group TCP thật của Kafka).
+  + 5. Sinh lại kiểu tự động từ hợp đồng `openapi.yaml` (`npm run generate:types`); dọn dẹp toàn bộ cảnh báo React compiler purity trong `OverviewTab` (`currentTime` state + timer 30s).
+- Chạy thế nào:
+  + Kiểm tra hợp đồng: `python docs/contract/validate_contract.py` (OK)
+  + Kiểm tra linter: `npm run lint` (0 warnings, 0 errors)
+  + Build production: `npm run build` (thành công sạch sẽ, ~700ms)
+  + Khởi động giao diện kết nối backend thật trong WSL: `cd frontend && $env:VITE_API_BASE="http://localhost:8000"; $env:VITE_STREAM="ws"; npm run dev`
+- Chưa làm / chưa kiểm với backend thật:
+  + Hai luồng `kafka-produce` và `spark-streaming` đã sẵn sàng trên UI, đang đợi lead bật cờ `FLOWS_EXTRA=1` ở backend để quan sát thực tế trên `/api/flows` và `/ws/stream`.
+- Cần bên kia: Lead backend có thể bật `FLOWS_EXTRA=1`. Mọi giao tiếp và schema đều tuân thủ 100% hợp đồng `openapi.yaml`.
+
 ### 2026-10-12 22:50 — Sửa 4 điểm theo rà soát P9 của Claude
 - Xong:
   + 1. `TerminalTab`: Nút "Kết nối Terminal" giờ đây truyền trực tiếp `tokenInput` (`connect(tokenInput)`) thay vì chỉ dựa vào state `token` bất đồng bộ, sửa lỗi phải bấm hai lần mới kết nối được token mới.

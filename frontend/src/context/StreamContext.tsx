@@ -15,10 +15,13 @@ export const StreamProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [status, setStatus] = useState<ConnectionStatus>('disconnected');
   const [events, setEvents] = useState<StreamEvent[]>([]);
   const [latestReading, setLatestReading] = useState<AqiReading | null>(null);
+  const [hasStreamReading, setHasStreamReading] = useState<boolean>(false);
   const [latestKafkaStats, setLatestKafkaStats] = useState<KafkaStatsEvent['data'] | null>(null);
   const [latestSparkProgress, setLatestSparkProgress] = useState<SparkProgressEvent['data'] | null>(null);
   const [recentHdfsOps, setRecentHdfsOps] = useState<HdfsOpEvent['data'][]>([]);
   const [serviceOverrides, setServiceOverrides] = useState<Record<string, ServiceStateEvent['data']>>({});
+  const [flowStepsByFlow, setFlowStepsByFlow] = useState<Record<string, Record<string, FlowStepEvent['data'][]>>>({});
+  const [latestRunIdByFlow, setLatestRunIdByFlow] = useState<Record<string, string>>({});
   const [flowStepsByRunId, setFlowStepsByRunId] = useState<Record<string, FlowStepEvent['data'][]>>({});
   const [latestFlowRunId, setLatestFlowRunId] = useState<string | null>(null);
 
@@ -36,6 +39,7 @@ export const StreamProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       if (event.type === 'reading') {
         setLatestReading(event.data);
+        setHasStreamReading(true);
       } else if (event.type === 'kafka.stats') {
         setLatestKafkaStats(event.data);
       } else if (event.type === 'spark.progress') {
@@ -48,29 +52,64 @@ export const StreamProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           [event.data.name]: event.data,
         }));
       } else if (event.type === 'flow.step') {
+        const { flowId, runId, step } = event.data;
+
+        // Lưu flow.step gom nhóm theo flowId và runId
+        setFlowStepsByFlow((prev) => {
+          const currentFlowRuns = prev[flowId] || {};
+          const currentRunSteps = currentFlowRuns[runId] || [];
+          if (currentRunSteps.some((s) => s.step === step)) {
+            return prev;
+          }
+          const updatedRunSteps = [...currentRunSteps, event.data].sort((a, b) => a.step - b.step);
+          const updatedFlowRuns = {
+            ...currentFlowRuns,
+            [runId]: updatedRunSteps,
+          };
+          // Giới hạn 20 run gần nhất cho mỗi flowId
+          const keys = Object.keys(updatedFlowRuns);
+          if (keys.length > 20) {
+            const trimmed: Record<string, FlowStepEvent['data'][]> = {};
+            for (const k of keys.slice(keys.length - 20)) {
+              trimmed[k] = updatedFlowRuns[k];
+            }
+            return {
+              ...prev,
+              [flowId]: trimmed,
+            };
+          }
+          return {
+            ...prev,
+            [flowId]: updatedFlowRuns,
+          };
+        });
+
+        setLatestRunIdByFlow((prev) => ({
+          ...prev,
+          [flowId]: runId,
+        }));
+
+        // Đồng thời cập nhật flowStepsByRunId cho tương thích ngược
         setFlowStepsByRunId((prev) => {
-          const runId = event.data.runId;
           const currentList = prev[runId] || [];
-          if (currentList.some((s) => s.step === event.data.step)) {
+          if (currentList.some((s) => s.step === step)) {
             return prev;
           }
           const updated = {
             ...prev,
             [runId]: [...currentList, event.data].sort((a, b) => a.step - b.step),
           };
-          // Giới hạn giữ tối đa 20 run gần nhất để tránh phình bộ nhớ
           const keys = Object.keys(updated);
           if (keys.length > 20) {
             const trimmed: Record<string, FlowStepEvent['data'][]> = {};
-            const recentKeys = keys.slice(keys.length - 20);
-            for (const k of recentKeys) {
+            for (const k of keys.slice(keys.length - 20)) {
               trimmed[k] = updated[k];
             }
             return trimmed;
           }
           return updated;
         });
-        setLatestFlowRunId(event.data.runId);
+        setLatestFlowRunId(runId);
       }
     });
 
@@ -90,10 +129,13 @@ export const StreamProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         status,
         events,
         latestReading,
+        hasStreamReading,
         latestKafkaStats,
         latestSparkProgress,
         recentHdfsOps,
         serviceOverrides,
+        flowStepsByFlow,
+        latestRunIdByFlow,
         flowStepsByRunId,
         latestFlowRunId,
         clearEvents,

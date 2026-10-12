@@ -183,29 +183,44 @@ export const KafkaTab: React.FC = () => {
                   {topic.consumerGroups.length === 0 ? (
                     <div className="text-xs text-slate-500 italic">Không có consumer group nào.</div>
                   ) : (
-                    topic.consumerGroups.map((cg) => (
-                      <div
-                        key={cg.group}
-                        className="flex items-center justify-between p-2 rounded bg-slate-900/60 text-xs font-mono"
-                      >
-                        <div className="flex items-center gap-2 text-slate-300">
-                          <ArrowDownRight className="w-3.5 h-3.5 text-slate-500" />
-                          <span>{cg.group}</span>
+                    topic.consumerGroups.map((cg) => {
+                      const isSparkCheckpointGroup = cg.group === 'spark:co_stream';
+                      return (
+                        <div
+                          key={cg.group}
+                          className="p-2.5 rounded bg-slate-900/60 text-xs font-mono space-y-1.5"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2 text-slate-300">
+                              <ArrowDownRight className="w-3.5 h-3.5 text-slate-500" />
+                              <span className="font-semibold text-slate-200">{cg.group}</span>
+                              {isSparkCheckpointGroup && (
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-sans bg-sky-500/20 text-sky-300 border border-sky-500/30">
+                                  Spark Checkpoint
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-slate-500">Lag:</span>
+                              <span
+                                className={`font-bold px-2 py-0.5 rounded text-[11px] ${
+                                  cg.lag === 0
+                                    ? 'bg-emerald-500/20 text-emerald-400'
+                                    : 'bg-amber-500/20 text-amber-400'
+                                }`}
+                              >
+                                {cg.lag}
+                              </span>
+                            </div>
+                          </div>
+                          {isSparkCheckpointGroup && (
+                            <div className="text-[11px] text-slate-400 font-sans pl-5.5 leading-relaxed">
+                              * Lưu ý: Độ trễ được backend tính từ checkpoint HDFS của Spark (<code>/live/_checkpoints/co_stream</code>), không phải consumer group TCP thật của Kafka.
+                            </div>
+                          )}
                         </div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-slate-500">Lag:</span>
-                          <span
-                            className={`font-bold px-2 py-0.5 rounded text-[11px] ${
-                              cg.lag === 0
-                                ? 'bg-emerald-500/20 text-emerald-400'
-                                : 'bg-amber-500/20 text-amber-400'
-                            }`}
-                          >
-                            {cg.lag}
-                          </span>
-                        </div>
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               </div>
