@@ -7,7 +7,7 @@ Hai agent làm chung qua Orca: **Claude** là backend và lead, **Antigravity** 
 ## Chạy thử không cần Hadoop
 
 ```bash
-pip install pyyaml jsonschema
+pip install pyyaml 'jsonschema>=4.18'
 python docs/contract/validate_contract.py     # kiểm tra hợp đồng
 python mock/serve.py                          # mock API tại http://127.0.0.1:8010
 curl http://127.0.0.1:8010/api/services

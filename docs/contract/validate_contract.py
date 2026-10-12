@@ -3,7 +3,7 @@
 
   python docs/contract/validate_contract.py
 
-Cần: pip install pyyaml jsonschema
+Cần: pip install pyyaml 'jsonschema>=4.18'
 Kiểm tra:
   1. openapi.yaml là schema hợp lệ (mọi $ref trỏ được, mọi schema đúng Draft 2020-12).
   2. Mọi path + method trong openapi.yaml có dòng trong mock/routes.json, và ngược lại.
@@ -15,7 +15,10 @@ import json, sys
 from pathlib import Path
 
 import yaml
-from jsonschema import Draft202012Validator
+try:
+    from jsonschema import Draft202012Validator
+except ImportError:
+    sys.exit("Cần jsonschema >= 4.0: pip install -U 'jsonschema>=4.18' pyyaml")
 
 ROOT = Path(__file__).resolve().parents[2]
 SPEC = ROOT / "docs" / "contract" / "openapi.yaml"
