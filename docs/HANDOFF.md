@@ -24,4 +24,16 @@ Mẫu:
 
 ## Frontend (Antigravity)
 
-(chưa có)
+### 2026-10-12 15:30 — Hoàn tất P1, P2, P3 Frontend
+- Xong:
+  + P1: Dự án Vite + React 19 + TypeScript + Tailwind CSS; sinh kiểu tự động từ `docs/contract/openapi.yaml` (`npm run generate:types`); khung điều hướng responsive hỗ trợ di động; lớp `StreamSource` với `ReplaySource` (đọc `mock/stream-events.ndjson`) và `WebSocketSource` (kết nối `/ws/stream` với backoff tái kết nối 1-15s); thanh Ticker sự kiện trực tiếp; trang Tổng quan đọc `/api/services`, cập nhật `service.state`, thẻ số liệu CO trực tiếp, cảnh báo trạm mô phỏng, nguồn dữ liệu và trạng thái CO từ backend.
+  + P2: Trang HDFS (tóm tắt cụm `/api/hdfs/summary`, danh sách `/api/hdfs/datanodes`, duyệt cây tệp tin `/api/hdfs/files`, modal xem blocks `/api/hdfs/blocks`, lịch sử `hdfs.op`); trang Kafka (`/api/kafka/topics`, theo dõi `kafka.stats`); trang Spark (`/api/spark/applications`, theo dõi `spark.progress`).
+  + P3: Trang Phân tích CO & AQI: Biểu đồ chuỗi thời gian theo giờ/ngày/tháng (`/api/aqi/series`), biểu đồ nhịp sinh học 24 giờ (`/api/aqi/hourly-profile`); ĐẶC BIỆT: Tách rời và đánh dấu điểm gãy dữ liệu ngày 01/07/2025, tuyệt đối không nối mượt qua điểm này; ghi chú cảnh báo trạm mô phỏng luân phiên; hiển thị nguồn dữ liệu (`source`).
+- Chạy thế nào:
+  + Mock server: `python mock/serve.py` (cổng 8010)
+  + Frontend: `cd frontend && npm install && npm run dev` (truy cập `http://localhost:5173`)
+  + Build production: `cd frontend && npm run build`
+- Chưa làm / đang giả lập: P4 (Sơ đồ luồng sống) và P5 (Terminal xterm.js, SQL, dự đoán CO). Đang chạy với mock server 8010 và ReplaySource phát lại luồng sự kiện.
+- Cần bên kia: Backend thật (FastAPI) triển khai các route REST và `/ws/stream`. Frontend đã sẵn sàng chuyển sang backend thật qua `VITE_API_BASE=http://localhost:8000` và `VITE_STREAM=ws`.
+- Vấn đề phát hiện: Không có. Schema và contract hoàn toàn khớp, build TypeScript sạch sẽ không có lỗi.
+
