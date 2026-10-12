@@ -305,7 +305,7 @@ export const HdfsTab: React.FC = () => {
                     index === pathParts.length - 1 ? 'font-bold text-sky-400' : ''
                   }`}
                 >
-                  {part}
+                  {part.replace(/\r/g, '\\r').replace(/\n/g, '\\n')}
                 </button>
               </React.Fragment>
             );
@@ -345,6 +345,8 @@ export const HdfsTab: React.FC = () => {
                 const fullPath =
                   currentPath === '/' ? `/${entry.name}` : `${currentPath}/${entry.name}`;
                 const isDir = entry.type === 'directory';
+                const hasControlChar = entry.name.includes('\n') || entry.name.includes('\r');
+                const safeName = entry.name.replace(/\r/g, '\\r').replace(/\n/g, '\\n');
 
                 return (
                   <tr
@@ -365,8 +367,13 @@ export const HdfsTab: React.FC = () => {
                         <File className="w-4 h-4 text-sky-400 shrink-0" />
                       )}
                       <span className={isDir ? 'text-amber-200' : 'text-slate-100'}>
-                        {entry.name}
+                        {safeName}
                       </span>
+                      {hasControlChar && (
+                        <span className="px-1.5 py-0.2 rounded text-[10px] bg-rose-500/20 text-rose-300 border border-rose-500/30 font-mono">
+                          [\\n]
+                        </span>
+                      )}
                     </td>
                     <td className="py-2 px-3 text-slate-400">{entry.type}</td>
                     <td className="py-2 px-3">
@@ -378,6 +385,7 @@ export const HdfsTab: React.FC = () => {
                     <td className="py-2 px-3">
                       {isDir ? '—' : formatBytes(entry.blockSizeBytes)}
                     </td>
+
                     <td className="py-2 px-3 text-slate-400">{entry.owner}</td>
                     <td className="py-2 px-3 text-slate-500">
                       {formatDateTime(entry.modifiedAt)}
@@ -420,7 +428,10 @@ export const HdfsTab: React.FC = () => {
             <div className="p-3 bg-slate-800/40 rounded-xl text-xs font-mono space-y-1">
               <div>
                 <span className="text-slate-500">Đường dẫn: </span>
-                <span className="text-sky-300 font-bold">{selectedFileBlocks.path}</span>
+                <span className="text-sky-300 font-bold">
+                  {selectedFileBlocks.path.replace(/\r/g, '\\r').replace(/\n/g, '\\n')}
+                </span>
+
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2">
                 <div>

@@ -440,12 +440,17 @@ export interface components {
                 version: string;
                 /** @enum {string} */
                 kind: "heuristic" | "ml";
-                /** @description Mô tả dữ liệu huấn luyện, null với heuristic */
+                /** @description Mô tả dữ liệu mà mô hình hoặc heuristic dựa vào và những gì được/không được dùng; null nếu không dựa vào dữ liệu nào */
                 trainedOn: string | null;
             };
         };
         SqlRequest: {
-            /** @description Chỉ chấp nhận một câu SELECT */
+            /**
+             * @description Chỉ chấp nhận một câu SELECT (hoặc WITH ... SELECT). Bảng duy nhất là `aqi` (bộ Kaggle, đọc từ HDFS /raw/Dataset.csv) với các cột:
+             *     datetime_utc (timestamp, giờ gốc UTC), datetime_vn (timestamp, = UTC + 7 giờ), hour_vn, month_vn, year_vn,
+             *     aqi_label, co, no, no2, o3, so2, pm2_5, pm10, nh3, temperature_C, humidity_pct, rain_mm, wind_speed_kmh, is_event_anomaly, o3_was_missing.
+             *     Giá trị timestamp trả về dạng chuỗi "yyyy-MM-dd HH:mm:ss". Lần gọi đầu tiên khởi động Spark nên có thể mất 10 giây trở lên.
+             */
             query: string;
             /** @default 100 */
             limit: number;

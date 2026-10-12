@@ -101,7 +101,25 @@ Mẫu:
 
 ## Frontend (Antigravity)
 
+### 2026-10-12 16:45 — Sửa các điểm theo rà soát P6 của Claude
+- Xong:
+  + 1. `AqiTab.tsx`: Hộp cảnh báo điểm gãy 01/07/2025 hiển thị trực tiếp chuỗi `note` từ `/api/aqi/hourly-profile` (do backend sinh từ dữ liệu thật), không tự viết số suy đoán hay nguyên nhân thay đổi thuật toán. Giữ nguyên việc tách đoạn biểu đồ tại 01/07/2025 (không nối mượt).
+  + 2. `OverviewTab.tsx`: Ghi chú "Trạm mô phỏng" đã điều chỉnh linh hoạt theo `source` (phân biệt rõ `replay-dataset` luân phiên trạm, dòng cuối bộ dữ liệu Kaggle không có trạm, và `live-open-meteo` mô phỏng vùng TP.HCM). Tiêu đề thẻ CO hiển thị "Bản ghi đo thời gian thực" khi có stream hoặc "Bản ghi đo gần nhất" khi lấy từ API nền, không gọi là "trực tiếp" khi thư mục stream trống.
+  + 3. Sinh lại kiểu `src/types/api.ts` từ `openapi.yaml` mới (`SqlRequest.query`, `PredictResponse.model.trainedOn`).
+  + 4. `SparkTab.tsx`: Thêm trạng thái rỗng tường minh (empty state) cho thẻ Structured Streaming khi luồng live chưa phát `spark.progress`, không để ô trống hay hiển thị số 0.
+  + 5. `KafkaTab.tsx`: Hiển thị thông báo lỗi chi tiết (nhắc bật broker khi gặp 503 `KAFKA_UNREACHABLE`) thay vì để bảng topics trống.
+  + 6. `HdfsTab.tsx`: Tên tệp tin và đường dẫn chứa ký tự điều khiển (như `\n` trong `Dataset.csv\n` ở `/raw`) được escape an toàn khi render hiển thị (`\n`, `\r`), đồng thời khi gửi gọi `/api/hdfs/blocks` vẫn giữ nguyên chuỗi gốc đã qua `encodeURIComponent`.
+- Chạy thế nào:
+  + `npm run generate:types`
+  + `npm run build` (build thành công sạch sẽ trong 723ms)
+- Chưa làm / chưa kiểm với backend thật:
+  + Backend thật chạy trong WSL (`127.0.0.1:8000`) cần người dùng bật và kiểm tra qua trình duyệt. Chưa kiểm được với backend thật vì môi trường hiện tại đang chạy mock server 8010.
+  + Kafka thật đang tắt trên máy nên chưa kiểm được dữ liệu thật của Kafka topics.
+  + Chưa làm frontend P4 (Sơ đồ luồng) và P5 (Terminal xterm.js, SQL, Dự đoán).
+- Cần bên kia: Không có. Contract và mock hoàn toàn khớp.
+
 ### 2026-10-12 15:30 — Hoàn tất P1, P2, P3 Frontend
+
 - Xong:
   + P1: Dự án Vite + React 19 + TypeScript + Tailwind CSS; sinh kiểu tự động từ `docs/contract/openapi.yaml` (`npm run generate:types`); khung điều hướng responsive hỗ trợ di động; lớp `StreamSource` với `ReplaySource` (đọc `mock/stream-events.ndjson`) và `WebSocketSource` (kết nối `/ws/stream` với backoff tái kết nối 1-15s); thanh Ticker sự kiện trực tiếp; trang Tổng quan đọc `/api/services`, cập nhật `service.state`, thẻ số liệu CO trực tiếp, cảnh báo trạm mô phỏng, nguồn dữ liệu và trạng thái CO từ backend.
   + P2: Trang HDFS (tóm tắt cụm `/api/hdfs/summary`, danh sách `/api/hdfs/datanodes`, duyệt cây tệp tin `/api/hdfs/files`, modal xem blocks `/api/hdfs/blocks`, lịch sử `hdfs.op`); trang Kafka (`/api/kafka/topics`, theo dõi `kafka.stats`); trang Spark (`/api/spark/applications`, theo dõi `spark.progress`).

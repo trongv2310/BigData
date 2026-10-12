@@ -108,7 +108,7 @@ export const OverviewTab: React.FC = () => {
               </div>
               <div>
                 <span className="text-xs font-semibold text-sky-400 uppercase tracking-wider">
-                  Bản ghi đo trực tiếp
+                  {streamReading ? 'Bản ghi đo thời gian thực' : 'Bản ghi đo gần nhất'}
                 </span>
                 <h3 className="text-lg font-bold text-white flex items-center gap-2">
                   <span>Trạm: {currentReading ? currentReading.station : 'Đang tải...'}</span>
@@ -130,12 +130,18 @@ export const OverviewTab: React.FC = () => {
             <div className="mt-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-start gap-2.5">
               <AlertTriangle className="w-4 h-4 shrink-0 text-amber-400 mt-0.5" />
               <div>
-                <span className="font-bold">Ghi chú: Trạm mô phỏng.</span> Nhãn "
-                {currentReading.station}" là nhãn được gán luân phiên theo luồng phát lại
-                (replay), không phải trạm đo thực tế tại vị trí này.
+                <span className="font-bold">Ghi chú: Trạm mô phỏng. </span>
+                {currentReading.source === 'replay-dataset'
+                  ? currentReading.station.includes('không có trạm')
+                    ? `Nhãn "${currentReading.station}" từ bộ dữ liệu lịch sử Kaggle (không có trạm đo thực tế tại vị trí này).`
+                    : `Nhãn "${currentReading.station}" là nhãn được gán luân phiên theo luồng phát lại (replay), không phải trạm đo thực tế tại vị trí này.`
+                  : currentReading.source === 'live-open-meteo'
+                  ? `Dữ liệu đo mô phỏng theo vị trí "${currentReading.station}" từ nguồn Open-Meteo, không phải trạm đo cố định mặt đất.`
+                  : `Dữ liệu từ nguồn ${getSourceLabel(currentReading.source)} mang tính chất mô phỏng, không phải trạm đo thực tế.`}
               </div>
             </div>
           )}
+
 
           {/* Chỉ số CO chính */}
           <div className="py-6 flex flex-col sm:flex-row sm:items-baseline gap-2 sm:gap-4">

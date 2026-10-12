@@ -112,16 +112,34 @@ export const KafkaTab: React.FC = () => {
         <div className="flex items-center gap-2">
           <Layers className="w-5 h-5 text-emerald-400" />
           <h3 className="text-base font-bold text-white">
-            Danh sách Topics ({data?.topics.length || 0})
+            Danh sách Topics ({data?.topics?.length || 0})
           </h3>
         </div>
 
-        <div className="grid grid-cols-1 gap-4">
-          {data?.topics.map((topic) => (
-            <div
-              key={topic.name}
-              className="p-4 rounded-xl bg-slate-800/40 border border-slate-800 space-y-3"
-            >
+        {error ? (
+          <div className="p-6 rounded-xl bg-slate-800/30 border border-dashed border-rose-500/30 text-center space-y-2">
+            <AlertTriangle className="w-6 h-6 text-rose-400 mx-auto" />
+            <p className="text-sm font-semibold text-rose-300">
+              Không thể kết nối đến Apache Kafka
+            </p>
+            <p className="text-xs text-slate-400 max-w-md mx-auto">
+              {error.includes('KAFKA_UNREACHABLE')
+                ? 'Broker Kafka hiện chưa khởi động hoặc gặp sự cố kết nối (KAFKA_UNREACHABLE). Hãy khởi động Kafka để xem danh sách topics và thông số consumer groups.'
+                : error}
+            </p>
+          </div>
+        ) : !data || data.topics.length === 0 ? (
+          <div className="p-6 rounded-xl bg-slate-800/20 border border-dashed border-slate-800 text-center text-xs text-slate-500">
+            Chưa có topic nào trên cụm Kafka.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-4">
+            {data.topics.map((topic) => (
+              <div
+                key={topic.name}
+                className="p-4 rounded-xl bg-slate-800/40 border border-slate-800 space-y-3"
+              >
+
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-bold text-emerald-400 font-mono">
@@ -177,7 +195,10 @@ export const KafkaTab: React.FC = () => {
             </div>
           ))}
         </div>
-      </div>
+      )}
     </div>
+  </div>
+
+
   );
 };
