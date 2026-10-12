@@ -1,0 +1,12 @@
+{
+  "coPredicted": 389.4,
+  "unit": "µg/m³",
+  "status": "SAFE",
+  "interval": null,
+  "model": {
+    "name": "hourly-profile-baseline",
+    "version": "0.1",
+    "kind": "heuristic",
+    "trainedOn": null
+  }
+}

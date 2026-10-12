@@ -1,0 +1,41 @@
+{
+  "path": "/raw/Dataset.csv",
+  "lengthBytes": 3179004,
+  "blockSizeBytes": 1048576,
+  "replication": 1,
+  "blockCount": 4,
+  "blocks": [
+    {
+      "index": 0,
+      "blockId": "blk_1073741827",
+      "lengthBytes": 1048576,
+      "locations": [
+        "datanode-1"
+      ]
+    },
+    {
+      "index": 1,
+      "blockId": "blk_1073741828",
+      "lengthBytes": 1048576,
+      "locations": [
+        "datanode-1"
+      ]
+    },
+    {
+      "index": 2,
+      "blockId": "blk_1073741829",
+      "lengthBytes": 1048576,
+      "locations": [
+        "datanode-1"
+      ]
+    },
+    {
+      "index": 3,
+      "blockId": "blk_1073741830",
+      "lengthBytes": 33276,
+      "locations": [
+        "datanode-1"
+      ]
+    }
+  ]
+}

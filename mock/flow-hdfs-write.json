@@ -1,0 +1,104 @@
+{
+  "id": "hdfs-write",
+  "title": "HDFS ghi file",
+  "components": [
+    {
+      "id": "client",
+      "label": "Client (hdfs dfs -put)",
+      "kind": "client",
+      "note": "Chương trình ghi file"
+    },
+    {
+      "id": "namenode",
+      "label": "NameNode",
+      "kind": "namenode",
+      "note": "Giữ metadata, không giữ dữ liệu"
+    },
+    {
+      "id": "datanode-1",
+      "label": "DataNode 1",
+      "kind": "datanode",
+      "note": "Giữ block thật"
+    },
+    {
+      "id": "secondary",
+      "label": "Secondary NameNode",
+      "kind": "secondary-namenode",
+      "note": "Checkpoint định kỳ"
+    }
+  ],
+  "steps": [
+    {
+      "order": 1,
+      "from": "client",
+      "to": "namenode",
+      "label": "create(): xin tạo file, NameNode ghi vào edit log",
+      "channel": "control",
+      "repeats": null
+    },
+    {
+      "order": 2,
+      "from": "client",
+      "to": "namenode",
+      "label": "addBlock(): xin block mới và danh sách DataNode",
+      "channel": "control",
+      "repeats": "mỗi block"
+    },
+    {
+      "order": 3,
+      "from": "namenode",
+      "to": "client",
+      "label": "Trả về blockId và vị trí DataNode",
+      "channel": "control",
+      "repeats": "mỗi block"
+    },
+    {
+      "order": 4,
+      "from": "client",
+      "to": "datanode-1",
+      "label": "Gửi dữ liệu theo packet 64 KB (cổng 9866)",
+      "channel": "data",
+      "repeats": "mỗi block"
+    },
+    {
+      "order": 5,
+      "from": "datanode-1",
+      "to": "client",
+      "label": "ACK cho từng packet",
+      "channel": "data",
+      "repeats": "mỗi packet"
+    },
+    {
+      "order": 6,
+      "from": "datanode-1",
+      "to": "namenode",
+      "label": "blockReceived: báo đã nhận đủ block",
+      "channel": "control",
+      "repeats": "mỗi block"
+    },
+    {
+      "order": 7,
+      "from": "client",
+      "to": "namenode",
+      "label": "complete(): đóng file",
+      "channel": "control",
+      "repeats": null
+    },
+    {
+      "order": 8,
+      "from": "client",
+      "to": "namenode",
+      "label": "rename: bỏ hậu tố ._COPYING_",
+      "channel": "control",
+      "repeats": null
+    },
+    {
+      "order": 9,
+      "from": "secondary",
+      "to": "namenode",
+      "label": "Checkpoint gộp edit log vào fsimage (mỗi giờ)",
+      "channel": "background",
+      "repeats": null
+    }
+  ]
+}

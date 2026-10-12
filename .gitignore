@@ -1,0 +1,22 @@
+# bí mật
+.env
+own_key.txt
+*.key
+# phụ thuộc và build
+node_modules/
+dist/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+# dữ liệu lớn và công cụ cài sẵn
+Data/raw/
+*.vhdx
+hadoop-3.3.6/
+jdk8/
+kafka_*/
+# hệ điều hành, trình soạn thảo
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

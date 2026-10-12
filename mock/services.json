@@ -1,0 +1,68 @@
+{
+  "services": [
+    {
+      "name": "NameNode",
+      "kind": "namenode",
+      "state": "up",
+      "url": "http://localhost:9870",
+      "checkedAt": "2026-10-12T12:00:00+07:00",
+      "detail": "hdfs://localhost:9000"
+    },
+    {
+      "name": "DataNode",
+      "kind": "datanode",
+      "state": "up",
+      "url": "http://localhost:9864",
+      "checkedAt": "2026-10-12T12:00:00+07:00",
+      "detail": "1 node, replication 1"
+    },
+    {
+      "name": "ResourceManager",
+      "kind": "resourcemanager",
+      "state": "up",
+      "url": "http://localhost:8088",
+      "checkedAt": "2026-10-12T12:00:00+07:00",
+      "detail": null
+    },
+    {
+      "name": "NodeManager",
+      "kind": "nodemanager",
+      "state": "up",
+      "url": null,
+      "checkedAt": "2026-10-12T12:00:00+07:00",
+      "detail": null
+    },
+    {
+      "name": "Kafka",
+      "kind": "kafka",
+      "state": "up",
+      "url": null,
+      "checkedAt": "2026-10-12T12:00:00+07:00",
+      "detail": "localhost:9092, topic hcmc_co_stream"
+    },
+    {
+      "name": "Spark Streaming",
+      "kind": "spark",
+      "state": "unknown",
+      "url": "http://localhost:4040",
+      "checkedAt": "2026-10-12T12:00:00+07:00",
+      "detail": "Chưa có ứng dụng nào đang chạy"
+    },
+    {
+      "name": "Airflow",
+      "kind": "airflow",
+      "state": "down",
+      "url": "http://localhost:8080",
+      "checkedAt": "2026-10-12T12:00:00+07:00",
+      "detail": "DAG hcmc_co_pipeline"
+    },
+    {
+      "name": "Backend",
+      "kind": "backend",
+      "state": "up",
+      "url": "http://localhost:8000",
+      "checkedAt": "2026-10-12T12:00:00+07:00",
+      "detail": "mock"
+    }
+  ]
+}

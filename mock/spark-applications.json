@@ -1,0 +1,14 @@
+{
+  "applications": [
+    {
+      "id": "local-1760245200000",
+      "name": "hcmc_co_streaming",
+      "state": "running",
+      "startedAt": "2026-10-12T11:40:00+07:00",
+      "jobsRunning": 1,
+      "jobsSucceeded": 57,
+      "jobsFailed": 0,
+      "uiUrl": "http://localhost:4040"
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "clusterId": "CID-mock-0001",
+  "version": "3.3.6",
+  "safeMode": false,
+  "capacityTotalBytes": 214748364800,
+  "capacityUsedBytes": 1288490188,
+  "capacityRemainingBytes": 161061273600,
+  "liveDataNodes": 1,
+  "deadDataNodes": 0,
+  "filesTotal": 42,
+  "blocksTotal": 45,
+  "underReplicatedBlocks": 0,
+  "missingBlocks": 0,
+  "defaultBlockSizeBytes": 134217728,
+  "defaultReplication": 1,
+  "updatedAt": "2026-10-12T12:00:00+07:00"
+}

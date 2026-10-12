@@ -1,0 +1,41 @@
+{
+  "path": "/",
+  "entries": [
+    {
+      "name": "raw",
+      "type": "directory",
+      "lengthBytes": 0,
+      "replication": 0,
+      "blockSizeBytes": 0,
+      "modifiedAt": "2026-09-20T09:15:00+07:00",
+      "owner": "trong"
+    },
+    {
+      "name": "stream_input",
+      "type": "directory",
+      "lengthBytes": 0,
+      "replication": 0,
+      "blockSizeBytes": 0,
+      "modifiedAt": "2026-10-12T12:00:00+07:00",
+      "owner": "trong"
+    },
+    {
+      "name": "tmp",
+      "type": "directory",
+      "lengthBytes": 0,
+      "replication": 0,
+      "blockSizeBytes": 0,
+      "modifiedAt": "2026-09-20T09:00:00+07:00",
+      "owner": "trong"
+    },
+    {
+      "name": "Dataset.csv",
+      "type": "file",
+      "lengthBytes": 3179004,
+      "replication": 1,
+      "blockSizeBytes": 1048576,
+      "modifiedAt": "2026-09-20T09:16:00+07:00",
+      "owner": "trong"
+    }
+  ]
+}

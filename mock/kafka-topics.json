@@ -1,0 +1,12 @@
+{
+  "bootstrapServers": "localhost:9092",
+  "topics": [
+    {
+      "name": "hcmc_co_stream",
+      "partitions": 1,
+      "replicationFactor": 1,
+      "approxMessages": null,
+      "consumerGroups": []
+    }
+  ]
+}

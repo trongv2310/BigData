@@ -1,0 +1,29 @@
+{
+  "columns": [
+    {
+      "name": "month",
+      "type": "string"
+    },
+    {
+      "name": "avg_co",
+      "type": "double"
+    }
+  ],
+  "rows": [
+    [
+      "2025-05",
+      1322.6
+    ],
+    [
+      "2025-06",
+      657.3
+    ],
+    [
+      "2025-07",
+      399.4
+    ]
+  ],
+  "rowCount": 3,
+  "truncated": false,
+  "elapsedMs": 412
+}

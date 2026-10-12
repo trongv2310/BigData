@@ -1,0 +1,89 @@
+{
+  "_note": "Ánh xạ route -> file mock -> schema trong openapi.yaml. {id} trong file được thay bằng tham số đường dẫn.",
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/api/services",
+      "file": "services.json",
+      "schema": "ServiceList"
+    },
+    {
+      "method": "GET",
+      "path": "/api/hdfs/summary",
+      "file": "hdfs-summary.json",
+      "schema": "HdfsSummary"
+    },
+    {
+      "method": "GET",
+      "path": "/api/hdfs/datanodes",
+      "file": "hdfs-datanodes.json",
+      "schema": "HdfsDataNodes"
+    },
+    {
+      "method": "GET",
+      "path": "/api/hdfs/files",
+      "file": "hdfs-files.json",
+      "schema": "HdfsListing"
+    },
+    {
+      "method": "GET",
+      "path": "/api/hdfs/blocks",
+      "file": "hdfs-blocks.json",
+      "schema": "HdfsFileBlocks"
+    },
+    {
+      "method": "GET",
+      "path": "/api/kafka/topics",
+      "file": "kafka-topics.json",
+      "schema": "KafkaTopics"
+    },
+    {
+      "method": "GET",
+      "path": "/api/spark/applications",
+      "file": "spark-applications.json",
+      "schema": "SparkApplications"
+    },
+    {
+      "method": "GET",
+      "path": "/api/aqi/latest",
+      "file": "aqi-latest.json",
+      "schema": "AqiReading"
+    },
+    {
+      "method": "GET",
+      "path": "/api/aqi/series",
+      "file": "aqi-series-month.json",
+      "schema": "AqiSeries"
+    },
+    {
+      "method": "GET",
+      "path": "/api/aqi/hourly-profile",
+      "file": "aqi-hourly-profile.json",
+      "schema": "HourlyProfile"
+    },
+    {
+      "method": "POST",
+      "path": "/api/predict",
+      "file": "predict.json",
+      "schema": "PredictResponse"
+    },
+    {
+      "method": "POST",
+      "path": "/api/sql",
+      "file": "sql.json",
+      "schema": "SqlResponse"
+    },
+    {
+      "method": "GET",
+      "path": "/api/flows",
+      "file": "flows.json",
+      "schema": "FlowList"
+    },
+    {
+      "method": "GET",
+      "path": "/api/flows/{id}",
+      "file": "flow-{id}.json",
+      "schema": "FlowDefinition"
+    }
+  ]
+}

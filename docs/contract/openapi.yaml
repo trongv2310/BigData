@@ -1,0 +1,699 @@
+openapi: 3.1.0
+info:
+  title: CO HCMC Dashboard API
+  version: 0.1.0
+  description: |
+    Hợp đồng giữa backend (Claude, lead) và frontend (Antigravity).
+    Chỉ lead được sửa file này. Muốn thêm hoặc đổi trường: ghi vào docs/HANDOFF.md hoặc mở PR riêng sửa contract.
+
+    Quy ước chung
+    - JSON camelCase. Backend tự đổi từ snake_case của pipeline (wind_speed_kmh -> windSpeedKmh).
+    - Thời gian: ISO 8601 có offset, múi giờ Asia/Ho_Chi_Minh (+07:00).
+    - Nồng độ khí: µg/m³. Dung lượng: byte.
+    - Lỗi: HTTP 4xx/5xx kèm body Error.
+    - Kênh thời gian thực (WebSocket) mô tả ở docs/contract/events.md; schema sự kiện là StreamEvent ở dưới.
+servers:
+  - url: http://localhost:8000
+    description: Backend thật (chạy trong WSL Ubuntu)
+  - url: http://localhost:8010
+    description: Mock server (python mock/serve.py), chỉ để frontend làm trước
+
+paths:
+  /api/services:
+    get:
+      summary: Trạng thái các dịch vụ (NameNode, DataNode, YARN, Kafka, Spark, Airflow)
+      operationId: getServices
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ServiceList" }
+  /api/hdfs/summary:
+    get:
+      summary: Tóm tắt cụm HDFS (nguồn dự kiến - NameNode JMX)
+      operationId: getHdfsSummary
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HdfsSummary" }
+  /api/hdfs/datanodes:
+    get:
+      summary: Danh sách DataNode (NameNode JMX - LiveNodes/DeadNodes)
+      operationId: getHdfsDataNodes
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HdfsDataNodes" }
+  /api/hdfs/files:
+    get:
+      summary: Liệt kê thư mục HDFS (WebHDFS LISTSTATUS)
+      operationId: listHdfsFiles
+      parameters:
+        - name: path
+          in: query
+          required: false
+          schema: { type: string, default: "/" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HdfsListing" }
+        "404":
+          description: Không có đường dẫn này
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  /api/hdfs/blocks:
+    get:
+      summary: File được cắt thành những block nào, nằm ở DataNode nào
+      operationId: getHdfsBlocks
+      parameters:
+        - name: path
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HdfsFileBlocks" }
+        "404":
+          description: Không có file này
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  /api/kafka/topics:
+    get:
+      summary: Topic Kafka và độ trễ của consumer group
+      operationId: getKafkaTopics
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/KafkaTopics" }
+  /api/spark/applications:
+    get:
+      summary: Ứng dụng Spark đang chạy hoặc đã chạy (Spark REST /api/v1/applications)
+      operationId: getSparkApplications
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SparkApplications" }
+  /api/aqi/latest:
+    get:
+      summary: Bản ghi đo mới nhất trong luồng
+      operationId: getAqiLatest
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AqiReading" }
+  /api/aqi/series:
+    get:
+      summary: Chuỗi thời gian của một chỉ số, đã gộp theo giờ/ngày/tháng
+      operationId: getAqiSeries
+      parameters:
+        - name: metric
+          in: query
+          schema: { type: string, enum: [co, no, no2, o3, so2, pm2_5, pm10, nh3], default: co }
+        - name: granularity
+          in: query
+          schema: { type: string, enum: [hour, day, month], default: month }
+        - name: from
+          in: query
+          schema: { type: string }
+          description: ISO 8601, mặc định đầu dữ liệu
+        - name: to
+          in: query
+          schema: { type: string }
+          description: ISO 8601, mặc định cuối dữ liệu
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AqiSeries" }
+  /api/aqi/hourly-profile:
+    get:
+      summary: Nhịp trung bình theo giờ trong ngày (giờ địa phương)
+      operationId: getAqiHourlyProfile
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HourlyProfile" }
+  /api/predict:
+    post:
+      summary: Dự đoán CO từ giờ, tháng, nhiệt độ, tốc độ gió
+      operationId: predictCo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PredictRequest" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PredictResponse" }
+        "400":
+          description: Tham số không hợp lệ
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  /api/sql:
+    post:
+      summary: Chạy SparkSQL chỉ đọc (chỉ SELECT, có giới hạn số dòng)
+      operationId: runSql
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SqlRequest" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SqlResponse" }
+        "400":
+          description: Câu lệnh không được phép hoặc sai cú pháp
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  /api/flows:
+    get:
+      summary: Danh sách các kỹ thuật có sơ đồ luồng
+      operationId: listFlows
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FlowList" }
+  /api/flows/{id}:
+    get:
+      summary: Định nghĩa một luồng (thành phần và các bước) để frontend vẽ
+      operationId: getFlow
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FlowDefinition" }
+        "404":
+          description: Chưa có định nghĩa cho luồng này
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+components:
+  schemas:
+    DateTime:
+      type: string
+      description: ISO 8601 có offset, ví dụ 2026-10-12T12:00:00+07:00
+      pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?([+-]\d{2}:\d{2}|Z)$'
+
+    Error:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required: [code, message]
+          properties:
+            code: { type: string, description: "Mã ngắn, ví dụ HDFS_UNREACHABLE, SQL_NOT_ALLOWED" }
+            message: { type: string, description: "Câu giải thích hiển thị được cho người dùng" }
+
+    ServiceStatus:
+      type: object
+      additionalProperties: false
+      required: [name, kind, state, url, checkedAt, detail]
+      properties:
+        name: { type: string }
+        kind: { type: string, enum: [namenode, datanode, resourcemanager, nodemanager, kafka, spark, airflow, backend] }
+        state: { type: string, enum: [up, down, unknown] }
+        url: { type: [string, "null"] }
+        checkedAt: { $ref: "#/components/schemas/DateTime" }
+        detail: { type: [string, "null"] }
+    ServiceList:
+      type: object
+      additionalProperties: false
+      required: [services]
+      properties:
+        services:
+          type: array
+          items: { $ref: "#/components/schemas/ServiceStatus" }
+
+    HdfsSummary:
+      type: object
+      additionalProperties: false
+      required: [clusterId, version, safeMode, capacityTotalBytes, capacityUsedBytes, capacityRemainingBytes, liveDataNodes, deadDataNodes, filesTotal, blocksTotal, underReplicatedBlocks, missingBlocks, defaultBlockSizeBytes, defaultReplication, updatedAt]
+      properties:
+        clusterId: { type: string }
+        version: { type: string }
+        safeMode: { type: boolean }
+        capacityTotalBytes: { type: integer, minimum: 0 }
+        capacityUsedBytes: { type: integer, minimum: 0 }
+        capacityRemainingBytes: { type: integer, minimum: 0 }
+        liveDataNodes: { type: integer, minimum: 0 }
+        deadDataNodes: { type: integer, minimum: 0 }
+        filesTotal: { type: integer, minimum: 0 }
+        blocksTotal: { type: integer, minimum: 0 }
+        underReplicatedBlocks: { type: integer, minimum: 0 }
+        missingBlocks: { type: integer, minimum: 0 }
+        defaultBlockSizeBytes: { type: integer, minimum: 1 }
+        defaultReplication: { type: integer, minimum: 1 }
+        updatedAt: { $ref: "#/components/schemas/DateTime" }
+
+    DataNodeInfo:
+      type: object
+      additionalProperties: false
+      required: [name, address, state, lastContactSeconds, capacityBytes, usedBytes, blockCount, version]
+      properties:
+        name: { type: string }
+        address: { type: string, description: "host:port truyền dữ liệu" }
+        state: { type: string, enum: [live, dead, decommissioning] }
+        lastContactSeconds: { type: integer, minimum: 0, description: "Số giây từ lần Heartbeat gần nhất" }
+        capacityBytes: { type: integer, minimum: 0 }
+        usedBytes: { type: integer, minimum: 0 }
+        blockCount: { type: integer, minimum: 0 }
+        version: { type: string }
+    HdfsDataNodes:
+      type: object
+      additionalProperties: false
+      required: [dataNodes, heartbeatIntervalSeconds, deadAfterSeconds]
+      properties:
+        heartbeatIntervalSeconds: { type: integer, description: "Mặc định 3" }
+        deadAfterSeconds: { type: integer, description: "Mặc định 630 (2 x 300 + 10 x 3)" }
+        dataNodes:
+          type: array
+          items: { $ref: "#/components/schemas/DataNodeInfo" }
+
+    HdfsEntry:
+      type: object
+      additionalProperties: false
+      required: [name, type, lengthBytes, replication, blockSizeBytes, modifiedAt, owner]
+      properties:
+        name: { type: string }
+        type: { type: string, enum: [file, directory] }
+        lengthBytes: { type: integer, minimum: 0 }
+        replication: { type: integer, minimum: 0, description: "0 với thư mục" }
+        blockSizeBytes: { type: integer, minimum: 0, description: "0 với thư mục" }
+        modifiedAt: { $ref: "#/components/schemas/DateTime" }
+        owner: { type: string }
+    HdfsListing:
+      type: object
+      additionalProperties: false
+      required: [path, entries]
+      properties:
+        path: { type: string }
+        entries:
+          type: array
+          items: { $ref: "#/components/schemas/HdfsEntry" }
+
+    HdfsBlock:
+      type: object
+      additionalProperties: false
+      required: [index, blockId, lengthBytes, locations]
+      properties:
+        index: { type: integer, minimum: 0 }
+        blockId: { type: string, description: "Ví dụ blk_1073741827" }
+        lengthBytes: { type: integer, minimum: 0 }
+        locations:
+          type: array
+          description: Tên các DataNode đang giữ bản sao của block
+          items: { type: string }
+    HdfsFileBlocks:
+      type: object
+      additionalProperties: false
+      required: [path, lengthBytes, blockSizeBytes, replication, blockCount, blocks]
+      properties:
+        path: { type: string }
+        lengthBytes: { type: integer, minimum: 0 }
+        blockSizeBytes: { type: integer, minimum: 1 }
+        replication: { type: integer, minimum: 1 }
+        blockCount: { type: integer, minimum: 0 }
+        blocks:
+          type: array
+          items: { $ref: "#/components/schemas/HdfsBlock" }
+
+    KafkaTopic:
+      type: object
+      additionalProperties: false
+      required: [name, partitions, replicationFactor, approxMessages, consumerGroups]
+      properties:
+        name: { type: string }
+        partitions: { type: integer, minimum: 1 }
+        replicationFactor: { type: integer, minimum: 1 }
+        approxMessages: { type: [integer, "null"] }
+        consumerGroups:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [group, lag]
+            properties:
+              group: { type: string }
+              lag: { type: integer, minimum: 0 }
+    KafkaTopics:
+      type: object
+      additionalProperties: false
+      required: [bootstrapServers, topics]
+      properties:
+        bootstrapServers: { type: string }
+        topics:
+          type: array
+          items: { $ref: "#/components/schemas/KafkaTopic" }
+
+    SparkApplication:
+      type: object
+      additionalProperties: false
+      required: [id, name, state, startedAt, jobsRunning, jobsSucceeded, jobsFailed, uiUrl]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        state: { type: string, enum: [running, completed, failed, unknown] }
+        startedAt: { $ref: "#/components/schemas/DateTime" }
+        jobsRunning: { type: integer, minimum: 0 }
+        jobsSucceeded: { type: integer, minimum: 0 }
+        jobsFailed: { type: integer, minimum: 0 }
+        uiUrl: { type: [string, "null"] }
+    SparkApplications:
+      type: object
+      additionalProperties: false
+      required: [applications]
+      properties:
+        applications:
+          type: array
+          items: { $ref: "#/components/schemas/SparkApplication" }
+
+    CoStatus:
+      type: string
+      enum: [SAFE, WARNING, DANGER]
+      description: |
+        Hiện theo logic của spark_streaming_consumer.py: co > 1000 là DANGER, co > 500 là WARNING.
+        Ngưỡng này chưa có căn cứ chuẩn, xem quyết định D3 trong docs/TASKS.md. Frontend chỉ hiển thị, không tự tính.
+    AqiReading:
+      type: object
+      additionalProperties: false
+      required: [datetime, station, isSimulatedStation, source, co, windSpeedKmh, temperatureC, coAccumulationIndex, status]
+      properties:
+        datetime: { $ref: "#/components/schemas/DateTime" }
+        station: { type: string }
+        isSimulatedStation:
+          type: boolean
+          description: true khi nhãn trạm chỉ là nhãn gán luân phiên của bản replay, không phải trạm đo thật. Frontend phải ghi chú rõ.
+        source: { type: string, enum: [replay-dataset, live-open-meteo, live-openweather] }
+        co: { type: number, description: "µg/m³" }
+        windSpeedKmh: { type: number, minimum: 0 }
+        temperatureC: { type: number }
+        coAccumulationIndex: { type: number, description: "co / (windSpeedKmh + 1), làm tròn 2 chữ số" }
+        status: { $ref: "#/components/schemas/CoStatus" }
+
+    AqiSeries:
+      type: object
+      additionalProperties: false
+      required: [metric, unit, granularity, timezone, source, points]
+      properties:
+        metric: { type: string, enum: [co, no, no2, o3, so2, pm2_5, pm10, nh3] }
+        unit: { type: string, const: "µg/m³" }
+        granularity: { type: string, enum: [hour, day, month] }
+        timezone: { type: string, const: Asia/Ho_Chi_Minh }
+        source: { type: string }
+        points:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [t, value]
+            properties:
+              t: { $ref: "#/components/schemas/DateTime" }
+              value: { type: number }
+    HourlyProfile:
+      type: object
+      additionalProperties: false
+      required: [metric, unit, timezone, profiles, note]
+      properties:
+        metric: { type: string }
+        unit: { type: string, const: "µg/m³" }
+        timezone: { type: string, const: Asia/Ho_Chi_Minh }
+        note: { type: string }
+        profiles:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [label, from, to, values]
+            properties:
+              label: { type: string }
+              from: { $ref: "#/components/schemas/DateTime" }
+              to: { $ref: "#/components/schemas/DateTime" }
+              values:
+                type: array
+                minItems: 24
+                maxItems: 24
+                description: Phần tử thứ i là trung bình của giờ địa phương i (0 đến 23)
+                items: { type: number }
+
+    PredictRequest:
+      type: object
+      additionalProperties: false
+      required: [hour, month, temperatureC, windSpeedKmh]
+      properties:
+        hour: { type: integer, minimum: 0, maximum: 23 }
+        month: { type: integer, minimum: 1, maximum: 12 }
+        dayOfWeek: { type: integer, minimum: 0, maximum: 6, description: "0 là thứ Hai" }
+        temperatureC: { type: number }
+        windSpeedKmh: { type: number, minimum: 0 }
+    PredictResponse:
+      type: object
+      additionalProperties: false
+      required: [coPredicted, unit, status, model, interval]
+      properties:
+        coPredicted: { type: number }
+        unit: { type: string, const: "µg/m³" }
+        status: { $ref: "#/components/schemas/CoStatus" }
+        interval:
+          description: Khoảng dự đoán, null nếu mô hình không có
+          oneOf:
+            - { type: "null" }
+            - type: object
+              additionalProperties: false
+              required: [low, high]
+              properties:
+                low: { type: number }
+                high: { type: number }
+        model:
+          type: object
+          additionalProperties: false
+          required: [name, version, kind, trainedOn]
+          properties:
+            name: { type: string }
+            version: { type: string }
+            kind: { type: string, enum: [heuristic, ml] }
+            trainedOn: { type: [string, "null"], description: "Mô tả dữ liệu huấn luyện, null với heuristic" }
+
+    SqlRequest:
+      type: object
+      additionalProperties: false
+      required: [query]
+      properties:
+        query: { type: string, description: "Chỉ chấp nhận một câu SELECT" }
+        limit: { type: integer, minimum: 1, maximum: 1000, default: 100 }
+    SqlResponse:
+      type: object
+      additionalProperties: false
+      required: [columns, rows, rowCount, truncated, elapsedMs]
+      properties:
+        columns:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [name, type]
+            properties:
+              name: { type: string }
+              type: { type: string }
+        rows:
+          type: array
+          items:
+            type: array
+            items: { type: [string, number, boolean, "null"] }
+        rowCount: { type: integer, minimum: 0 }
+        truncated: { type: boolean }
+        elapsedMs: { type: integer, minimum: 0 }
+
+    FlowSummary:
+      type: object
+      additionalProperties: false
+      required: [id, title, status, description]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        status: { type: string, enum: [available, planned] }
+        description: { type: string }
+    FlowList:
+      type: object
+      additionalProperties: false
+      required: [flows]
+      properties:
+        flows:
+          type: array
+          items: { $ref: "#/components/schemas/FlowSummary" }
+    FlowDefinition:
+      type: object
+      additionalProperties: false
+      required: [id, title, components, steps]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        components:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, label, kind, note]
+            properties:
+              id: { type: string }
+              label: { type: string }
+              kind: { type: string, enum: [client, namenode, datanode, secondary-namenode, kafka-broker, spark, yarn, airflow, storage] }
+              note: { type: string }
+        steps:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [order, from, to, label, channel, repeats]
+            properties:
+              order: { type: integer, minimum: 1 }
+              from: { type: string, description: "id của một component" }
+              to: { type: string, description: "id của một component" }
+              label: { type: string }
+              channel: { type: string, enum: [data, control, background], description: "data: byte dữ liệu; control: lệnh RPC/metadata; background: việc chạy nền" }
+              repeats: { type: [string, "null"], description: "Ví dụ: mỗi block. null nếu chạy một lần" }
+
+    StreamEnvelope:
+      type: object
+      description: Phần chung của mọi sự kiện WebSocket /ws/stream
+      required: [type, ts, seq, data]
+      properties:
+        type: { type: string }
+        ts: { $ref: "#/components/schemas/DateTime" }
+        seq: { type: integer, minimum: 0, description: "Tăng dần, để frontend phát hiện mất tin" }
+        data: { type: object }
+    StreamEvent:
+      oneOf:
+        - $ref: "#/components/schemas/ReadingEvent"
+        - $ref: "#/components/schemas/HdfsOpEvent"
+        - $ref: "#/components/schemas/FlowStepEvent"
+        - $ref: "#/components/schemas/SparkProgressEvent"
+        - $ref: "#/components/schemas/KafkaStatsEvent"
+        - $ref: "#/components/schemas/ServiceStateEvent"
+    ReadingEvent:
+      type: object
+      additionalProperties: false
+      required: [type, ts, seq, data]
+      properties:
+        type: { const: reading }
+        ts: { $ref: "#/components/schemas/DateTime" }
+        seq: { type: integer, minimum: 0 }
+        data: { $ref: "#/components/schemas/AqiReading" }
+    HdfsOpEvent:
+      type: object
+      additionalProperties: false
+      required: [type, ts, seq, data]
+      properties:
+        type: { const: hdfs.op }
+        ts: { $ref: "#/components/schemas/DateTime" }
+        seq: { type: integer, minimum: 0 }
+        data:
+          type: object
+          additionalProperties: false
+          required: [op, path, blockId, datanode, bytes]
+          properties:
+            op: { type: string, enum: [mkdir, create, addBlock, close, rename, delete] }
+            path: { type: string }
+            blockId: { type: [string, "null"] }
+            datanode: { type: [string, "null"] }
+            bytes: { type: [integer, "null"] }
+    FlowStepEvent:
+      type: object
+      additionalProperties: false
+      required: [type, ts, seq, data]
+      properties:
+        type: { const: flow.step }
+        ts: { $ref: "#/components/schemas/DateTime" }
+        seq: { type: integer, minimum: 0 }
+        data:
+          type: object
+          additionalProperties: false
+          required: [flowId, runId, step, state]
+          properties:
+            flowId: { type: string }
+            runId: { type: string, description: "Phân biệt các lần chạy của cùng một luồng" }
+            step: { type: integer, minimum: 1, description: "Khớp steps[].order trong FlowDefinition" }
+            state: { type: string, enum: [started, done, failed] }
+    SparkProgressEvent:
+      type: object
+      additionalProperties: false
+      required: [type, ts, seq, data]
+      properties:
+        type: { const: spark.progress }
+        ts: { $ref: "#/components/schemas/DateTime" }
+        seq: { type: integer, minimum: 0 }
+        data:
+          type: object
+          additionalProperties: false
+          required: [queryName, batchId, numInputRows, inputRowsPerSecond, processedRowsPerSecond]
+          properties:
+            queryName: { type: string }
+            batchId: { type: integer, minimum: 0 }
+            numInputRows: { type: integer, minimum: 0 }
+            inputRowsPerSecond: { type: number, minimum: 0 }
+            processedRowsPerSecond: { type: number, minimum: 0 }
+    KafkaStatsEvent:
+      type: object
+      additionalProperties: false
+      required: [type, ts, seq, data]
+      properties:
+        type: { const: kafka.stats }
+        ts: { $ref: "#/components/schemas/DateTime" }
+        seq: { type: integer, minimum: 0 }
+        data:
+          type: object
+          additionalProperties: false
+          required: [topic, messagesPerSecond, lagTotal]
+          properties:
+            topic: { type: string }
+            messagesPerSecond: { type: number, minimum: 0 }
+            lagTotal: { type: integer, minimum: 0 }
+    ServiceStateEvent:
+      type: object
+      additionalProperties: false
+      required: [type, ts, seq, data]
+      properties:
+        type: { const: service.state }
+        ts: { $ref: "#/components/schemas/DateTime" }
+        seq: { type: integer, minimum: 0 }
+        data: { $ref: "#/components/schemas/ServiceStatus" }

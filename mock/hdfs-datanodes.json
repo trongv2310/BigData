@@ -1,0 +1,16 @@
+{
+  "heartbeatIntervalSeconds": 3,
+  "deadAfterSeconds": 630,
+  "dataNodes": [
+    {
+      "name": "datanode-1",
+      "address": "127.0.0.1:9866",
+      "state": "live",
+      "lastContactSeconds": 1,
+      "capacityBytes": 214748364800,
+      "usedBytes": 1288490188,
+      "blockCount": 45,
+      "version": "3.3.6"
+    }
+  ]
+}
