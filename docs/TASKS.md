@@ -21,7 +21,8 @@ Trạng thái: [ ] chưa, [~] đang làm, [x] xong. Người làm: C = Claude, A
 - Xong khi: mở `localhost:5173` thấy trạng thái dịch vụ từ backend thật và một tin `reading` chạy trên màn hình.
 
 ## P2 — Dữ liệu thật của HDFS, Kafka, Spark
-- [ ] C: `/api/hdfs/*` (JMX + WebHDFS), `/api/kafka/topics`, `/api/spark/applications`.
+- [x] C: `/api/hdfs/*` (JMX + WebHDFS), `/api/spark/applications` — đã so với `hdfs fsck`/`dfsadmin` trên cụm thật.
+- [~] C: `/api/kafka/topics` + `kafka.stats` đã viết và test giả lập, **chưa thử với broker thật** (Kafka không khởi động được: mất `/tmp/kraft-combined-logs`, cần `kafka-storage format`, chờ người dùng đồng ý).
 - [ ] A: trang HDFS (DataNode, cây thư mục, block của file), trang Kafka, trang Spark.
 - Xong khi: các số trên trang khớp NameNode UI `:9870`.
 

@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from . import config, errors
 from .clients import hdfs
-from .routes import core, stream
+from .routes import core, hdfs as hdfs_routes, infra, stream
 
 
 @asynccontextmanager
@@ -20,6 +20,8 @@ def create_app() -> FastAPI:
     app.add_middleware(CORSMiddleware, allow_origins=config.CORS_ORIGINS, allow_methods=["GET", "POST"], allow_headers=["Content-Type"])
     errors.install(app)
     app.include_router(core.router)
+    app.include_router(hdfs_routes.router)
+    app.include_router(infra.router)
     app.include_router(stream.router)
     return app
 

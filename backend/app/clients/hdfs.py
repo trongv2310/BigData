@@ -4,6 +4,7 @@ Không có hàm ghi. Nếu sau này cần ghi, phải đi qua app.writeguard.
 """
 import json
 from urllib.parse import quote
+from xml.etree import ElementTree
 
 import httpx
 
@@ -89,6 +90,19 @@ async def server_defaults() -> dict:
 
 async def read_text(path: str) -> str:
     return (await webhdfs(path, "OPEN")).text
+
+
+async def conf_value(name: str, default: str) -> str:
+    """Giá trị cấu hình đang áp dụng ở NameNode (servlet /conf trả XML). Không đọc được thì trả default."""
+    try:
+        r = await _get(f"{config.NAMENODE_HTTP}/conf", {"name": name})
+        if r.status_code == 200:
+            el = ElementTree.fromstring(r.text).find("./property/value")
+            if el is not None and el.text:
+                return el.text
+    except (HdfsUnreachable, ElementTree.ParseError):
+        pass
+    return default
 
 
 def parse_json_bean_field(bean: dict, field: str) -> dict:

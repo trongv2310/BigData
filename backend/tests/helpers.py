@@ -25,8 +25,10 @@ class FakeNameNode:
     {"/x": [LocatedBlock...]} cho GET_BLOCK_LOCATIONS khi đặt trong `blocks`.
     """
 
-    def __init__(self, jmx=None, files=None, blocks=None, defaults=None):
+    def __init__(self, jmx=None, files=None, blocks=None, defaults=None, conf=None, extra=None):
         self.jmx, self.files, self.blocks, self.defaults = jmx or {}, files or {}, blocks or {}, defaults
+        # conf: tên cấu hình -> giá trị; extra: đường dẫn GET bất kỳ -> JSON (ví dụ Spark REST)
+        self.conf, self.extra = conf or {}, extra or {}
         outer = self
 
         class H(BaseHTTPRequestHandler):
@@ -43,6 +45,13 @@ class FakeNameNode:
             def do_GET(self):
                 u = urlparse(self.path)
                 q = parse_qs(u.query)
+                if u.path in outer.extra:
+                    return self._send(200, outer.extra[u.path])
+                if u.path == "/conf":
+                    k = q["name"][0]
+                    if k not in outer.conf:
+                        return self._send(404, "")
+                    return self._send(200, f"<configuration><property><name>{k}</name><value>{outer.conf[k]}</value></property></configuration>")
                 if u.path == "/jmx":
                     bean = outer.jmx.get(q["qry"][0])
                     return self._send(200, {"beans": [bean] if bean else []})

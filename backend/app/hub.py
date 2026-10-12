@@ -1,14 +1,16 @@
 """Phát sự kiện thật cho /ws/stream. Chỉ chạy các vòng thăm dò khi có ít nhất một người nghe."""
 import asyncio
 import logging
+import time
 
-from . import services, stream_input
-from .clients import hdfs
+from . import config, services, stream_input
+from .clients import hdfs, kafka
 
 log = logging.getLogger("hub")
 
 STREAM_POLL_SECONDS = 1.0
 SERVICE_POLL_SECONDS = 5.0
+KAFKA_POLL_SECONDS = 5.0
 QUEUE_MAX = 200
 
 
@@ -22,7 +24,8 @@ class Hub:
         q: asyncio.Queue = asyncio.Queue(QUEUE_MAX)
         self._subs.add(q)
         if not self._tasks:
-            self._tasks = [asyncio.create_task(self._poll_stream_input()), asyncio.create_task(self._poll_services())]
+            self._tasks = [asyncio.create_task(self._poll_stream_input()), asyncio.create_task(self._poll_services()),
+                           asyncio.create_task(self._poll_kafka())]
         return q
 
     def unsubscribe(self, q: asyncio.Queue) -> None:
@@ -55,6 +58,26 @@ class Hub:
             except Exception:
                 log.exception("lỗi khi kiểm tra dịch vụ")
             await asyncio.sleep(SERVICE_POLL_SECONDS)
+
+    async def _poll_kafka(self):
+        """kafka.stats mỗi KAFKA_POLL_SECONDS: tốc độ tin/giây (từ độ tăng offset giữa hai lần hỏi) và tổng lag. Lần hỏi đầu chỉ lấy mốc."""
+        prev: tuple[float, int] | None = None
+        while True:
+            try:
+                topic = next((t for t in await kafka.snapshot() if t["name"] == config.KAFKA_TOPIC), None)
+                now = time.monotonic()
+                if topic is not None:
+                    total = topic["endOffsetTotal"]
+                    if prev is not None:
+                        rate = max(total - prev[1], 0) / max(now - prev[0], 1e-6)
+                        lag = sum(g["lag"] for g in topic["consumerGroups"])
+                        self.publish("kafka.stats", {"topic": topic["name"], "messagesPerSecond": round(rate, 2), "lagTotal": lag})
+                    prev = (now, total)
+            except kafka.KafkaUnreachable:
+                prev = None
+            except Exception:
+                log.exception("lỗi khi hỏi Kafka")
+            await asyncio.sleep(KAFKA_POLL_SECONDS)
 
     async def _poll_stream_input(self):
         """Báo `reading` cho mỗi file mới xuất hiện trong /stream_input (file đã có lúc bắt đầu nghe thì bỏ qua)."""

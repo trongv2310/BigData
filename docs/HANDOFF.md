@@ -15,6 +15,20 @@ Mẫu:
 
 ## Backend (Claude)
 
+### 2026-10-12 — P2: /api/hdfs/*, /api/kafka/topics, /api/spark/applications
+- Xong: `GET /api/hdfs/summary|datanodes|files|blocks` (NameNode JMX + WebHDFS, chỉ đọc), `GET /api/spark/applications` (Spark REST, quét cổng 4040-4043), `GET /api/kafka/topics`, và sự kiện `kafka.stats` trên `/ws/stream` (mỗi 5 giây, bỏ qua lần đo đầu).
+- Đã kiểm thật trên cụm của người dùng: số liệu khớp `hdfs dfsadmin -report`, `hdfs fsck /raw/Dataset.csv -files -blocks -locations` (4 block, đúng blockId và DataNode); `check_live.py` báo OK schema và không lệch cấu trúc so với mock. Spark kiểm bằng một ứng dụng PySpark thử (không đụng HDFS), thấy đúng id/tên/số job.
+- **Chưa kiểm với Kafka thật:** Kafka không chạy được (thư mục `/tmp/kraft-combined-logs` đã mất sau khi WSL khởi động lại; muốn chạy phải `kafka-storage format`, tức tạo cụm mới, tôi chưa làm). Mã Kafka chỉ được test với dữ liệu giả và với trường hợp broker tắt (trả 503 `KAFKA_UNREACHABLE`). Không rõ `kafka-python-ng 2.2.3` tương thích Kafka 4.1.2 (KRaft); sẽ biết khi chạy thật.
+- Quy ước cần frontend biết:
+  - Tên DataNode = khóa của NameNode `host:xferPort` (ví dụ `DESKTOP-HHFANUM.localdomain:9866`); `HdfsBlock.locations[]` dùng đúng chuỗi này, nên ghép trực tiếp với `/api/hdfs/datanodes`. Cả 4 DataNode cùng một host, chỉ khác cổng.
+  - `filesTotal` = số file **và thư mục** (như NameNode UI "files and directories"). `blocksTotal` là số block, không phải số bản sao (4 DataNode giữ tổng 38 bản sao của 24 block vì có file replication > 1).
+  - `capacityTotalBytes` = tổng 4 DataNode, mỗi cái báo cả đĩa host (~1 TB), nên ~4 TB là số thật nhưng đĩa vật lý chỉ có một.
+  - `defaultBlockSizeBytes` là 128 MiB (cấu hình cụm), nhưng `/raw/Dataset.csv` được ghi với block 1 MiB, lấy từ `blockSizeBytes` của từng file.
+  - Lỗi: 404 `NOT_FOUND`; 400 `BAD_PATH` (không bắt đầu bằng `/` hoặc có `..`), `NOT_A_DIRECTORY`, `NOT_A_FILE`; 503 `HDFS_UNREACHABLE`, `KAFKA_UNREACHABLE`. Spark không chạy thì `/api/spark/applications` trả `{"applications": []}` (200), không phải lỗi, vì UI Spark chỉ tồn tại khi có ứng dụng.
+  - Topic nội bộ Kafka (tên bắt đầu `__`) bị ẩn. `SparkApplication.state` chỉ có `running` hoặc `completed` (Spark REST không báo failed ở mức ứng dụng).
+- Phát hiện cho người dùng: trong HDFS `/raw` có file thừa tên `Dataset.csv` (có ký tự xuống dòng ở cuối tên, do một lệnh `hdfs dfs -put` từ file .sh/.bat CRLF). Backend trả nguyên tên; UI nên hiển thị an toàn. Thư mục `/stream_input` đang trống.
+- Chưa làm: `spark.progress` (Structured Streaming không lộ tiến độ micro-batch qua REST của UI; cần listener hoặc đọc log, để sau).
+
 ### 2026-10-12 — P1: backend chạy, /api/services thật, /ws/stream
 - Xong: FastAPI trong `backend/` (cổng 8000). `GET /api/services` gọi thật từng cổng (NameNode JMX, 4 cổng HTTP DataNode, YARN REST, TCP Kafka, Spark UI 4040-4043, Airflow /health). `ws://localhost:8000/ws/stream`: lúc nối gửi trạng thái 8 dịch vụ (`service.state`), sau đó `service.state` khi có đổi và `reading` cho mỗi file mới trong HDFS `/stream_input`. Lỗi trả đúng schema `Error` (kể cả 404/400 mặc định của FastAPI).
 - Chạy thế nào (trong WSL): `cd backend && python3 -m uvicorn app.main:app --host 127.0.0.1 --port 8000`. Cần HDFS đang chạy (`bash ~/start-4nodes.sh`). Test: `cd backend && python3 -W ignore -m unittest discover tests`; kiểm backend đang chạy: `python3 backend/tools/check_live.py`.
@@ -33,16 +47,4 @@ Mẫu:
 
 ## Frontend (Antigravity)
 
-### 2026-10-12 15:30 — Hoàn tất P1, P2, P3 Frontend
-- Xong:
-  + P1: Dự án Vite + React 19 + TypeScript + Tailwind CSS; sinh kiểu tự động từ `docs/contract/openapi.yaml` (`npm run generate:types`); khung điều hướng responsive hỗ trợ di động; lớp `StreamSource` với `ReplaySource` (đọc `mock/stream-events.ndjson`) và `WebSocketSource` (kết nối `/ws/stream` với backoff tái kết nối 1-15s); thanh Ticker sự kiện trực tiếp; trang Tổng quan đọc `/api/services`, cập nhật `service.state`, thẻ số liệu CO trực tiếp, cảnh báo trạm mô phỏng, nguồn dữ liệu và trạng thái CO từ backend.
-  + P2: Trang HDFS (tóm tắt cụm `/api/hdfs/summary`, danh sách `/api/hdfs/datanodes`, duyệt cây tệp tin `/api/hdfs/files`, modal xem blocks `/api/hdfs/blocks`, lịch sử `hdfs.op`); trang Kafka (`/api/kafka/topics`, theo dõi `kafka.stats`); trang Spark (`/api/spark/applications`, theo dõi `spark.progress`).
-  + P3: Trang Phân tích CO & AQI: Biểu đồ chuỗi thời gian theo giờ/ngày/tháng (`/api/aqi/series`), biểu đồ nhịp sinh học 24 giờ (`/api/aqi/hourly-profile`); ĐẶC BIỆT: Tách rời và đánh dấu điểm gãy dữ liệu ngày 01/07/2025, tuyệt đối không nối mượt qua điểm này; ghi chú cảnh báo trạm mô phỏng luân phiên; hiển thị nguồn dữ liệu (`source`).
-- Chạy thế nào:
-  + Mock server: `python mock/serve.py` (cổng 8010)
-  + Frontend: `cd frontend && npm install && npm run dev` (truy cập `http://localhost:5173`)
-  + Build production: `cd frontend && npm run build`
-- Chưa làm / đang giả lập: P4 (Sơ đồ luồng sống) và P5 (Terminal xterm.js, SQL, dự đoán CO). Đang chạy với mock server 8010 và ReplaySource phát lại luồng sự kiện.
-- Cần bên kia: Backend thật (FastAPI) triển khai các route REST và `/ws/stream`. Frontend đã sẵn sàng chuyển sang backend thật qua `VITE_API_BASE=http://localhost:8000` và `VITE_STREAM=ws`.
-- Vấn đề phát hiện: Không có. Schema và contract hoàn toàn khớp, build TypeScript sạch sẽ không có lỗi.
-
+(chưa có)
