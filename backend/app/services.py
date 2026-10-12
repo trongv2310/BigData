@@ -100,7 +100,7 @@ async def check_all() -> list[dict]:
         return _cache[1]
     (nn, info), (rm, nm), kafka, spark, airflow = await asyncio.gather(_namenode(), _yarn(), _kafka(), _spark(), _airflow())
     dn = await _datanode(info)
-    backend = _status("Backend", "backend", "up", "http://localhost:8000", f"FastAPI, luồng /ws/stream: {config.STREAM_MODE}")
+    backend = _status("Backend", "backend", "up", "http://localhost:8000", f"FastAPI, luồng /ws/stream: {config.STREAM_MODE}" + ("" if config.STREAM_SOURCE == "hdfs" else f", nguồn reading: {config.STREAM_SOURCE}"))
     result = [nn, dn, rm, nm, kafka, spark, airflow, backend]
     _cache = (time.monotonic(), result)
     return result
