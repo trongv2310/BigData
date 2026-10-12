@@ -13,18 +13,16 @@ import {
   AlertCircle,
   RefreshCw,
   Info,
+  Radio,
+  Zap,
+  Database,
 } from 'lucide-react';
 import { api } from '../services/api';
 import { useStream } from '../context/useStream';
 import type { FlowList, FlowDefinition, FlowSummary } from '../types';
 
-// Các bước được quan sát thật từ NameNode log (theo HANDOFF.md P4)
-const OBSERVED_REAL_STEPS = new Set([2, 7, 8]);
-// Bước 9 là tác vụ checkpoint nền, không phát theo từng file ghi
-const BACKGROUND_STEPS = new Set([9]);
-
 export const FlowsTab: React.FC = () => {
-  const { flowStepsByRunId, latestFlowRunId, recentHdfsOps } = useStream();
+  const { flowStepsByFlow, latestRunIdByFlow, recentHdfsOps } = useStream();
   const [flows, setFlows] = useState<FlowSummary[]>([]);
   const [selectedFlowId, setSelectedFlowId] = useState<string>('hdfs-write');
   const [currentFlow, setCurrentFlow] = useState<FlowDefinition | null>(null);
@@ -102,10 +100,36 @@ export const FlowsTab: React.FC = () => {
     };
   }, [selectedFlowId]);
 
-  const runIds = Object.keys(flowStepsByRunId);
-  const activeRun = userSelectedRunId || latestFlowRunId || (runIds.length > 0 ? runIds[runIds.length - 1] : null);
-  const activeStepsForRun = activeRun ? flowStepsByRunId[activeRun] || [] : [];
+  // Đổi luồng và reset run đã chọn thủ công
+  const handleSelectFlow = (flowId: string) => {
+    setSelectedFlowId(flowId);
+    setUserSelectedRunId(null);
+  };
+
+  // QUAN TRỌNG: Lọc flow.step nghiêm ngặt theo selectedFlowId
+  const runsForFlow = flowStepsByFlow[selectedFlowId] || {};
+  const runIds = Object.keys(runsForFlow);
+  const latestRunForFlow = latestRunIdByFlow[selectedFlowId] || null;
+  const activeRun =
+    userSelectedRunId && runsForFlow[userSelectedRunId]
+      ? userSelectedRunId
+      : latestRunForFlow || (runIds.length > 0 ? runIds[runIds.length - 1] : null);
+  const activeStepsForRun = activeRun ? runsForFlow[activeRun] || [] : [];
   const completedStepOrders = new Set(activeStepsForRun.map((s) => s.step));
+
+  // Kiểm tra bước là Quan sát thật
+  const isStepReal = (flowId: string, order: number): boolean => {
+    if (flowId === 'hdfs-write') return order === 2 || order === 7 || order === 8;
+    if (flowId === 'kafka-produce') return order === 2; // ACK kèm offset là quan sát thật
+    if (flowId === 'spark-streaming') return false; // Cả 4 bước đều là suy ra từ micro-batch thành công
+    return false;
+  };
+
+  // Kiểm tra bước là Tác vụ nền
+  const isStepBackground = (flowId: string, order: number): boolean => {
+    if (flowId === 'hdfs-write') return order === 9;
+    return false;
+  };
 
   const getComponentIcon = (kind: string) => {
     switch (kind) {
@@ -116,12 +140,78 @@ export const FlowsTab: React.FC = () => {
         return <Server className="w-5 h-5 text-indigo-400" />;
       case 'datanode':
         return <HardDrive className="w-5 h-5 text-emerald-400" />;
+      case 'kafka-broker':
+        return <Radio className="w-5 h-5 text-purple-400" />;
       case 'spark':
+        return <Zap className="w-5 h-5 text-amber-400" />;
+      case 'storage':
+        return <Database className="w-5 h-5 text-emerald-400" />;
       case 'yarn':
         return <Cpu className="w-5 h-5 text-amber-400" />;
       default:
         return <Layers className="w-5 h-5 text-slate-400" />;
     }
+  };
+
+  const renderFlowGuidance = () => {
+    if (selectedFlowId === 'hdfs-write') {
+      return (
+        <div className="p-4 rounded-xl bg-sky-500/10 border border-sky-500/20 text-xs text-sky-300 flex items-start gap-3">
+          <Info className="w-5 h-5 shrink-0 text-sky-400 mt-0.5" />
+          <div className="space-y-1">
+            <p className="font-semibold text-sky-200">
+              Quan sát các bước sáng lên theo thời gian thực (HDFS Write):
+            </p>
+            <p className="text-slate-300">
+              Chạy lệnh sau trong terminal WSL Ubuntu để phát bản ghi qua HDFS:
+            </p>
+            <code className="block bg-slate-950/80 px-2.5 py-1.5 rounded font-mono text-amber-300 border border-slate-800">
+              python3 infra/replay_producer.py --count 20 --interval 3
+            </code>
+            <p className="text-slate-400 text-[11px]">
+              * Lưu ý: Bước 2, 7, 8 quan sát thật từ NameNode log; Bước 1, 3, 4, 5, 6 suy ra. Sự kiện <code>reading</code> có thể tới trước các bước 4-6 vì backend đọc file ngay khi đổi tên.
+            </p>
+          </div>
+        </div>
+      );
+    }
+    if (selectedFlowId === 'kafka-produce') {
+      return (
+        <div className="p-4 rounded-xl bg-purple-500/10 border border-purple-500/20 text-xs text-purple-300 flex items-start gap-3">
+          <Info className="w-5 h-5 shrink-0 text-purple-400 mt-0.5" />
+          <div className="space-y-1">
+            <p className="font-semibold text-purple-200">
+              Luồng Kafka Producer (Open-Meteo → Kafka topic hcmc_co_stream):
+            </p>
+            <p className="text-slate-300">
+              <code>live_producer.py</code> lấy CO và thời tiết từ Open-Meteo và chỉ gửi vào topic khi có quan sát mới.
+            </p>
+            <p className="text-slate-400 text-[11px]">
+              * <strong>Bước 2 (ACK kèm offset)</strong> là quan sát thật sau khi bản ghi đã nằm trong log trên đĩa; <strong>Bước 1 (send)</strong> là suy ra. Run ID có dạng <code>kafka-p&#123;partition&#125;-o&#123;offset&#125;</code> (ví dụ: <code>kafka-p0-o7</code>).
+            </p>
+          </div>
+        </div>
+      );
+    }
+    if (selectedFlowId === 'spark-streaming') {
+      return (
+        <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300 flex items-start gap-3">
+          <Info className="w-5 h-5 shrink-0 text-amber-400 mt-0.5" />
+          <div className="space-y-1">
+            <p className="font-semibold text-amber-200">
+              Luồng Spark Structured Streaming (Kafka → Spark → HDFS /live):
+            </p>
+            <p className="text-slate-300">
+              Ứng dụng Spark Structured Streaming đọc từ Kafka theo offset, tính tích lũy CO và ghi Parquet kèm checkpoint vào HDFS.
+            </p>
+            <p className="text-slate-400 text-[11px]">
+              * <strong>Tất cả 4 bước đều là SUY RA</strong> từ việc micro-batch (job Spark) thành công (do Spark REST không lộ chi tiết từng bước con). Run ID có dạng <code>spark-batch-&#123;batchId&#125;</code> (ví dụ: <code>spark-batch-12</code>).
+            </p>
+          </div>
+        </div>
+      );
+    }
+    return null;
   };
 
   return (
@@ -134,7 +224,7 @@ export const FlowsTab: React.FC = () => {
             Sơ đồ Luồng Kỹ thuật & Theo dõi Bước Trực tiếp
           </h2>
           <p className="text-sm text-slate-400">
-            Giám sát quy trình truyền nhận, ghi dữ liệu HDFS theo thời gian thực từ NameNode log
+            Giám sát quy trình truyền nhận, ghi dữ liệu HDFS, Kafka và Spark Streaming theo thời gian thực
           </p>
         </div>
         <button
@@ -165,7 +255,7 @@ export const FlowsTab: React.FC = () => {
           return (
             <button
               key={f.id}
-              onClick={() => setSelectedFlowId(f.id)}
+              onClick={() => handleSelectFlow(f.id)}
               className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium transition flex items-center gap-2 border ${
                 isSelected
                   ? 'bg-sky-500/10 text-sky-400 border-sky-500/40 shadow-sm'
@@ -204,7 +294,7 @@ export const FlowsTab: React.FC = () => {
               </p>
             </div>
 
-            {/* RunId selector */}
+            {/* RunId selector - Chỉ hiện runId của flow hiện tại */}
             <div className="flex flex-col sm:flex-row sm:items-center gap-2">
               <span className="text-xs text-slate-400">Phiên chạy (Run ID):</span>
               {runIds.length > 0 ? (
@@ -215,36 +305,20 @@ export const FlowsTab: React.FC = () => {
                 >
                   {runIds.map((rid) => (
                     <option key={rid} value={rid}>
-                      {rid} {rid === latestFlowRunId ? '(Mới nhất)' : ''}
+                      {rid} {rid === latestRunForFlow ? '(Mới nhất)' : ''}
                     </option>
                   ))}
                 </select>
               ) : (
                 <span className="text-xs font-mono text-slate-500 bg-slate-800/60 px-3 py-1.5 rounded-lg border border-slate-800">
-                  Chưa có lượt chạy nào trong phiên này
+                  Chưa có lượt chạy nào cho luồng này
                 </span>
               )}
             </div>
           </div>
 
-          {/* Hướng dẫn thử nghiệm trong WSL */}
-          <div className="p-4 rounded-xl bg-sky-500/10 border border-sky-500/20 text-xs text-sky-300 flex items-start gap-3">
-            <Info className="w-5 h-5 shrink-0 text-sky-400 mt-0.5" />
-            <div className="space-y-1">
-              <p className="font-semibold text-sky-200">
-                Quan sát các bước sáng lên theo thời gian thực:
-              </p>
-              <p className="text-slate-300">
-                Chạy lệnh sau trong terminal WSL Ubuntu để phát bản ghi qua HDFS:
-              </p>
-              <code className="block bg-slate-950/80 px-2.5 py-1.5 rounded font-mono text-amber-300 border border-slate-800">
-                python3 infra/replay_producer.py --count 20 --interval 3
-              </code>
-              <p className="text-slate-400 text-[11px]">
-                * Lưu ý: Sự kiện <code>reading</code> có thể tới trước các bước 4-6 vì backend đọc file ngay khi đổi tên.
-              </p>
-            </div>
-          </div>
+          {/* Hướng dẫn thử nghiệm / chi tiết kỹ thuật của luồng */}
+          {renderFlowGuidance()}
 
           {/* Thành phần tham gia (Components) */}
           <div className="space-y-3">
@@ -295,8 +369,8 @@ export const FlowsTab: React.FC = () => {
 
             <div className="space-y-2">
               {currentFlow.steps.map((st) => {
-                const isReal = OBSERVED_REAL_STEPS.has(st.order);
-                const isBg = BACKGROUND_STEPS.has(st.order);
+                const isReal = isStepReal(currentFlow.id, st.order);
+                const isBg = isStepBackground(currentFlow.id, st.order);
                 const isCompleted = completedStepOrders.has(st.order);
 
                 return (
@@ -437,7 +511,7 @@ export const FlowsTab: React.FC = () => {
           </h3>
           <p className="text-xs text-slate-400 max-w-md mx-auto">
             Luồng này hiện đang trong trạng thái kế hoạch (planned). Hãy chọn luồng{' '}
-            <strong className="text-sky-400">"HDFS ghi file"</strong> để xem sơ đồ thành phần và các bước thực thi trực tiếp.
+            <strong className="text-sky-400">"HDFS ghi file"</strong> (hoặc luồng khả dụng khác khi bật FLOWS_EXTRA) để xem sơ đồ thành phần và các bước thực thi trực tiếp.
           </p>
         </div>
       )}

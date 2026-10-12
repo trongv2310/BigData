@@ -449,6 +449,9 @@ export interface components {
              * @description Chỉ chấp nhận một câu SELECT (hoặc WITH ... SELECT). Bảng duy nhất là `aqi` (bộ Kaggle, đọc từ HDFS /raw/Dataset.csv) với các cột:
              *     datetime_utc (timestamp, giờ gốc UTC), datetime_vn (timestamp, = UTC + 7 giờ), hour_vn, month_vn, year_vn,
              *     aqi_label, co, no, no2, o3, so2, pm2_5, pm10, nh3, temperature_C, humidity_pct, rain_mm, wind_speed_kmh, is_event_anomaly, o3_was_missing.
+             *     Có thể có thêm bảng `live` (dữ liệu sống Spark ghi từ Kafka vào HDFS /live/co_stream; chưa có dữ liệu thì bảng này không tồn tại) với các cột:
+             *     datetime_vn (timestamp, giờ Việt Nam), station, co, wind_speed_kmh, temperature_C, co_accumulation_index, canh_bao,
+             *     co_observed_at, weather_observed_at, provider, kafka_partition, kafka_offset, kafka_timestamp (UTC). Khác bộ Kaggle, nên không trộn hai bảng vào một chuỗi.
              *     Giá trị timestamp trả về dạng chuỗi "yyyy-MM-dd HH:mm:ss". Lần gọi đầu tiên khởi động Spark nên có thể mất 10 giây trở lên.
              */
             query: string;

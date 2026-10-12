@@ -14,16 +14,24 @@ import type { SqlResponse } from '../types';
 
 const SAMPLE_QUERIES = [
   {
-    title: 'Trung bình CO theo Tháng',
+    title: 'Bảng aqi: Trung bình CO theo Tháng',
     sql: 'SELECT year_vn, month_vn, round(avg(co), 2) as avg_co, count(*) as n FROM aqi GROUP BY year_vn, month_vn ORDER BY year_vn, month_vn',
   },
   {
-    title: '20 Bản ghi Gần nhất',
+    title: 'Bảng aqi: 20 Bản ghi Gần nhất',
     sql: 'SELECT datetime_vn, co, pm2_5, pm10, aqi_label FROM aqi ORDER BY datetime_utc DESC LIMIT 20',
   },
   {
-    title: 'Trung bình CO theo Giờ (từ 2025)',
+    title: 'Bảng aqi: Trung bình CO theo Giờ (từ 2025)',
     sql: 'SELECT hour_vn, round(avg(co), 2) as avg_co, round(avg(temperature_C), 1) as avg_temp FROM aqi WHERE year_vn >= 2025 GROUP BY hour_vn ORDER BY hour_vn',
+  },
+  {
+    title: 'Bảng live: 10 Bản ghi Mới nhất',
+    sql: 'SELECT datetime_vn, co, wind_speed_kmh, temperature_C, canh_bao, kafka_offset FROM live ORDER BY datetime_vn DESC LIMIT 10',
+  },
+  {
+    title: 'Bảng live: Thống kê CO theo Trạm',
+    sql: 'SELECT station, round(avg(co), 2) as avg_co, count(*) as n, min(co) as min_co, max(co) as max_co FROM live GROUP BY station',
   },
 ];
 
@@ -48,6 +56,22 @@ const AQI_COLUMNS = [
   'wind_speed_kmh',
   'is_event_anomaly',
   'o3_was_missing',
+];
+
+const LIVE_COLUMNS = [
+  'datetime_vn',
+  'station',
+  'co',
+  'wind_speed_kmh',
+  'temperature_C',
+  'co_accumulation_index',
+  'canh_bao',
+  'co_observed_at',
+  'weather_observed_at',
+  'provider',
+  'kafka_partition',
+  'kafka_offset',
+  'kafka_timestamp',
 ];
 
 export const SqlTab: React.FC = () => {
@@ -101,7 +125,7 @@ export const SqlTab: React.FC = () => {
             SparkSQL — Truy vấn Dữ liệu Lớn Trực tiếp
           </h2>
           <p className="text-sm text-slate-400">
-            Truy vấn bảng <code>aqi</code> đọc từ HDFS <code>/raw/Dataset.csv</code> thông qua Apache Spark engine
+            Truy vấn bảng <code>aqi</code> (bộ Kaggle trên HDFS) và bảng <code>live</code> (luồng Spark Kafka Streaming trên HDFS) thông qua Apache Spark engine
           </p>
         </div>
       </div>
@@ -189,7 +213,7 @@ export const SqlTab: React.FC = () => {
 
       {/* Error alert */}
       {error && (
-        <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs sm:text-sm space-y-1">
+        <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs sm:text-sm space-y-2">
           <div className="flex items-center gap-2 font-bold text-rose-400">
             <AlertTriangle className="w-4 h-4 shrink-0" />
             <span>
@@ -199,9 +223,26 @@ export const SqlTab: React.FC = () => {
             </span>
           </div>
           <p className="font-mono text-slate-200 pl-6">{error.message}</p>
+          {error.code === 'SQL_ERROR' && (
+            <div className="ml-6 p-3 rounded-lg bg-slate-950/70 border border-amber-500/20 text-xs space-y-1.5 text-slate-300">
+              <div className="font-semibold text-amber-300 flex items-center gap-1.5">
+                <Info className="w-3.5 h-3.5 text-amber-400" />
+                Giải thích lỗi câu lệnh:
+              </div>
+              {error.message.toLowerCase().includes('live') || query.toLowerCase().includes('live') ? (
+                <p className="text-slate-300 leading-relaxed">
+                  Nếu bạn đang truy vấn bảng <code>live</code>: Bảng này chỉ tồn tại sau khi Spark Streaming hoàn tất ít nhất một micro-batch ghi vào HDFS <code>/live/co_stream</code>. Nếu luồng live chưa phát dữ liệu hoặc Spark vừa khởi động lại, lỗi <code>Table or view not found: live</code> là hoàn toàn bình thường.
+                </p>
+              ) : (
+                <p className="text-slate-300 leading-relaxed">
+                  Vui lòng kiểm tra cú pháp câu lệnh SQL hoặc tên các cột trong bảng được liệt kê ở phần cấu trúc schema bên dưới.
+                </p>
+              )}
+            </div>
+          )}
           {error.code === 'SQL_NOT_ALLOWED' && (
             <p className="text-[11px] text-slate-400 pl-6">
-              * Lưu ý: Hệ thống chỉ cho phép các câu lệnh SELECT đơn lẻ trên bảng <code>aqi</code>. Không cho phép dấu chấm phẩy (;), lệnh ghi (INSERT, DROP...), hoặc hàm reflect.
+              * Lưu ý: Hệ thống chỉ cho phép các câu lệnh SELECT đơn lẻ trên bảng <code>aqi</code> hoặc <code>live</code>. Không cho phép dấu chấm phẩy (;), lệnh ghi (INSERT, DROP...), hoặc hàm reflect.
             </p>
           )}
           {error.code === 'SQL_TIMEOUT' && (
@@ -291,30 +332,81 @@ export const SqlTab: React.FC = () => {
         </div>
       )}
 
-      {/* Schema reference card */}
-      <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800/80 space-y-3">
-        <h4 className="text-xs font-bold text-slate-300 flex items-center gap-2 uppercase tracking-wider">
-          <Table className="w-4 h-4 text-amber-400" />
-          Bảng <code>aqi</code> & Danh sách các cột khả dụng
-        </h4>
-        <p className="text-xs text-slate-400">
-          Tập dữ liệu chất lượng không khí TP.HCM sau tiền xử lý (35 064 dòng từ 2022-04 đến 2026-04). Các cột ngày giờ đã được chuyển sang múi giờ Việt Nam (UTC+7):
+      {/* Important Data Source Warning */}
+      <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs sm:text-sm space-y-1.5">
+        <div className="flex items-center gap-2 font-bold text-amber-400">
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          <span>Quy ước Nguồn Dữ liệu: Không trộn bảng live và bảng aqi</span>
+        </div>
+        <p className="text-slate-300 pl-6 leading-relaxed">
+          Bảng <code>aqi</code> là tập dữ liệu lịch sử OpenWeather (Kaggle), giá trị trung bình sau điểm gãy 01/07/2025 là ~300 µg/m³. Bảng <code>live</code> thu thập trực tiếp từ mô hình khí quyển Open-Meteo (CAMS), giá trị đo quan sát thực tế dao động 1678–2508 µg/m³ (ngày 12–13/10/2026). Hai nguồn sử dụng phương pháp mô hình và chuẩn gốc khác nhau hoàn toàn, tuyệt đối <strong>không trộn (JOIN / UNION)</strong> vào cùng một chuỗi phân tích.
         </p>
-        <div className="flex flex-wrap gap-1.5 pt-1">
-          {AQI_COLUMNS.map((col) => (
-            <code
-              key={col}
-              onClick={() => {
-                if (!query.includes(col)) {
-                  setQuery((prev) => `${prev} ${col}`);
-                }
-              }}
-              title="Nhấn để chèn vào câu truy vấn"
-              className="text-xs px-2 py-1 rounded bg-slate-800 text-slate-300 font-mono border border-slate-700/80 hover:bg-slate-700 hover:text-amber-300 cursor-pointer transition"
-            >
-              {col}
-            </code>
-          ))}
+      </div>
+
+      {/* Schema reference cards */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Table aqi */}
+        <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800/80 space-y-3">
+          <div className="flex items-center justify-between">
+            <h4 className="text-xs font-bold text-slate-300 flex items-center gap-2 uppercase tracking-wider">
+              <Table className="w-4 h-4 text-amber-400" />
+              Bảng <code>aqi</code> (Lịch sử Kaggle)
+            </h4>
+            <span className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-400 font-mono">
+              35 064 dòng • HDFS /raw
+            </span>
+          </div>
+          <p className="text-xs text-slate-400">
+            Dữ liệu chất lượng không khí TP.HCM sau tiền xử lý (2022-04 đến 2026-04). Giờ đã chuyển múi giờ Việt Nam (UTC+7):
+          </p>
+          <div className="flex flex-wrap gap-1.5 pt-1">
+            {AQI_COLUMNS.map((col) => (
+              <code
+                key={col}
+                onClick={() => {
+                  if (!query.includes(col)) {
+                    setQuery((prev) => `${prev} ${col}`);
+                  }
+                }}
+                title="Nhấn để chèn vào câu truy vấn"
+                className="text-xs px-2 py-1 rounded bg-slate-800 text-slate-300 font-mono border border-slate-700/80 hover:bg-slate-700 hover:text-amber-300 cursor-pointer transition"
+              >
+                {col}
+              </code>
+            ))}
+          </div>
+        </div>
+
+        {/* Table live */}
+        <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800/80 space-y-3">
+          <div className="flex items-center justify-between">
+            <h4 className="text-xs font-bold text-slate-300 flex items-center gap-2 uppercase tracking-wider">
+              <Table className="w-4 h-4 text-emerald-400" />
+              Bảng <code>live</code> (Kafka Streaming)
+            </h4>
+            <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-mono">
+              Parquet • HDFS /live/co_stream
+            </span>
+          </div>
+          <p className="text-xs text-slate-400">
+            Dữ liệu sống Spark Structured Streaming nạp từ topic Kafka <code>hcmc_co_stream</code> (Open-Meteo). Bảng dựng lại mỗi truy vấn:
+          </p>
+          <div className="flex flex-wrap gap-1.5 pt-1">
+            {LIVE_COLUMNS.map((col) => (
+              <code
+                key={col}
+                onClick={() => {
+                  if (!query.includes(col)) {
+                    setQuery((prev) => `${prev} ${col}`);
+                  }
+                }}
+                title="Nhấn để chèn vào câu truy vấn"
+                className="text-xs px-2 py-1 rounded bg-slate-800 text-slate-300 font-mono border border-slate-700/80 hover:bg-slate-700 hover:text-emerald-300 cursor-pointer transition"
+              >
+                {col}
+              </code>
+            ))}
+          </div>
         </div>
       </div>
     </div>
