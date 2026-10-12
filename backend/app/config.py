@@ -36,6 +36,9 @@ STREAM_MODE = _env("STREAM_MODE", "live")
 STREAM_REPLAY_FILE = Path(_env("STREAM_REPLAY_FILE", str(REPO_ROOT / "mock" / "stream-events.ndjson")))
 STREAM_MAX_EVENTS_PER_SECOND = 20  # events.md
 
+# Log của NameNode (backend chỉ đọc) để phát hdfs.op / flow.step
+HADOOP_LOG_DIR = _env("HADOOP_LOG_DIR", "/home/trong/hadoop/logs")
+
 # Ghi lên HDFS/Kafka/Spark: mặc định TẮT (xem app/writeguard.py)
 ALLOW_WRITES = _flag("BACKEND_ALLOW_WRITES")
 

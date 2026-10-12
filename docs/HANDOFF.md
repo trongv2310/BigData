@@ -15,6 +15,23 @@ Mẫu:
 
 ## Backend (Claude)
 
+### 2026-10-12 — P4: /api/flows, hdfs.op và flow.step thật từ log NameNode
+- Xong: `GET /api/flows`, `GET /api/flows/hdfs-write` (các id khác trả 404 `NOT_FOUND`; `hdfs-read`, `kafka-produce`, `spark-streaming`, `sparksql` vẫn `planned`). Trên `/ws/stream` (chế độ live) có thêm `hdfs.op` và `flow.step`. Backend đọc (chỉ đọc file) log NameNode `~/hadoop/logs/hadoop-*-namenode-*.log`, bắt đầu từ cuối file nên không phát lại lịch sử. Không đổi cấu hình Hadoop nào.
+- Thử thế nào: `python3 backend/tools/watch_stream.py` (backend phải chạy), rồi ở cửa sổ WSL khác: `hdfs dfs -put -f file.json /stream_input/`.
+- **Quan sát thật hay suy ra** (UI cần ghi chú "suy ra" cho các bước dưới, theo events.md):
+  - Thật: bước 2 (dòng `allocate`), bước 7 (dòng `completeFile`), bước 8 (đổi tên `._COPYING_`: kiểm file tên cuối đã tồn tại qua WebHDFS, hoặc dòng audit `rename` nếu audit bật), `hdfs.op` `addBlock` và `close`, `hdfs.op` `rename`.
+  - Suy ra: bước 1 (log mặc định không ghi `create`; suy từ lần cấp block đầu tiên của file, vì không thể cấp block cho file chưa tạo), bước 3 (cùng dòng allocate), bước 4, 5, 6: sau khi file đóng, bảng block của NameNode (WebHDFS) xác nhận mỗi block có độ dài và có DataNode giữ bản sao, nên suy ra dữ liệu đã tới DataNode, được ACK, DataNode đã báo blockReceived. Không có gói tin nào được quan sát, và log của DataNode 2-4 không được ghi (chúng chạy bằng `hdfs datanode` trực tiếp, log đi vào /dev/null).
+  - Không phát: bước 9 (checkpoint nền, không gắn với một lượt ghi).
+- Quy ước cho frontend:
+  - Chỉ có state `done` (không có `started`): backend biết sau khi bước xảy ra. UI coi `done` đứng một mình là bước đã xong.
+  - Thứ tự phát của file nhiều block: 1, rồi (2,3) cho từng block, rồi (4,5,6) cho từng block, 7, 8. File một block (như `/stream_input/*.json`) ra đúng 1..8. Mỗi lượt ghi một `runId` (`run-xxxxxxxx`), gắn theo đường dẫn file.
+  - `hdfs.op.path` là đường dẫn đang ghi, có đuôi `._COPYING_` cho đến lúc đổi tên; `rename` mang đường dẫn cuối. `addBlock.datanode` là DataNode đầu pipeline, cùng dạng tên với `/api/hdfs/datanodes` (`host:cổng`); `close.bytes` là tổng độ dài các block, null nếu NameNode chưa trả được.
+  - Thành phần `datanode-1` trong định nghĩa luồng là "DataNode đầu pipeline"; tên thật nằm ở `hdfs.op.datanode`. Nhãn bước 4 đã bỏ chuyện "cổng 9866" vì cụm có 4 DataNode (mock `flow-hdfs-write.json` và `flows.json` đã đổi theo, có test giữ backend và mock không lệch).
+  - Mọi ghi của Spark (thư mục `_temporary`, `_SUCCESS`, parquet) cũng ra sự kiện; UI nên lọc theo `path` nếu chỉ muốn thấy `/stream_input`.
+- `create`, `mkdir`, `delete` chỉ phát khi bật audit log của NameNode (mặc định tắt: `hdfs.audit.logger=INFO,NullAppender`). Mã đọc audit đã viết và test với dòng mẫu đúng định dạng, **chưa thử với audit log thật**. Bật audit là đổi cấu hình và khởi động lại NameNode, nên để người dùng quyết định (cần đặt `HDFS_AUDIT_LOGGER=INFO,RFAAUDIT` cho NameNode).
+- Kiểm tra đã làm: 61 test; chạy lại các dòng log thật của lượt `put /raw/Dataset.csv` (2026-10-01) qua bộ theo dõi nối NameNode thật cho ra bước 1..8, 4 `addBlock` đúng blockId/DataNode, `close.bytes` = 3 179 004 (đúng kích thước file). Chưa chạy với một `put` thật đang diễn ra và chưa nhìn qua giao diện.
+- Chưa làm: `flow.step` cho các luồng khác (đọc HDFS, Kafka, Spark); luồng Kafka chờ quyết định D1 chính thức.
+
 ### 2026-10-12 — P3: /api/aqi/series, /hourly-profile, /latest (bộ Kaggle, D4 tạm)
 - Xong: ba route, đúng schema, kiểm bằng `check_live.py` và 43 test (`cd backend && python3 -W ignore -m unittest discover tests`). Đọc file `hcmc_aqi_dataset_after_preprocess_final.csv` (đường dẫn `AQI_CSV_PATH`); không có file thì đọc `/raw/Dataset.csv` trên HDFS, đã kiểm hai nguồn cho kết quả y hệt.
 - **Mock đã đổi** (`mock/aqi-series-month.json`, `mock/aqi-hourly-profile.json`): sinh lại từ chính mã backend bằng `backend/tools/regen_mock_aqi.py` để mock và backend cùng số. Ghi chú cũ trong mock sai ("đỉnh quanh 18 giờ, thấp nhất 7 giờ" là của dữ liệu chưa đổi sang giờ VN). Số thật theo giờ VN: trước 01/07/2025 đỉnh 23 giờ, thấp nhất 13 giờ; từ 01/07/2025 đỉnh 7 giờ, thấp nhất 14 giờ. Backend tự sinh `note` từ số tính được, đừng chép cứng lại. Chuỗi `source` không còn slug `kienuit/...` vì tôi không xác minh được nó.

@@ -35,4 +35,5 @@ python3 backend/tools/check_live.py http://127.0.0.1:8000       # backend đang 
 | `/api/kafka/topics` | kafka-python (admin + offset), chỉ đọc |
 | `/api/spark/applications` | Spark REST `:4040/api/v1` |
 | `/api/aqi/*` | bộ Kaggle (D4), cộng 7 giờ vì cột `datetime` gốc là UTC |
-| `/ws/stream` | `live`: file mới trong `/stream_input`, đổi trạng thái dịch vụ; `replay`: phát lại `mock/stream-events.ndjson` (giả lập) |
+| `/api/flows` | định nghĩa trong `app/flows.py` (trùng mock) |
+| `/ws/stream` | `live`: file mới trong `/stream_input`, đổi trạng thái dịch vụ, `kafka.stats`, `hdfs.op` + `flow.step` từ log NameNode; `replay`: phát lại `mock/stream-events.ndjson` (giả lập) |

@@ -3,7 +3,7 @@ import asyncio
 import logging
 import time
 
-from . import config, services, stream_input
+from . import config, hadoop_logs, hdfs_flow, services, stream_input
 from .clients import hdfs, kafka
 
 log = logging.getLogger("hub")
@@ -11,6 +11,7 @@ log = logging.getLogger("hub")
 STREAM_POLL_SECONDS = 1.0
 SERVICE_POLL_SECONDS = 5.0
 KAFKA_POLL_SECONDS = 5.0
+LOG_POLL_SECONDS = 0.3
 QUEUE_MAX = 200
 
 
@@ -25,7 +26,7 @@ class Hub:
         self._subs.add(q)
         if not self._tasks:
             self._tasks = [asyncio.create_task(self._poll_stream_input()), asyncio.create_task(self._poll_services()),
-                           asyncio.create_task(self._poll_kafka())]
+                           asyncio.create_task(self._poll_kafka()), asyncio.create_task(self._poll_hdfs_logs())]
         return q
 
     def unsubscribe(self, q: asyncio.Queue) -> None:
@@ -58,6 +59,22 @@ class Hub:
             except Exception:
                 log.exception("lỗi khi kiểm tra dịch vụ")
             await asyncio.sleep(SERVICE_POLL_SECONDS)
+
+    async def _poll_hdfs_logs(self):
+        """hdfs.op và flow.step từ log NameNode (và audit log nếu người dùng đã bật). Chỉ đọc file, bắt đầu từ cuối file."""
+        nn, audit = hadoop_logs.namenode_tailer(), hadoop_logs.audit_tailer()
+        nn.read_new(), audit.read_new()  # đặt mốc ở cuối file
+        tracker = hdfs_flow.live_tracker(audit.exists())
+        while True:
+            try:
+                tracker.audit = audit.exists()
+                events = [e for e in map(hadoop_logs.parse_line, nn.read_new() + audit.read_new()) if e]
+                for ev in sorted(events, key=lambda e: e.ts):
+                    for type_, data in await tracker.feed(ev):
+                        self.publish(type_, data)
+            except Exception:
+                log.exception("lỗi khi đọc log NameNode")
+            await asyncio.sleep(LOG_POLL_SECONDS)
 
     async def _poll_kafka(self):
         """kafka.stats mỗi KAFKA_POLL_SECONDS: tốc độ tin/giây (từ độ tăng offset giữa hai lần hỏi) và tổng lag. Lần hỏi đầu chỉ lấy mốc."""

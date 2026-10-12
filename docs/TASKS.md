@@ -31,7 +31,7 @@ Trạng thái: [ ] chưa, [~] đang làm, [x] xong. Người làm: C = Claude, A
 - [ ] A: biểu đồ theo tháng/ngày/giờ, nhịp theo giờ, đánh dấu điểm gãy 01/07/2025, nhãn "mô phỏng" cho trạm.
 
 ## P4 — Sơ đồ luồng sống
-- [ ] C: `/api/flows`, `flow.step` và `hdfs.op` từ thao tác thật (chốt D1 trước phần Kafka).
+- [x] C: `/api/flows` (hdfs-write có định nghĩa; các luồng khác `planned`), `hdfs.op` và `flow.step` của hdfs-write từ log NameNode thật. Luồng Kafka để `planned` vì D1 (tạm) giữ file-stream. **Chưa thấy chạy với một lệnh `hdfs dfs -put` thật** (tôi không được ghi lên HDFS): chỉ chạy lại dòng log thật cũ qua bộ theo dõi nối NameNode thật. Người dùng chạy thử: `python3 backend/tools/watch_stream.py` rồi `hdfs dfs -put` ở cửa sổ khác.
 - [ ] A: màn hình sơ đồ luồng: vẽ thành phần, chạy các bước theo sự kiện, phân biệt kênh data/control/background.
 - Xong khi: chạy `hdfs dfs -put` trong WSL và thấy các bước sáng lên đúng thứ tự.
 
