@@ -49,9 +49,10 @@ Trạng thái: [ ] chưa, [~] đang làm, [x] xong. Người làm: C = Claude, A
 - [x] C: PR của backend đã gộp vào `main`; đã đọc lại frontend P4-P5, P9, P11-P12 (HANDOFF P9, P10, P13).
 
 ## Còn lại
+- [x] Khởi động nguội từ đầu đến đuôi (13/10/2026): `bash infra/start_all.sh` một lệnh, 3 lỗi gặp đã sửa (HANDOFF P18).
 - [x] C: kịch bản demo và ảnh chụp (`docs/DEMO.md`, `docs/demo/`), kiểm tra cuối: console không lỗi; ở 390 px chỉ tab CO & AQI tràn ngang (xem dưới). Có ảnh luồng Kafka và Spark sáng (offset 34, 07:30 ngày 13/10).
-- [ ] A: tab CO & AQI tràn ngang ở 390 px: dòng "Nguồn: kaggle:hcmc_aqi_dataset_after_preprocess_final.csv ..." (thẻ biểu đồ chuỗi thời gian) không xuống dòng (`break-all` hoặc `min-w-0` cho thẻ cha).
-- [ ] A (nhẹ, từ rà soát P13): bỏ số viết cứng 1678-2508 và 35 064 trong SqlTab, sửa câu "đo quan sát thực tế" (nguồn là mô hình), chỉ giải thích lỗi `live` khi truy vấn thật sự dùng bảng `live`, reset `hasStreamReading` khi kết nối lại.
+- [x] A (PR #14, đã gộp): tab CO & AQI tràn ngang ở 390 px: dòng "Nguồn: kaggle:hcmc_aqi_dataset_after_preprocess_final.csv ..." (thẻ biểu đồ chuỗi thời gian) không xuống dòng (`break-all` hoặc `min-w-0` cho thẻ cha).
+- [x] A (PR #14, đã gộp) (nhẹ, từ rà soát P13): bỏ số viết cứng 1678-2508 và 35 064 trong SqlTab, sửa câu "đo quan sát thực tế" (nguồn là mô hình), chỉ giải thích lỗi `live` khi truy vấn thật sự dùng bảng `live`, reset `hasStreamReading` khi kết nối lại.
 - [x] D2, D3, D4 đã chốt (xem trên).
 - [x] A (PR #16, đã gộp): theo D3 mới, sửa đoạn chữ cố định "500 và 1000 µg/m³" ở `AqiTab.tsx` (~dòng 442) và các ghi chú ngưỡng khác (Tổng quan: "chưa có quy chuẩn chính thức"), chạy lại `npm run generate:types` (mô tả `CoStatus` trong openapi đã đổi). Chỉ hiển thị `status` backend trả; có thể nói ngưỡng theo thang OpenWeather.
 - [x] Airflow đã bật (13/10/2026, `bash infra/airflow.sh start`; DAG mẫu đang tạm dừng, xem `infra/README.md`) và dashboard báo UP.

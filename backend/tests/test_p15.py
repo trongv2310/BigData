@@ -47,5 +47,66 @@ class AirflowProbe(unittest.TestCase):
         self.assertEqual(s["url"], config.AIRFLOW_HTTP)
 
 
+class FakeMsg:
+    def __init__(self, value):
+        self.value = value
+
+
+class FakeConsumer:
+    """Giả KafkaConsumer: `log` là {partition: [value, ...]}; chỉ hỗ trợ đúng các lời gọi live_producer.last_published dùng."""
+    log = {}
+
+    def __init__(self, **kw):
+        self.pos = {}
+
+    def partitions_for_topic(self, topic):
+        return set(self.log) or None
+
+    def assign(self, parts):
+        self.parts = parts
+
+    def end_offsets(self, parts):
+        return {tp: len(self.log.get(tp.partition, [])) for tp in parts}
+
+    def seek(self, tp, off):
+        self.pos[tp] = off
+
+    def poll(self, timeout_ms=0):
+        return {tp: [FakeMsg(v) for v in self.log[tp.partition][off:]] for tp, off in self.pos.items()}
+
+    def close(self):
+        pass
+
+
+def rec(co_at, weather_at):
+    return {"coObservedAt": co_at, "weatherObservedAt": weather_at, "co": 1.0}
+
+
+class ProducerRestart(unittest.TestCase):
+    """Khởi động lại producer không được gửi lại quan sát đã có trong topic (lỗi gặp khi khởi động nguội: offset 44 và 45 trùng nhau)."""
+
+    @classmethod
+    def setUpClass(cls):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("live_producer", Path(__file__).resolve().parents[2] / "infra" / "live_producer.py")
+        cls.lp = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cls.lp)
+
+    def last(self, log):
+        FakeConsumer.log = log
+        return self.lp.last_published("x:9092", "t", consumer_cls=FakeConsumer)
+
+    def test_returns_newest_message_key(self):
+        self.assertEqual(self.last({0: [rec("2026-10-13T09:00", "2026-10-13T09:45"), rec("2026-10-13T10:00", "2026-10-13T10:00")]}),
+                         ("2026-10-13T10:00", "2026-10-13T10:00"))
+
+    def test_empty_topic_is_none(self):
+        self.assertIsNone(self.last({0: []}))
+        self.assertIsNone(self.last({}))
+
+    def test_message_without_observation_times_is_ignored(self):
+        self.assertIsNone(self.last({0: [{"co": 1.0}]}))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -27,12 +27,28 @@ start() {
   echo "Airflow chưa trả lời sau 90 giây, xem $LOGDIR/airflow.log"; return 1
 }
 
+LEFTOVER='[a]irflow (standalone|api[-_]server|scheduler|dag[-_]processor|triggerer|worker|serve-l)'  # không khớp chính script này
+
+alive_count() { pgrep -f "$LEFTOVER" | wc -l; }
+
 stop() {
-  if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then kill "$(cat "$PIDFILE")" && echo "đã gửi tín hiệu dừng cho pid $(cat "$PIDFILE")"; else echo "không có pid Airflow đang chạy"; fi
+  # Chỉ dừng `airflow standalone` thì scheduler, api-server và các worker thành tiến trình mồ côi (đã gặp: 35 tiến trình còn sống,
+  # scheduler và worker bỏ qua SIGTERM). Nên dừng cả nhóm tiến trình (standalone chạy trong phiên riêng nhờ setsid), rồi SIGKILL nếu còn sót.
+  if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
+    pg="$(ps -o pgid= -p "$(cat "$PIDFILE")" | tr -d ' ')"
+    kill -TERM -- "-$pg" 2>/dev/null && echo "đã gửi SIGTERM cho nhóm tiến trình $pg"
+  else
+    echo "không có pid Airflow trong $PIDFILE, dừng theo tên tiến trình"
+    pkill -TERM -f "$LEFTOVER" 2>/dev/null
+  fi
   rm -f "$PIDFILE"
-  sleep 5
-  pkill -f '[a]irflow (standalone|api-server|scheduler|dag-processor|triggerer)' 2>/dev/null   # tiến trình còn sót (mẫu này không khớp chính script)
-  return 0
+  for _ in $(seq 1 10); do [ "$(alive_count)" = "0" ] && break; sleep 2; done
+  if [ "$(alive_count)" != "0" ]; then
+    echo "còn $(alive_count) tiến trình Airflow bỏ qua SIGTERM, gửi SIGKILL"
+    pkill -KILL -f "$LEFTOVER" 2>/dev/null
+    sleep 2
+  fi
+  echo "Airflow đã dừng (còn $(alive_count) tiến trình)"
 }
 
 status() {
