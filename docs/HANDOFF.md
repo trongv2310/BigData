@@ -15,6 +15,11 @@ Mẫu:
 
 ## Backend (Claude)
 
+### 2026-10-13 09:15 — P16: rà soát `feat/frontend-p15`, gộp PR #16 (`a64b709`)
+- Diff chỉ `frontend/` và mục Frontend của HANDOFF; chữ ngưỡng ở `AqiTab` và Tổng quan khớp D3 (SAFE < 4400, WARNING từ 4400, DANGER từ 12400, "không phải quy chuẩn Việt Nam", không tự tính); `npm run generate:types` chạy lại không đổi thêm; lint, build sạch; không còn ngưỡng 500/1000 trong `frontend/src`.
+- Xem trên giao diện thật (backend `STREAM_SOURCE=kafka`, ngưỡng mới): Tổng quan hiện ghi chú mới và trạng thái `AN TOÀN (SAFE)` cho 1280 µg/m³; tab CO & AQI hiện đoạn thang OpenWeather, không còn "500 và 1000", không tràn ngang; console không lỗi.
+- Không còn việc nào chờ frontend.
+
 ### 2026-10-13 09:00 — P15: chốt D2, D3, D4, tắt YARN, dọn file, gộp frontend polish (PR #14)
 - **D3 (ngưỡng CO) đổi:** từ 500/1000 (ngưỡng trong script mẫu, không căn cứ) sang thang CO của OpenWeather Air Pollution API, nguồn của bộ lịch sử: Good < 4400, Fair 4400..9400, Moderate 9400..12400, Poor 12400..15400, Very Poor ≥ 15400 µg/m³ (tra trên openweathermap.org/api/air-pollution-index-levels; 4400 cũng xấp xỉ hướng dẫn 24 giờ 4 mg/m³ của WHO 2021). Hợp đồng chỉ có 3 mức: `SAFE` < 4400, `WARNING` 4400 đến dưới 12400, `DANGER` ≥ 12400 (mốc thuộc mức cao hơn). Cấu hình `CO_WARNING_UG`, `CO_DANGER_UG`. Đổi ở `reading.status_for`, mô tả `CoStatus` trong openapi, `infra/spark_kafka_consumer.py` (`--warning`, `--danger`), mock (một sự kiện 1180 từ DANGER thành SAFE), AGENTS.md mục 5. View `live` của `/api/sql` tính lại `canh_bao` từ `co` theo ngưỡng hiện hành (Parquet cũ vẫn mang nhãn 500/1000). **Hệ quả:** mọi số đã thấy (Open-Meteo 1000 đến 2500, Kaggle) đều `SAFE`, nên cảnh báo hiếm khi đổi màu; script cũ `spark_streaming_consumer.py` (không sửa) vẫn in nhãn 500/1000.
 - **D2:** giữ nhãn trạm nhưng `isSimulatedStation` luôn `true`; luồng sống chỉ một điểm "TP.HCM (Open-Meteo)"; không trộn Open-Meteo với OpenWeather/Kaggle. **D4:** bộ Kaggle. Cả hai chỉ chốt lại hiện trạng (xem `docs/TASKS.md`).

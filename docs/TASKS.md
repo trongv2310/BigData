@@ -53,5 +53,5 @@ Trạng thái: [ ] chưa, [~] đang làm, [x] xong. Người làm: C = Claude, A
 - [ ] A: tab CO & AQI tràn ngang ở 390 px: dòng "Nguồn: kaggle:hcmc_aqi_dataset_after_preprocess_final.csv ..." (thẻ biểu đồ chuỗi thời gian) không xuống dòng (`break-all` hoặc `min-w-0` cho thẻ cha).
 - [ ] A (nhẹ, từ rà soát P13): bỏ số viết cứng 1678-2508 và 35 064 trong SqlTab, sửa câu "đo quan sát thực tế" (nguồn là mô hình), chỉ giải thích lỗi `live` khi truy vấn thật sự dùng bảng `live`, reset `hasStreamReading` khi kết nối lại.
 - [x] D2, D3, D4 đã chốt (xem trên).
-- [ ] A: theo D3 mới, sửa đoạn chữ cố định "500 và 1000 µg/m³" ở `AqiTab.tsx` (~dòng 442) và các ghi chú ngưỡng khác (Tổng quan: "chưa có quy chuẩn chính thức"), chạy lại `npm run generate:types` (mô tả `CoStatus` trong openapi đã đổi). Chỉ hiển thị `status` backend trả; có thể nói ngưỡng theo thang OpenWeather.
+- [x] A (PR #16, đã gộp): theo D3 mới, sửa đoạn chữ cố định "500 và 1000 µg/m³" ở `AqiTab.tsx` (~dòng 442) và các ghi chú ngưỡng khác (Tổng quan: "chưa có quy chuẩn chính thức"), chạy lại `npm run generate:types` (mô tả `CoStatus` trong openapi đã đổi). Chỉ hiển thị `status` backend trả; có thể nói ngưỡng theo thang OpenWeather.
 - [ ] Người dùng: Airflow (không đủ RAM, xem `infra/README.md`).
