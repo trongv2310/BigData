@@ -215,7 +215,7 @@ export const OverviewTab: React.FC = () => {
             <div className="text-xs text-slate-400 sm:border-l sm:border-slate-800 sm:pl-4">
               <div>Chỉ số nồng độ Carbon Monoxide (CO) trong không khí.</div>
               <div className="text-slate-500 italic mt-0.5">
-                *Ngưỡng SAFE/WARNING/DANGER do backend trả về, chưa có quy chuẩn chính thức.
+                *Trạng thái do backend phân loại theo thang CO OpenWeather (WARNING ≥ 4400, DANGER ≥ 12400 µg/m³; không phải quy chuẩn Việt Nam).
               </div>
             </div>
           </div>

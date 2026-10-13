@@ -182,6 +182,17 @@ Mẫu:
 
 ## Frontend (Antigravity)
 
+### 2026-10-13 08:50 — P15: Ngưỡng CO mới theo thang OpenWeather (D3 đã chốt)
+- Xong:
+  + 1. `AqiTab`: Cập nhật mục "2. Về Ngưỡng Đánh giá SAFE / WARNING / DANGER" theo đúng thang CO của OpenWeather Air Pollution API (`SAFE` < 4400 µg/m³, `WARNING` 4400 đến dưới 12400 µg/m³, `DANGER` ≥ 12400 µg/m³; mốc 4400 µg/m³ xấp xỉ hướng dẫn 24 giờ 4 mg/m³ của WHO 2021). Nhấn mạnh đây là thang kỹ thuật của nguồn dữ liệu, không phải quy chuẩn pháp lý Việt Nam, và frontend luôn hiển thị status backend trả, không tự tính.
+  + 2. `OverviewTab`: Cập nhật dòng chú thích dưới số đo CO chính: "*Trạng thái do backend phân loại theo thang CO OpenWeather (WARNING ≥ 4400, DANGER ≥ 12400 µg/m³; không phải quy chuẩn Việt Nam)."
+  + 3. Sinh lại kiểu `frontend/src/types/api.ts` từ `openapi.yaml` (`npm run generate:types`), cập nhật mô tả `CoStatus`.
+- Chạy thế nào:
+  + `npm run lint` (0 warnings, 0 errors)
+  + `npm run build` (sạch sẽ, 0 lỗi, ~721ms)
+  + `python docs/contract/validate_contract.py` (OK)
+- Cần bên kia: Không có.
+
 ### 2026-10-13 08:15 — Sửa tràn ngang tab CO & AQI và 4 điểm nhẹ theo rà soát P13 / TASKS Còn lại
 - Xong:
   + 1. `AqiTab`: Sửa triệt để lỗi tràn ngang ở màn hình di động 390 px (ảnh `09-mobile-390px-co-aqi-tran-ngang.jpg`). Dòng hiển thị nguồn dài (`kaggle:hcmc_aqi_dataset_after_preprocess_final.csv`) được cấu hình `break-all`, thẻ chứa được đặt `min-w-0 max-w-full`, tiêu đề và nguồn chuyển sang layout `flex-col sm:flex-row`, các thẻ card chính được gán `min-w-0 max-w-full`. Đảm bảo toàn bộ 9/9 tab co giãn mượt mà, không còn thanh cuộn ngang ở 390 px.
