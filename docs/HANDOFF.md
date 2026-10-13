@@ -173,6 +173,19 @@ Mẫu:
 
 ## Frontend (Antigravity)
 
+### 2026-10-13 08:15 — Sửa tràn ngang tab CO & AQI và 4 điểm nhẹ theo rà soát P13 / TASKS Còn lại
+- Xong:
+  + 1. `AqiTab`: Sửa triệt để lỗi tràn ngang ở màn hình di động 390 px (ảnh `09-mobile-390px-co-aqi-tran-ngang.jpg`). Dòng hiển thị nguồn dài (`kaggle:hcmc_aqi_dataset_after_preprocess_final.csv`) được cấu hình `break-all`, thẻ chứa được đặt `min-w-0 max-w-full`, tiêu đề và nguồn chuyển sang layout `flex-col sm:flex-row`, các thẻ card chính được gán `min-w-0 max-w-full`. Đảm bảo toàn bộ 9/9 tab co giãn mượt mà, không còn thanh cuộn ngang ở 390 px.
+  + 2. `SqlTab`: Bỏ hoàn toàn các số viết cứng `1678–2508` và `35 064` trong hộp cảnh báo nguồn và thẻ schema của bảng `aqi` (thay bằng `HDFS /raw/Dataset.csv`).
+  + 3. `SqlTab`: Sửa cụm từ "giá trị đo quan sát thực tế" thành "thu thập từ mô hình khí quyển Open-Meteo (CAMS)" để nhất quán với việc nguồn là mô hình chứ không phải cảm biến thực tế.
+  + 4. `SqlTab`: Tinh chỉnh logic giải thích lỗi bảng `live` — chỉ hiển thị hướng dẫn về bảng `live` khi câu lệnh truy vấn thật sự chứa bảng này (`/\b(from|join)\s+[`"]?live[`"]?\b/i.test(query)`), tránh hiện nhầm khi truy vấn bảng `aqi`.
+  + 5. `StreamContext`: Tự động reset `hasStreamReading` về `false` mỗi khi socket ngắt kết nối hoặc bắt đầu kết nối lại (`onStatusChange` khi `s !== 'connected'`), đảm bảo tiêu đề thẻ CO ở Tổng quan luôn hiển thị đúng "Bản ghi đo gần nhất" cho đến khi nhận được tin `reading` mới từ luồng vừa nối.
+- Chạy thế nào:
+  + `npm run lint` (0 warnings, 0 errors)
+  + `npm run build` (sạch sẽ, 0 lỗi, ~722ms)
+  + `python docs/contract/validate_contract.py` (OK)
+- Cần bên kia: Lead gộp PR và tick 2 mục của Frontend trong `docs/TASKS.md` ("Còn lại").
+
 ### 2026-10-13 01:15 — Hoàn tất P11 & P12 Frontend (Kafka luồng sống, lọc flowId, bảng live trong SQL)
 - Xong:
   + 1. `FlowsTab` & `StreamContext`: Lọc sự kiện `flow.step` chặt chẽ theo `flowId` (`flowStepsByFlow[flowId][runId]`, `latestRunIdByFlow`), chỉ hiển thị danh sách run và bước thực thi của luồng đang chọn. Đã loại bỏ hoàn toàn hiện tượng sơ đồ HDFS sáng nhầm bước khi backend phát luồng khác. Sẵn sàng hỗ trợ hai luồng mới `kafka-produce` (2 bước: bước 2 ACK kèm offset là quan sát thật, bước 1 suy ra) và `spark-streaming` (4 bước: tất cả suy ra từ micro-batch job Spark thành công); hỗ trợ các `kind` thành phần mới (`kafka-broker`, `spark`, `storage`) và định dạng runId (`kafka-p0-o7`, `spark-batch-12`). **Backend lead có thể an tâm bật `FLOWS_EXTRA=1`**.
