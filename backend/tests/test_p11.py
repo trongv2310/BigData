@@ -25,7 +25,7 @@ class Parse(unittest.TestCase):
         r = kafka_stream._parse(raw(LIVE))
         self.assertEqual(schema_errors("AqiReading", r), [])
         self.assertEqual((r["source"], r["station"], r["co"], r["status"], r["isSimulatedStation"]),
-                         ("live-open-meteo", "TP.HCM (Open-Meteo)", 2508.0, "DANGER", True))
+                         ("live-open-meteo", "TP.HCM (Open-Meteo)", 2508.0, "SAFE", True))
         self.assertEqual(r["datetime"], "2026-10-12T23:15:00+07:00")
 
     def test_bad_messages_are_skipped(self):

@@ -45,6 +45,13 @@ Backend đã đưa Kafka vào luồng thật: Open-Meteo -> Kafka -> backend/Spa
 Không bịa số liệu; dữ liệu mô phỏng hoặc suy ra phải có nhãn.
 ```
 
+## Antigravity (frontend) — P15: ngưỡng CO mới (D3 đã chốt)
+
+```
+Bạn là agent frontend. Đọc lại AGENTS.md mục 5, docs/TASKS.md (D3 đã chốt, mục "Còn lại"), docs/HANDOFF.md (Backend P15) và openapi.yaml (CoStatus). Chỉ sửa frontend/ và mục "Frontend" của HANDOFF.
+Backend đổi ngưỡng CO sang thang OpenWeather: SAFE < 4400, WARNING từ 4400, DANGER từ 12400 µg/m³ (ví dụ 1280 µg/m³ giờ là SAFE). Việc: (1) sửa đoạn chữ cố định "500 và 1000 µg/m³ ... kế thừa từ spark_streaming_consumer.py" ở AqiTab.tsx (~dòng 442) thành mô tả đúng; chỉ ghi ngưỡng như thông tin (thang CO của OpenWeather), vẫn hiển thị status do backend trả, không tự tính, không gọi là quy chuẩn Việt Nam; có thể nói 4400 xấp xỉ hướng dẫn 24 giờ 4 mg/m³ của WHO 2021. (2) Sửa ghi chú ở Tổng quan "chưa có quy chuẩn chính thức" cho khớp (đừng khẳng định đó là quy chuẩn). (3) npm run generate:types, lint và build sạch, xem trên trình duyệt với backend thật, ghi HANDOFF và mở PR.
+```
+
 ## Lead duyệt PR của frontend
 
 ```

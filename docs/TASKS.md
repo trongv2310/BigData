@@ -6,12 +6,12 @@ Trạng thái: [ ] chưa, [~] đang làm, [x] xong. Người làm: C = Claude, A
 
 **D1 đã chốt = (b) (người dùng yêu cầu 2026-10-12): luồng thật đi qua Kafka với dữ liệu sống Open-Meteo** (xem HANDOFF P11, `infra/README.md`); luồng file-stream `/stream_input` và producer cũ vẫn chạy được với `STREAM_SOURCE=hdfs`.
 
-Đang áp dụng TẠM (người dùng chưa chốt, 2026-10-12): D2 = giữ nhãn trạm luân phiên nhưng luôn `isSimulatedStation=true`, không trộn Open-Meteo và OpenWeather vào một chuỗi; D3 = giữ 500/1000; D4 = bộ Kaggle cho `/api/aqi/*`.
+**D2, D3, D4 đã chốt ngày 13/10/2026 (người dùng giao cho lead chọn phương án tối ưu).**
 
 - ~~**D1. Luồng thật là gì?**~~ Đã chốt (b): Producer → Kafka → Spark/backend, xem trên.
-- **D2. Trạm giả và nguồn trộn.** Giữ nhãn trạm luân phiên (gắn nhãn "mô phỏng") hay bỏ; và có tách luồng Open-Meteo khỏi dữ liệu OpenWeather không.
-- **D3. Ngưỡng CO.** 500 và 1000 µg/m³ chưa có căn cứ. Cần tra băng mức của OpenWeather/AQI chuẩn rồi chọn.
-- **D4. Dữ liệu nền cho dashboard.** Bản Kaggle hay bản tự cào `owm_air_pollution_raw.csv` (CO tương quan 0,71 với Kaggle; Kaggle thấp hơn khoảng 13 %).
+- ~~**D2. Trạm giả và nguồn trộn.**~~ Chốt: giữ nhãn trạm nhưng luôn `isSimulatedStation=true` (UI phải ghi "mô phỏng"); luồng sống chỉ có một điểm "TP.HCM (Open-Meteo)", không có trạm; `source` tách `live-open-meteo` khỏi `replay-dataset`, và không trộn Open-Meteo với OpenWeather/Kaggle vào một chuỗi hay một truy vấn. Lý do: bỏ nhãn sẽ phải đổi hợp đồng và producer replay cũ của người dùng, trong khi nhãn kèm cờ mô phỏng đã đủ trung thực.
+- ~~**D3. Ngưỡng CO.**~~ Chốt: thang CO của OpenWeather Air Pollution API (nguồn của bộ lịch sử), đơn vị µg/m³: Good < 4400, Fair 4400..9400, Moderate 9400..12400, Poor 12400..15400, Very Poor ≥ 15400. Hợp đồng chỉ có ba mức nên: `SAFE` < 4400, `WARNING` 4400 đến dưới 12400, `DANGER` ≥ 12400 (mốc thuộc mức cao hơn). 4400 cũng xấp xỉ hướng dẫn 24 giờ 4 mg/m³ của WHO 2021. Cấu hình bằng `CO_WARNING_UG`, `CO_DANGER_UG`. Hệ quả cần nói thật: mọi giá trị đã thấy (Kaggle tối đa vài nghìn, Open-Meteo 1000 đến 2500) đều là `SAFE`; 500/1000 cũ chỉ là ngưỡng trong script mẫu của người dùng, không có căn cứ. Script cũ `spark_streaming_consumer.py` không bị sửa nên vẫn in nhãn theo 500/1000.
+- ~~**D4. Dữ liệu nền cho dashboard.**~~ Chốt: bộ Kaggle cho `/api/aqi/*` và bảng `aqi` (đã tiền xử lý, đủ 2022-04 đến 2026-04, có điểm gãy 01/07/2025 được ghi chú). Bản tự cào `owm_air_pollution_raw.csv` không dùng làm nền (ngắn hơn, CO thấp hơn Kaggle khoảng 13 %, tương quan 0,71).
 
 ## P0 — Khung dự án (C)
 - [x] Hợp đồng REST + WebSocket, mock, validator, AGENTS.md, prompt.
@@ -52,4 +52,6 @@ Trạng thái: [ ] chưa, [~] đang làm, [x] xong. Người làm: C = Claude, A
 - [x] C: kịch bản demo và ảnh chụp (`docs/DEMO.md`, `docs/demo/`), kiểm tra cuối: console không lỗi; ở 390 px chỉ tab CO & AQI tràn ngang (xem dưới). Có ảnh luồng Kafka và Spark sáng (offset 34, 07:30 ngày 13/10).
 - [ ] A: tab CO & AQI tràn ngang ở 390 px: dòng "Nguồn: kaggle:hcmc_aqi_dataset_after_preprocess_final.csv ..." (thẻ biểu đồ chuỗi thời gian) không xuống dòng (`break-all` hoặc `min-w-0` cho thẻ cha).
 - [ ] A (nhẹ, từ rà soát P13): bỏ số viết cứng 1678-2508 và 35 064 trong SqlTab, sửa câu "đo quan sát thực tế" (nguồn là mô hình), chỉ giải thích lỗi `live` khi truy vấn thật sự dùng bảng `live`, reset `hasStreamReading` khi kết nối lại.
-- [ ] Người dùng: chốt D2, D3 (mọi giá trị Open-Meteo hiện bị gắn DANGER theo ngưỡng tạm), D4; Airflow (không đủ RAM, xem `infra/README.md`).
+- [x] D2, D3, D4 đã chốt (xem trên).
+- [ ] A: theo D3 mới, sửa đoạn chữ cố định "500 và 1000 µg/m³" ở `AqiTab.tsx` (~dòng 442) và các ghi chú ngưỡng khác (Tổng quan: "chưa có quy chuẩn chính thức"), chạy lại `npm run generate:types` (mô tả `CoStatus` trong openapi đã đổi). Chỉ hiển thị `status` backend trả; có thể nói ngưỡng theo thang OpenWeather.
+- [ ] Người dùng: Airflow (không đủ RAM, xem `infra/README.md`).

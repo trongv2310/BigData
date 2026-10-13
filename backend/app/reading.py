@@ -2,7 +2,7 @@
 import json
 from datetime import datetime
 
-from . import timeutil
+from . import config, timeutil
 
 LIVE_STATION = "Tram_TPHCM_Live_API"
 # Nhãn trạm trong producer replay gán luân phiên theo số thứ tự dòng, không phải trạm đo thật.
@@ -16,10 +16,10 @@ STATION_LABELS = {
 
 
 def status_for(co: float) -> str:
-    """Quyết định D3 (TẠM): giữ đúng logic spark_streaming_consumer.py. Ngưỡng chưa có căn cứ chuẩn."""
-    if co > 1000:
+    """Quyết định D3: ngưỡng theo thang CO của OpenWeather (config.CO_WARNING_UG, CO_DANGER_UG); mốc thuộc về mức cao hơn như thang gốc."""
+    if co >= config.CO_DANGER_UG:
         return "DANGER"
-    if co > 500:
+    if co >= config.CO_WARNING_UG:
         return "WARNING"
     return "SAFE"
 

@@ -57,9 +57,17 @@ TERMINAL_IDLE_SECONDS = int(_env("TERMINAL_IDLE_SECONDS", "1800"))
 # Log của NameNode (backend chỉ đọc) để phát hdfs.op / flow.step
 HADOOP_LOG_DIR = _env("HADOOP_LOG_DIR", "/home/trong/hadoop/logs")
 
-# Luồng kafka-produce và spark-streaming (định nghĩa ở /api/flows và sự kiện flow.step). Mặc định TẮT: frontend phải lọc flow.step theo
-# flowId trước (bản FlowsTab hiện tại gom mọi flow.step theo runId và gắn vào các bước của hdfs-write, nên bật sớm sẽ làm sai sơ đồ HDFS).
+# Luồng kafka-produce và spark-streaming (định nghĩa ở /api/flows và sự kiện flow.step). Mặc định TẮT vì chỉ có ý nghĩa khi
+# STREAM_SOURCE=kafka (frontend đã lọc flow.step theo flowId từ PR #11).
 FLOWS_EXTRA = _flag("FLOWS_EXTRA")
+
+# Ngưỡng CO (µg/m³) cho `status` (quyết định D3, chốt 13/10/2026): thang CO của OpenWeather Air Pollution API, cũng là nguồn của bộ
+# dữ liệu lịch sử. Good < 4400, Fair 4400..9400, Moderate 9400..12400, Poor 12400..15400, Very Poor >= 15400. Hợp đồng chỉ có ba mức:
+# SAFE = Good; WARNING = Fair và Moderate (từ 4400, cũng xấp xỉ hướng dẫn 24 giờ 4 mg/m³ của WHO 2021); DANGER = Poor và Very Poor.
+CO_WARNING_UG = float(_env("CO_WARNING_UG", "4400"))
+CO_DANGER_UG = float(_env("CO_DANGER_UG", "12400"))
+if not 0 < CO_WARNING_UG < CO_DANGER_UG:
+    raise SystemExit(f"CO_WARNING_UG phải dương và nhỏ hơn CO_DANGER_UG (nhận: {CO_WARNING_UG}, {CO_DANGER_UG})")
 
 # Ghi lên HDFS/Kafka/Spark: mặc định TẮT (xem app/writeguard.py)
 ALLOW_WRITES = _flag("BACKEND_ALLOW_WRITES")
