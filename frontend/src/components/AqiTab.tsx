@@ -187,7 +187,7 @@ export const AqiTab: React.FC = () => {
   const profileData = prepareProfileChartData();
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 min-w-0 max-w-full">
       {/* Header & Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -270,9 +270,9 @@ export const AqiTab: React.FC = () => {
 
 
       {/* Biểu đồ Chuỗi thời gian (AqiSeries) */}
-      <div className="p-5 sm:p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-4 shadow-xl">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
-          <div>
+      <div className="p-4 sm:p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-4 shadow-xl min-w-0 max-w-full">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3 min-w-0">
+          <div className="min-w-0">
             <h3 className="text-base font-bold text-white flex items-center gap-2">
               <span>Chuỗi thời gian Nồng độ {metric.toUpperCase()} ({series?.unit || 'µg/m³'})</span>
             </h3>
@@ -280,10 +280,10 @@ export const AqiTab: React.FC = () => {
               Đơn vị: µg/m³ • Múi giờ: {series?.timezone || 'Asia/Ho_Chi_Minh (+07:00)'}
             </p>
           </div>
-          <div className="text-xs text-slate-400 flex items-center gap-1.5 font-mono">
-            <Layers className="w-3.5 h-3.5 text-slate-500" />
-            <span>Nguồn: </span>
-            <span className="text-sky-400 font-semibold">{series?.source || 'Đang tải...'}</span>
+          <div className="text-xs text-slate-400 flex items-start sm:items-center gap-1.5 font-mono min-w-0 max-w-full">
+            <Layers className="w-3.5 h-3.5 text-slate-500 shrink-0 mt-0.5 sm:mt-0" />
+            <span className="shrink-0">Nguồn: </span>
+            <span className="text-sky-400 font-semibold break-all">{series?.source || 'Đang tải...'}</span>
           </div>
         </div>
 
@@ -343,8 +343,8 @@ export const AqiTab: React.FC = () => {
       </div>
 
       {/* Biểu đồ Nhịp theo Giờ trong Ngày (HourlyProfile) */}
-      <div className="p-5 sm:p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-4 shadow-xl">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
+      <div className="p-4 sm:p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-4 shadow-xl min-w-0 max-w-full">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3 min-w-0">
           <div>
             <h3 className="text-base font-bold text-white flex items-center gap-2">
               <Clock className="w-5 h-5 text-indigo-400" />

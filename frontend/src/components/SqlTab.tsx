@@ -229,7 +229,7 @@ export const SqlTab: React.FC = () => {
                 <Info className="w-3.5 h-3.5 text-amber-400" />
                 Giải thích lỗi câu lệnh:
               </div>
-              {error.message.toLowerCase().includes('live') || query.toLowerCase().includes('live') ? (
+              {/\b(from|join)\s+[`"]?live[`"]?\b/i.test(query) ? (
                 <p className="text-slate-300 leading-relaxed">
                   Nếu bạn đang truy vấn bảng <code>live</code>: Bảng này chỉ tồn tại sau khi Spark Streaming hoàn tất ít nhất một micro-batch ghi vào HDFS <code>/live/co_stream</code>. Nếu luồng live chưa phát dữ liệu hoặc Spark vừa khởi động lại, lỗi <code>Table or view not found: live</code> là hoàn toàn bình thường.
                 </p>
@@ -339,7 +339,7 @@ export const SqlTab: React.FC = () => {
           <span>Quy ước Nguồn Dữ liệu: Không trộn bảng live và bảng aqi</span>
         </div>
         <p className="text-slate-300 pl-6 leading-relaxed">
-          Bảng <code>aqi</code> là tập dữ liệu lịch sử OpenWeather (Kaggle), giá trị trung bình sau điểm gãy 01/07/2025 là ~300 µg/m³. Bảng <code>live</code> thu thập trực tiếp từ mô hình khí quyển Open-Meteo (CAMS), giá trị đo quan sát thực tế dao động 1678–2508 µg/m³ (ngày 12–13/10/2026). Hai nguồn sử dụng phương pháp mô hình và chuẩn gốc khác nhau hoàn toàn, tuyệt đối <strong>không trộn (JOIN / UNION)</strong> vào cùng một chuỗi phân tích.
+          Bảng <code>aqi</code> là tập dữ liệu lịch sử OpenWeather (Kaggle), còn bảng <code>live</code> thu thập từ mô hình khí quyển Open-Meteo (CAMS). Hai nguồn sử dụng phương pháp tính toán và thang đo khác nhau hoàn toàn, tuyệt đối <strong>không trộn (JOIN / UNION)</strong> vào cùng một chuỗi phân tích.
         </p>
       </div>
 
@@ -353,7 +353,7 @@ export const SqlTab: React.FC = () => {
               Bảng <code>aqi</code> (Lịch sử Kaggle)
             </h4>
             <span className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-400 font-mono">
-              35 064 dòng • HDFS /raw
+              HDFS /raw/Dataset.csv
             </span>
           </div>
           <p className="text-xs text-slate-400">

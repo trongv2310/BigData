@@ -31,6 +31,9 @@ export const StreamProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     const unsubStatus = source.onStatusChange((s) => {
       setStatus(s);
+      if (s !== 'connected') {
+        setHasStreamReading(false);
+      }
     });
 
     const unsubEvents = source.subscribe((event) => {
@@ -118,6 +121,7 @@ export const StreamProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       unsubEvents();
       // Ngắt nguồn khi cleanup để tránh giữ duplicate socket
       source.stop();
+      setHasStreamReading(false);
     };
   }, []);
 
