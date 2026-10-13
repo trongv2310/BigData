@@ -5,7 +5,8 @@ Khác sensor_producer_live_api.py ở thư mục cha (script cũ không bị s�
   - gọi API mỗi --interval giây nhưng chỉ GỬI khi có quan sát mới (thời điểm `time` do API trả đổi), vì Open-Meteo cập nhật
     CO mỗi 3600 giây và thời tiết mỗi 900 giây (trường `interval` của API); gọi 3 giây một lần chỉ nhận lại cùng một số;
   - không tự điền số khi API thiếu dữ liệu (script cũ điền 450.0): thiếu thì bỏ qua lần đó và ghi log;
-  - datetime của bản ghi là thời điểm quan sát của API (giờ Việt Nam), không phải giờ máy.
+  - datetime của bản ghi là thời điểm quan sát của API (giờ Việt Nam), không phải giờ máy;
+  - khi khởi động đọc tin mới nhất trong topic để không gửi lại quan sát đã gửi (khởi động lại không tạo bản trùng).
 
 Lưu ý nguồn: CO của Open-Meteo là số của mô hình chất lượng không khí (CAMS), không phải cảm biến đặt tại một trạm.
 
@@ -19,7 +20,7 @@ import time
 from datetime import datetime
 
 import requests
-from kafka import KafkaProducer
+from kafka import KafkaConsumer, KafkaProducer, TopicPartition
 from kafka.errors import KafkaError
 
 LATITUDE, LONGITUDE = 10.8231, 106.6297
@@ -55,6 +56,42 @@ def fetch_record() -> dict:
     }
 
 
+def last_published(bootstrap: str, topic: str, consumer_cls=KafkaConsumer):
+    """(coObservedAt, weatherObservedAt) của tin mới nhất đang nằm trong topic, hoặc None nếu topic trống/không đọc được.
+
+    Producer chỉ giữ trạng thái "đã gửi quan sát nào" trong bộ nhớ; không có hàm này thì mỗi lần khởi động lại (hay khởi động nguội
+    sau khi tắt WSL) nó gửi lại quan sát hiện tại thành bản trùng (đã gặp: offset 44 và 45 giống hệt nhau). Đọc chỉ-đọc, không dùng
+    consumer group nên không để lại offset commit.
+    """
+    try:
+        c = consumer_cls(bootstrap_servers=bootstrap, group_id=None, enable_auto_commit=False,
+                         consumer_timeout_ms=5000, value_deserializer=lambda v: json.loads(v.decode("utf-8")))
+    except KafkaError as e:
+        print(f"[live_producer] không đọc được tin cũ để tránh gửi trùng ({type(e).__name__}: {e})", file=sys.stderr, flush=True)
+        return None
+    try:
+        parts = [TopicPartition(topic, p) for p in sorted(c.partitions_for_topic(topic) or [])]
+        if not parts:
+            return None
+        c.assign(parts)
+        best = None
+        for tp, end in c.end_offsets(parts).items():
+            if end <= 0:
+                continue
+            c.seek(tp, end - 1)
+            for rec in c.poll(timeout_ms=5000).get(tp, []):
+                v = rec.value
+                if isinstance(v, dict) and v.get("coObservedAt") and v.get("weatherObservedAt"):
+                    key = (v["coObservedAt"], v["weatherObservedAt"])
+                    best = key if best is None or key > best else best
+        return best
+    except (KafkaError, ValueError) as e:
+        print(f"[live_producer] không đọc được tin cũ để tránh gửi trùng ({type(e).__name__}: {e})", file=sys.stderr, flush=True)
+        return None
+    finally:
+        c.close()
+
+
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--interval", type=float, default=60.0, help="giây giữa hai lần gọi API (mặc định 60)")
@@ -67,7 +104,9 @@ def main() -> int:
                              key_serializer=lambda k: k.encode("utf-8"),
                              value_serializer=lambda v: json.dumps(v, ensure_ascii=False).encode("utf-8"))
     print(f"[live_producer] DỮ LIỆU THẬT Open-Meteo -> Kafka {a.bootstrap} topic {a.topic}, hỏi API mỗi {a.interval:.0f}s", flush=True)
-    last = None  # (coObservedAt, weatherObservedAt) của bản ghi đã gửi
+    last = last_published(a.bootstrap, a.topic)  # (coObservedAt, weatherObservedAt) của bản ghi đã gửi; lấy từ topic để không gửi trùng khi khởi động lại
+    if last:
+        print(f"[live_producer] tin mới nhất trong topic: CO {last[0]}, thời tiết {last[1]} (không gửi lại quan sát này)", flush=True)
     while True:
         try:
             rec = fetch_record()

@@ -29,6 +29,14 @@ Open-Meteo API ──▶ infra/live_producer.py ──▶ Kafka hcmc_co_stream �
 - **SQL trên dữ liệu sống**: `/api/sql` có thêm bảng `live` (Parquet `/live/co_stream`), dựng lại mỗi truy vấn; ví dụ `SELECT datetime_vn, co, kafka_offset FROM live ORDER BY kafka_offset`. Phiên SQL của backend cần ~1 GB RAM (xem giới hạn bộ nhớ).
 - **Luồng `kafka-produce` và `spark-streaming` trong Sơ đồ luồng**: backend đã có định nghĩa và phát `flow.step`, nhưng mặc định TẮT; chạy backend với `FLOWS_EXTRA=1` để bật (nên bật cùng `STREAM_SOURCE=kafka`). Frontend đã lọc `flow.step` theo `flowId` (PR #11), nên bật không còn làm sáng sai sơ đồ HDFS. Đã xem thật 13/10/2026 06:01: offset 28 sáng `kafka-produce`, `spark-batch-26` sáng `spark-streaming`. Lưu ý: Spark ghi checkpoint và Parquet vào `/live` thì NameNode log cũng sinh `hdfs.op` và vài lần `hdfs-write` thật (bước 1, 2, 3, 7), nên sơ đồ HDFS có thể có run mới dù không chạy `replay_producer.py`; đó là ghi thật của Spark, không phải lỗi.
 
+## Khởi động nguội một lệnh (đã thử 13/10/2026)
+
+- `bash infra/start_all.sh` bật HDFS, Kafka, (YARN nếu `WITH_YARN=1`), Airflow, dữ liệu sống và backend theo đúng thứ tự, kiểm từng bước rồi in bảng dịch vụ; `bash infra/stop_all.sh` dừng ngược lại (`KEEP_INFRA=1` giữ HDFS, Kafka). Frontend chạy riêng trên Windows (lệnh in ở cuối `start_all.sh`, xem `docs/DEMO.md`).
+- Đã thử hai vòng: dừng sạch, `wsl --shutdown`, khởi động lại. Kết quả: HDFS `fsck` HEALTHY, 4 DataNode, dữ liệu `/live` nguyên vẹn (43 file Parquet, 43 commit); Kafka giữ topic và toàn bộ tin (offset không mất); Spark tiếp tục từ checkpoint, lag 0; khởi động nguội cả hệ thống bằng `start_all.sh` mất khoảng 1 phút 20 giây.
+- Ba lỗi gặp và đã sửa trong lần thử này (chi tiết ở `docs/HANDOFF.md` P18): `airflow.sh stop` để lại 35 tiến trình mồ côi; producer gửi lại quan sát gần nhất mỗi lần khởi động (tạo bản trùng, offset 44 và 45 giống hệt); Vite tự nhảy sang cổng 5174 khiến backend chặn CORS.
+- Dữ liệu trùng đã có từ trước khi sửa: offset 0 và 1, 44 và 45 trong topic và Parquet `/live`. Kafka không sửa được tin đã ghi; truy vấn dùng `DISTINCT` hoặc lọc theo `kafka_offset`. Bản producer mới không tạo thêm bản trùng khi khởi động lại.
+- Lỗi cú pháp dòng 1 của `~/start-4nodes.sh` và `~/stop-4nodes.sh` ("No such file or directory" trước chữ `#!/bin/bash`) là ký tự BOM đầu file của người dùng; vô hại (script vẫn chạy), không sửa vì là script cũ của bạn.
+
 ## Chạy tay các thành phần (đã chạy thật 2026-10-12, trong WSL)
 
 | Thành phần | Lệnh | Ghi chú |

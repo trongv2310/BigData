@@ -2,17 +2,20 @@
 
 Ảnh chụp (13/10/2026, backend thật) nằm trong `docs/demo/`. Kịch bản này chỉ nói những gì đã chạy và quan sát được; phần nào là suy ra hoặc mô phỏng thì có ghi rõ để nói đúng khi trình bày.
 
-## 1. Chuẩn bị (làm trước, khoảng 3 phút, trong WSL)
+## 1. Chuẩn bị (làm trước, khoảng 2 phút; đã thử khởi động nguội ngày 13/10/2026)
 
-Thứ tự (chi tiết và lý do ở `infra/README.md`):
+**Cách nhanh (một lệnh).** Trong WSL, từ thư mục repo: `bash infra/start_all.sh`. Script chạy đúng thứ tự, kiểm tra từng bước (HDFS đủ 4 DataNode và hết safe mode, Kafka có topic, Airflow trả lời, Spark consumer chạy, backend trả lời) rồi in bảng dịch vụ và lệnh frontend. Khởi động nguội (sau `wsl --shutdown`) mất khoảng 1 phút 20 giây. Biến tùy chọn: `WITH_YARN=1` (bật YARN), `WITH_AIRFLOW=0`, `BACKEND_ALLOW_WRITES=1` (bật cửa sổ lệnh, script in token). Dừng sạch: `bash infra/stop_all.sh` (thêm `KEEP_INFRA=1` để giữ HDFS và Kafka).
 
-1. HDFS: `bash ~/start-4nodes.sh`.
+Frontend (node của Windows, mở PowerShell): `cd frontend; $env:VITE_API_BASE="http://localhost:8000"; $env:VITE_STREAM="ws"; npm run dev -- --port 5173 --strictPort`, rồi mở `http://localhost:5173`. Nếu cổng 5173 đang bận (ví dụ một Vite chế độ mock đang chạy) thì lệnh báo lỗi rõ ràng; đổi sang `--port 5174` hoặc `--port 5175` (backend của `start_all.sh` cho phép cả ba cổng). Không bỏ `--strictPort`: nếu Vite tự nhảy sang cổng khác mà backend không cho phép Origin đó thì trang báo "Lỗi kết nối REST API: failed to fetch".
+
+**Từng bước thủ công** (chi tiết và lý do ở `infra/README.md`):
+
+1. HDFS: `bash ~/start-4nodes.sh`, rồi chờ `hdfs dfsadmin -safemode wait`.
 2. Kafka (Java 17): `JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 PATH=$JAVA_HOME/bin:$PATH /home/trong/kafka/bin/kafka-server-start.sh -daemon /home/trong/kafka/config/server.properties`. Dữ liệu Kafka nằm ở `/home/trong/kafka-data`, nên topic `hcmc_co_stream` còn sau khi khởi động lại WSL.
-3. YARN (đang TẮT từ 13/10/2026 để lấy RAM; chỉ bật nếu muốn thẻ ResourceManager, NodeManager hiện UP, khi đó còn rất ít RAM): `setsid nohup ~/hadoop/bin/yarn --daemon start resourcemanager`, rồi NodeManager như ghi trong `infra/README.md`.
+3. YARN (đang TẮT từ 13/10/2026 để lấy RAM; chỉ bật nếu muốn thẻ ResourceManager, NodeManager hiện UP, khi đó còn rất ít RAM): `WITH_YARN=1 bash infra/start_all.sh` hoặc hai lệnh `~/hadoop/bin/yarn --daemon start resourcemanager` và `... start nodemanager`.
 4. Airflow (nếu muốn thẻ Airflow UP): `bash infra/airflow.sh start`.
-5. Dữ liệu sống: `bash infra/live_stack.sh start` (producer Open-Meteo và Spark consumer; lần đầu Spark tải connector Kafka khoảng 1 phút).
-6. Backend: `cd backend && STREAM_SOURCE=kafka FLOWS_EXTRA=1 python3 -m uvicorn app.main:app --host 127.0.0.1 --port 8000`.
-7. Frontend (node của Windows): `cd frontend && $env:VITE_API_BASE="http://localhost:8000"; $env:VITE_STREAM="ws"; npm run dev`, mở `http://localhost:5173`.
+5. Dữ liệu sống: `bash infra/live_stack.sh start` (producer Open-Meteo và Spark consumer). Producer khởi động lại không gửi trùng quan sát đã có trong topic.
+6. Backend: `cd backend && STREAM_SOURCE=kafka FLOWS_EXTRA=1 ALLOWED_ORIGINS=http://localhost:5173,http://localhost:5174,http://localhost:5175 python3 -m uvicorn app.main:app --host 127.0.0.1 --port 8000` (đặt đúng cổng frontend vào `ALLOWED_ORIGINS`).
 
 Lưu ý bộ nhớ: máy chỉ có khoảng 7,7 GB. Với YARN tắt thì còn khoảng 2 GB trống (đủ cho truy vấn SparkSQL, đã chạy từ giao diện ngày 13/10); với YARN bật chỉ còn khoảng 0,3 GB, truy vấn SparkSQL (cần thêm khoảng 1 GB) có thể làm hệ thống kill tiến trình.
 
