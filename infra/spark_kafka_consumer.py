@@ -1,7 +1,8 @@
 """Spark Structured Streaming: đọc topic Kafka hcmc_co_stream, tính chỉ số tích tụ CO và mức cảnh báo, ghi Parquet vào HDFS.
 
 Thay cho spark_streaming_consumer.py ở thư mục cha (script cũ đọc file JSON trong HDFS, không bị sửa). Cùng phép tính:
-  co_accumulation_index = co / (wind_speed_kmh + 1);  canh_bao theo ngưỡng 500 / 1000 µg/m³ (quyết định D3, TẠM, chưa có căn cứ chuẩn).
+  co_accumulation_index = co / (wind_speed_kmh + 1);  canh_bao theo thang CO của OpenWeather (quyết định D3, chốt 13/10/2026):
+  từ 4400 µg/m³ là WARNING, từ 12400 là DANGER (cùng giá trị với CO_WARNING_UG, CO_DANGER_UG của backend). Script cũ dùng 500/1000.
 
 Chạy (WSL; lần đầu spark-submit tải connector Kafka từ Maven Central, ~10 MB):
   spark-submit --driver-memory 640m \\
@@ -26,6 +27,8 @@ p.add_argument("--starting", default="earliest", choices=["earliest", "latest"],
 p.add_argument("--out", default="hdfs://localhost:9000/live/co_stream")
 p.add_argument("--checkpoint", default="hdfs://localhost:9000/live/_checkpoints/co_stream")
 p.add_argument("--trigger", default="30 seconds")
+p.add_argument("--warning", type=float, default=float(os.environ.get("CO_WARNING_UG", "4400")), help="µg/m³: từ mức này là WARNING")
+p.add_argument("--danger", type=float, default=float(os.environ.get("CO_DANGER_UG", "12400")), help="µg/m³: từ mức này là DANGER")
 p.add_argument("--console", action="store_true")
 a = p.parse_args()
 
@@ -58,8 +61,8 @@ parsed = (raw.select(F.col("topic"), F.col("partition"), F.col("offset"), F.col(
 
 processed = (parsed
              .withColumn("co_accumulation_index", F.round(F.col("co") / (F.col("wind_speed_kmh") + 1.0), 2))
-             .withColumn("canh_bao", F.when(F.col("co") > 1000, "NGUY HIEM (DANGER)")
-                                      .when(F.col("co") > 500, "CANH BAO (WARNING)")
+             .withColumn("canh_bao", F.when(F.col("co") >= a.danger, "NGUY HIEM (DANGER)")
+                                      .when(F.col("co") >= a.warning, "CANH BAO (WARNING)")
                                       .otherwise("AN TOAN (SAFE)")))
 
 query = (processed.writeStream.outputMode("append").format("parquet")

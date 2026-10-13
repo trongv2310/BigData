@@ -39,7 +39,7 @@ Cần đổi thứ mình không sở hữu: ghi yêu cầu vào `docs/HANDOFF.md
 - Có điểm gãy dữ liệu ngày 01/07/2025 (CO giảm mạnh), có ở cả bản Kaggle lẫn bản thô OpenWeather. Biểu đồ không được nối mượt qua điểm này như thể không có gì; ghi chú trên biểu đồ.
 - Nhãn "trạm" trong luồng replay chỉ là nhãn gán luân phiên, không phải trạm đo thật (`isSimulatedStation: true`). UI phải ghi chú rõ, không vẽ như dữ liệu theo trạm.
 - Luồng live đang dùng Open-Meteo, bộ dữ liệu lịch sử là OpenWeather: khác nguồn. Hiển thị `source` và không trộn vào cùng một đường biểu đồ.
-- Ngưỡng `SAFE/WARNING/DANGER` (500 và 1000 µg/m³) chưa có căn cứ chuẩn (quyết định D3). Chỉ hiển thị `status` backend trả, không tự tính, và không gọi là "chuẩn" hay "theo WHO".
+- Ngưỡng `SAFE/WARNING/DANGER` theo thang CO của OpenWeather (quyết định D3, chốt 13/10/2026): `WARNING` từ 4400 µg/m³, `DANGER` từ 12400. Chỉ hiển thị `status` backend trả, không tự tính; không gọi là quy chuẩn của Việt Nam hay "theo WHO" (chỉ có thể nói 4400 xấp xỉ hướng dẫn 24 giờ 4 mg/m³ của WHO 2021).
 
 ## 6. Bảo mật
 

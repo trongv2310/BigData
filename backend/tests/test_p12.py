@@ -127,6 +127,16 @@ class LiveView(unittest.TestCase):
         self.write([(4, "2026-10-13 00:00:00", 2100.0, 1.0)], "append")  # Spark ghi thêm một batch: lần truy vấn sau phải thấy
         self.assertEqual(self.sql("SELECT count(*) AS n, max(kafka_offset) AS last_offset FROM live")["rows"], [[2, 4]])
 
+    def test_canh_bao_is_recomputed_with_current_thresholds(self):
+        """Parquet cũ ghi canh_bao theo ngưỡng 500/1000 (trong DDL ở trên là DANGER); view `live` phải theo ngưỡng D3 hiện hành."""
+        import shutil
+        self.write([(5, "2026-10-13 01:00:00", 2100.0, 1.0), (6, "2026-10-13 02:00:00", 5000.0, 1.0), (7, "2026-10-13 03:00:00", 13000.0, 1.0)], "overwrite")
+        try:
+            b = self.sql("SELECT kafka_offset, canh_bao FROM live ORDER BY kafka_offset")
+            self.assertEqual(b["rows"], [[5, "AN TOAN (SAFE)"], [6, "CANH BAO (WARNING)"], [7, "NGUY HIEM (DANGER)"]])
+        finally:
+            shutil.rmtree(self.d / "live", ignore_errors=True)  # các test khác trong lớp bắt đầu từ trạng thái chưa có dữ liệu sống
+
 
 class ExtraFlows(unittest.TestCase):
     """Luồng kafka-produce và spark-streaming: chỉ có khi FLOWS_EXTRA; mặc định tắt (chỉ có ý nghĩa khi STREAM_SOURCE=kafka)."""

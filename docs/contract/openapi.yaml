@@ -412,8 +412,10 @@ components:
       type: string
       enum: [SAFE, WARNING, DANGER]
       description: |
-        Hiện theo logic của spark_streaming_consumer.py: co > 1000 là DANGER, co > 500 là WARNING.
-        Ngưỡng này chưa có căn cứ chuẩn, xem quyết định D3 trong docs/TASKS.md. Frontend chỉ hiển thị, không tự tính.
+        Quyết định D3 (chốt 13/10/2026): theo thang CO của OpenWeather Air Pollution API (µg/m³). co < 4400 là SAFE (Good);
+        4400 <= co < 12400 là WARNING (Fair, Moderate; 4400 cũng xấp xỉ hướng dẫn 24 giờ 4 mg/m³ của WHO 2021); co >= 12400 là DANGER (Poor, Very Poor).
+        Backend đổi được bằng CO_WARNING_UG, CO_DANGER_UG. Đây là thang của OpenWeather, không phải quy chuẩn pháp lý của Việt Nam.
+        Frontend chỉ hiển thị, không tự tính.
     AqiReading:
       type: object
       additionalProperties: false

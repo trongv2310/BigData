@@ -124,7 +124,7 @@ class Latest(Base):
     def test_falls_back_to_last_dataset_row_when_hdfs_down(self):
         config.NAMENODE_HTTP = "http://127.0.0.1:1"
         b = self.get("/api/aqi/latest", "AqiReading")
-        self.assertEqual((b["source"], b["status"], b["isSimulatedStation"], b["datetime"]), ("replay-dataset", "DANGER", True, "2025-06-30T21:00:00+07:00"))
+        self.assertEqual((b["source"], b["status"], b["isSimulatedStation"], b["datetime"]), ("replay-dataset", "SAFE", True, "2025-06-30T21:00:00+07:00"))
 
     def test_falls_back_when_stream_dir_empty(self):
         nn = FakeNameNode(files={"/stream_input": []})

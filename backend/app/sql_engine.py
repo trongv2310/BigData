@@ -83,7 +83,10 @@ def _refresh_live(spark) -> None:
         have = set(df.columns)
         if not {"datetime", "co"} <= have:
             raise ValueError("thiếu cột datetime/co")
-        cols = [F.to_timestamp("datetime").alias("datetime_vn")] + [F.col(c) for c in LIVE_COLUMNS if c in have]
+        # canh_bao tính lại từ co theo ngưỡng hiện hành (D3), để các dòng Spark đã ghi trước khi đổi ngưỡng không lệch với `status` của backend
+        warn = (F.when(F.col("co") >= config.CO_DANGER_UG, "NGUY HIEM (DANGER)")
+                 .when(F.col("co") >= config.CO_WARNING_UG, "CANH BAO (WARNING)").otherwise("AN TOAN (SAFE)").alias("canh_bao"))
+        cols = [F.to_timestamp("datetime").alias("datetime_vn")] + [F.col(c) for c in LIVE_COLUMNS if c in have and c != "canh_bao"] + [warn]
         cols += [F.col(src).alias(dst) for src, dst in (("coObservedAt", "co_observed_at"), ("weatherObservedAt", "weather_observed_at"),
                                                          ("partition", "kafka_partition"), ("offset", "kafka_offset")) if src in have]
         df.select(*cols).createOrReplaceTempView("live")

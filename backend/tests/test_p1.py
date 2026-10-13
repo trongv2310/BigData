@@ -26,7 +26,7 @@ class ReadingTest(unittest.TestCase):
     def test_replay_record(self):
         r = reading.from_record(REPLAY)
         self.assertEqual(schema_errors("AqiReading", r), [])
-        self.assertEqual((r["station"], r["source"], r["status"], r["coAccumulationIndex"]), ("Quận 5", "replay-dataset", "WARNING", 75.0))
+        self.assertEqual((r["station"], r["source"], r["status"], r["coAccumulationIndex"]), ("Quận 5", "replay-dataset", "SAFE", 75.0))
         self.assertTrue(r["isSimulatedStation"])
         self.assertEqual(r["datetime"], "2026-10-12T15:30:00+07:00")
 
@@ -36,8 +36,18 @@ class ReadingTest(unittest.TestCase):
         self.assertEqual((r["source"], r["status"]), ("live-open-meteo", "SAFE"))
         self.assertTrue(r["isSimulatedStation"])  # D2: luôn true
 
-    def test_thresholds_follow_consumer(self):
-        self.assertEqual([reading.status_for(x) for x in (500, 500.1, 1000, 1000.1)], ["SAFE", "WARNING", "WARNING", "DANGER"])
+    def test_thresholds_follow_openweather_co_scale(self):
+        """D3: Good < 4400, Fair/Moderate 4400..12400, Poor/Very Poor từ 12400; mốc thuộc mức cao hơn."""
+        self.assertEqual([reading.status_for(x) for x in (0, 2508, 4399.9, 4400, 12399.9, 12400, 20000)],
+                         ["SAFE", "SAFE", "SAFE", "WARNING", "WARNING", "DANGER", "DANGER"])
+
+    def test_thresholds_are_configurable(self):
+        old = config.CO_WARNING_UG, config.CO_DANGER_UG
+        try:
+            config.CO_WARNING_UG, config.CO_DANGER_UG = 500.0, 1000.0
+            self.assertEqual([reading.status_for(x) for x in (499, 500, 999, 1000)], ["SAFE", "WARNING", "WARNING", "DANGER"])
+        finally:
+            config.CO_WARNING_UG, config.CO_DANGER_UG = old
 
     def test_broken_file_is_none(self):
         self.assertIsNone(reading.parse_file_text(""))

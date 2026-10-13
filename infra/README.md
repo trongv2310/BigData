@@ -22,7 +22,7 @@ Open-Meteo API ──▶ infra/live_producer.py ──▶ Kafka hcmc_co_stream �
 
 - Chạy: `bash infra/live_stack.sh start` (producer + Spark consumer), backend: `STREAM_SOURCE=kafka python3 -m uvicorn app.main:app --host 127.0.0.1 --port 8000`. Dừng: `bash infra/live_stack.sh stop`. Xem: `bash infra/live_stack.sh status`.
 - **Tần suất thật của nguồn:** Open-Meteo cập nhật CO mỗi 3600 giây và thời tiết mỗi 900 giây (trường `interval` của API), nên một bản ghi mới xuất hiện tối đa 15 phút một lần. Producer hỏi API mỗi 60 giây nhưng chỉ gửi khi thời điểm quan sát đổi. Không có số liệu nào được điền giả khi API thiếu.
-- **Nguồn dữ liệu:** CO của Open-Meteo là số của mô hình chất lượng không khí (CAMS), không phải cảm biến ở một trạm; giá trị khác hẳn bộ Kaggle/OpenWeather (Open-Meteo trả 2508 µg/m³ lúc 23:00 ngày 12/10/2026; trung bình bộ Kaggle từ 07/2025 là ~300, bộ này kết thúc ở 03/2026, không có số cùng thời điểm để so), nên `source: live-open-meteo` luôn tách khỏi `replay-dataset` (AGENTS.md mục 5) và ngưỡng 500/1000 (D3, tạm) gắn `DANGER` cho các giá trị này.
+- **Nguồn dữ liệu:** CO của Open-Meteo là số của mô hình chất lượng không khí (CAMS), không phải cảm biến ở một trạm; giá trị khác hẳn bộ Kaggle/OpenWeather (Open-Meteo trả 2508 µg/m³ lúc 23:00 ngày 12/10/2026; trung bình bộ Kaggle từ 07/2025 là ~300, bộ này kết thúc ở 03/2026, không có số cùng thời điểm để so), nên `source: live-open-meteo` luôn tách khỏi `replay-dataset` (AGENTS.md mục 5). Ngưỡng cảnh báo (D3, chốt 13/10/2026) theo thang CO của OpenWeather: `WARNING` từ 4400, `DANGER` từ 12400 µg/m³ (`CO_WARNING_UG`, `CO_DANGER_UG`), nên các giá trị Open-Meteo đã thấy (1000 đến 2500) đều là `SAFE`.
 - Spark cần connector Kafka: lần đầu `spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1` tải ~10 MB từ Maven Central vào `~/.ivy2`. Kết quả ghi vào `hdfs://localhost:9000/live/co_stream` (checkpoint `/live/_checkpoints/co_stream`); khởi động lại thì đọc tiếp từ offset đã xử lý.
 - Script cũ ở thư mục cha (`sensor_producer_*.py`, `spark_streaming_consumer.py`) không bị sửa và vẫn chạy được với `STREAM_SOURCE=hdfs`.
 - **Độ trễ Spark (`lagTotal`, `consumerGroups`)**: Spark đọc Kafka không dùng consumer group, nên backend đọc checkpoint `/live/_checkpoints/co_stream` trên HDFS (chỉ đọc) để lấy offset batch đã commit, rồi trừ cho end offset của Kafka; hiện trong `/api/kafka/topics` với tên `spark:co_stream`. Đã thấy lag = 1 ngay sau khi producer gửi tin mới rồi về 0 khi Spark commit.
@@ -39,6 +39,8 @@ Open-Meteo API ──▶ infra/live_producer.py ──▶ Kafka hcmc_co_stream �
 | Producer mô phỏng | `python3 infra/replay_producer.py --count 300 --interval 5` | Ghi `/stream_input/replay_<epoch>_<n>.json`; dọn bằng `hdfs dfs -rm '/stream_input/replay_*.json'`. MÔ PHỎNG, không phải đo thật. |
 | Spark Streaming | `cd BigData && spark-submit --driver-memory 640m spark_streaming_consumer.py` | Đọc `/stream_input`, in ra console (không ghi HDFS), UI `:4040`. Mỗi micro-batch một file. |
 | Frontend | node của Windows (WSL không có node): `VITE_API_BASE=http://localhost:8000 VITE_STREAM=ws npm run dev` | |
+
+YARN đang TẮT (từ 13/10/2026, theo yêu cầu người dùng để lấy RAM; Spark chạy `local[*]` nên không cần YARN): dashboard báo ResourceManager DOWN và NodeManager UNKNOWN, còn khoảng 2 GB RAM trống. Bật lại bằng hai lệnh `~/hadoop/bin/yarn --daemon start resourcemanager` và `... start nodemanager`.
 
 Bộ nhớ: máy WSL có ~7,7 GB; khi chạy HDFS (5 JVM), YARN, Kafka và Spark Streaming thì chỉ còn ~0,9 GB khả dụng, chưa đủ chỗ cho Airflow.
 
