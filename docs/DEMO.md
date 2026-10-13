@@ -9,13 +9,14 @@ Thứ tự (chi tiết và lý do ở `infra/README.md`):
 1. HDFS: `bash ~/start-4nodes.sh`.
 2. Kafka (Java 17): `JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 PATH=$JAVA_HOME/bin:$PATH /home/trong/kafka/bin/kafka-server-start.sh -daemon /home/trong/kafka/config/server.properties`. Dữ liệu Kafka nằm ở `/home/trong/kafka-data`, nên topic `hcmc_co_stream` còn sau khi khởi động lại WSL.
 3. YARN (đang TẮT từ 13/10/2026 để lấy RAM; chỉ bật nếu muốn thẻ ResourceManager, NodeManager hiện UP, khi đó còn rất ít RAM): `setsid nohup ~/hadoop/bin/yarn --daemon start resourcemanager`, rồi NodeManager như ghi trong `infra/README.md`.
-4. Dữ liệu sống: `bash infra/live_stack.sh start` (producer Open-Meteo và Spark consumer; lần đầu Spark tải connector Kafka khoảng 1 phút).
-5. Backend: `cd backend && STREAM_SOURCE=kafka FLOWS_EXTRA=1 python3 -m uvicorn app.main:app --host 127.0.0.1 --port 8000`.
-6. Frontend (node của Windows): `cd frontend && $env:VITE_API_BASE="http://localhost:8000"; $env:VITE_STREAM="ws"; npm run dev`, mở `http://localhost:5173`.
+4. Airflow (nếu muốn thẻ Airflow UP): `bash infra/airflow.sh start`.
+5. Dữ liệu sống: `bash infra/live_stack.sh start` (producer Open-Meteo và Spark consumer; lần đầu Spark tải connector Kafka khoảng 1 phút).
+6. Backend: `cd backend && STREAM_SOURCE=kafka FLOWS_EXTRA=1 python3 -m uvicorn app.main:app --host 127.0.0.1 --port 8000`.
+7. Frontend (node của Windows): `cd frontend && $env:VITE_API_BASE="http://localhost:8000"; $env:VITE_STREAM="ws"; npm run dev`, mở `http://localhost:5173`.
 
 Lưu ý bộ nhớ: máy chỉ có khoảng 7,7 GB. Với YARN tắt thì còn khoảng 2 GB trống (đủ cho truy vấn SparkSQL, đã chạy từ giao diện ngày 13/10); với YARN bật chỉ còn khoảng 0,3 GB, truy vấn SparkSQL (cần thêm khoảng 1 GB) có thể làm hệ thống kill tiến trình.
 
-Kiểm trước giờ demo: góc phải trên báo "WebSocket Kết nối"; Tổng quan hiện ít nhất 7/8 dịch vụ UP (Airflow đang tắt).
+Kiểm trước giờ demo: góc phải trên báo "WebSocket Kết nối"; Tổng quan hiện 6/8 dịch vụ UP khi YARN tắt (ResourceManager DOWN, NodeManager UNKNOWN); 8/8 nếu bật lại YARN.
 
 ## 2. Kịch bản
 
@@ -29,7 +30,7 @@ Kiểm trước giờ demo: góc phải trên báo "WebSocket Kết nối"; Tổ
 | 6 | Sơ đồ luồng | Chọn "Kafka nhận bản ghi", rồi "Spark Structured Streaming", chờ quan sát mới | Khi producer gửi bản ghi mới: bước ACK kèm offset sáng (quan sát thật), sau đó micro-batch của Spark sáng 4 bước (suy ra từ việc job thành công). Chọn luồng HDFS để thấy ghi thật của Spark xuống `/live`. | `06a-luong-kafka-produce.jpg`, `06b-luong-spark-streaming.jpg` (chụp lúc offset 34, 07:30 ngày 13/10) |
 | 7 | SparkSQL | Chọn truy vấn mẫu (ví dụ bảng `live`), chạy | Bảng `aqi` (Kaggle) và `live` (Spark ghi từ Kafka) khác nguồn, không trộn. Lần đầu mất khoảng 10 giây vì khởi động phiên Spark. | `08-sparksql-live.jpg` |
 | 8 | Dự đoán CO | Chạy dự đoán | Đây là heuristic thống kê, không phải mô hình ML: nhiệt độ, gió, tháng chưa dùng vì hồi quy cho R² gần 0. Điểm cần nhấn là khoảng 10%-90%, không phải một con số. | `07-du-doan-ket-qua.jpg` |
-| 9 | Cửa sổ lệnh | Chỉ giới thiệu | Tắt mặc định. Bật bằng `BACKEND_ALLOW_WRITES=1`, cần token in ra ở console backend, chỉ nhận Origin localhost:5173. Chưa chụp ảnh vì cần bật ghi. | |
+| 9 | Cửa sổ lệnh | Chạy backend với `BACKEND_ALLOW_WRITES=1`, dán token (in ở console backend), kết nối, gõ lệnh chỉ đọc như `hdfs dfs -ls /raw` | Tắt mặc định vì shell ghi được lên HDFS/Kafka/Spark. Chỉ nhận Origin trong `ALLOWED_ORIGINS` (mặc định localhost:5173), token đổi mỗi lần khởi động backend. Không có ảnh trong repo vì đầu ra shell chứa PATH Windows của máy. Sau demo khởi động lại backend không có cờ này. | |
 
 Nếu quan sát mới chưa tới lúc demo: Open-Meteo đổi thời tiết lúc :00, :15, :30, :45 (producer gửi trong khoảng 1 phút sau mốc đó). Có thể dùng `python3 infra/replay_producer.py --count 20 --interval 3` để thấy luồng HDFS sáng, nhưng phải nói rõ đó là dữ liệu phát lại, không phải dữ liệu sống.
 
@@ -43,8 +44,8 @@ Nếu quan sát mới chưa tới lúc demo: Open-Meteo đổi thời tiết lú
 
 ## 4. Chưa làm hoặc còn hạn chế
 
-- Cửa sổ lệnh chưa thử trên giao diện thật (cần `BACKEND_ALLOW_WRITES=1`).
-- Airflow vẫn tắt (không đủ RAM), chỉ có DAG thử.
+- Cửa sổ lệnh đã thử trên giao diện thật ngày 13/10/2026 (kết nối được, `echo`, `whoami`, `hdfs dfs -ls /raw` chạy đúng). Mỗi lần mở shell tương tác in một lỗi cú pháp từ `/etc/bash.bashrc` dòng 74 (PATH Windows có dấu ngoặc đơn, lỗi của cấu hình WSL, không phải của dự án); lệnh vẫn chạy bình thường.
+- Airflow đã bật (13/10/2026) nhưng DAG `hcmc_co_pipeline` chỉ là DAG mẫu của bạn (số liệu cố định), đang tạm dừng, không nối với luồng Kafka/Spark thật.
 - D2, D3, D4 đã chốt ngày 13/10/2026 (xem `docs/TASKS.md`). Hệ quả cần nói thật: với ngưỡng OpenWeather (WARNING từ 4400, DANGER từ 12400 µg/m³), mọi số đã thấy (Open-Meteo 1000 đến 2500, Kaggle trung bình sau 07/2025 khoảng 300) đều SAFE, nên cảnh báo hiếm khi đổi màu.
 - Không có mô hình ML; dự đoán là heuristic.
 - Tuổi dữ liệu tính từ giờ quan sát thời tiết; CO của Open-Meteo có thể cũ hơn tới 1 giờ.

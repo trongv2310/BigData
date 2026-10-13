@@ -8,7 +8,7 @@ Môi trường hiện có của dự án (không do repo này cài):
 | Hadoop 3.3.6 | `/home/trong/hadoop`, HDFS `hdfs://localhost:9000`, NameNode UI `:9870`, DataNode `:9864`, YARN RM `:8088` |
 | Kafka | `/home/trong/kafka`, `localhost:9092`, topic `hcmc_co_stream` (`start-kafka.sh`, `stop-kafka.sh`) |
 | Spark | PySpark `local[*]` (`spark_streaming_consumer.py`) |
-| Airflow | DAG `hcmc_co_pipeline` |
+| Airflow 3.3.2 | DAG `hcmc_co_pipeline` (bản sao của `test_airflow_dag.py`: extract, validate, load trên số liệu mẫu cố định, KHÔNG liên quan tới luồng Kafka/Spark thật), UI `:8080`; bật bằng `bash infra/airflow.sh start` |
 | HDFS | `/stream_input` (file JSON của luồng), `/raw/Dataset.csv` |
 
 Quy ước: các script pipeline cũ nằm ở thư mục cha `BigData/`. Repo này **sao chép** khi cần, không di chuyển, để đồ án đang nộp không bị hỏng.
@@ -42,6 +42,14 @@ Open-Meteo API ──▶ infra/live_producer.py ──▶ Kafka hcmc_co_stream �
 
 YARN đang TẮT (từ 13/10/2026, theo yêu cầu người dùng để lấy RAM; Spark chạy `local[*]` nên không cần YARN): dashboard báo ResourceManager DOWN và NodeManager UNKNOWN, còn khoảng 2 GB RAM trống. Bật lại bằng hai lệnh `~/hadoop/bin/yarn --daemon start resourcemanager` và `... start nodemanager`.
 
-Bộ nhớ: máy WSL có ~7,7 GB; khi chạy HDFS (5 JVM), YARN, Kafka và Spark Streaming thì chỉ còn ~0,9 GB khả dụng, chưa đủ chỗ cho Airflow.
+Bộ nhớ: máy WSL có ~7,7 GB; khi chạy HDFS (5 JVM), YARN, Kafka và Spark Streaming thì chỉ còn ~0,9 GB khả dụng, chưa đủ chỗ cho Airflow. Với YARN tắt thì còn ~2,2 GB; bật thêm Airflow standalone còn ~1,3 GB (đã đo 13/10/2026, backend mới khởi động lại để giải phóng JVM SQL).
+
+### Airflow (bật ngày 13/10/2026)
+
+- `bash infra/airflow.sh start|stop|status` chạy `airflow standalone` (api-server, scheduler, dag-processor, triggerer). Không sửa `~/airflow/airflow.cfg`: tắt ví dụ mẫu bằng biến môi trường `AIRFLOW__CORE__LOAD_EXAMPLES=False`. Script sao chép `test_airflow_dag.py` vào `~/airflow/dags/hcmc_co_pipeline.py` nếu chưa có (bản gốc ở thư mục cha không bị đụng).
+- Mật khẩu đăng nhập UI do SimpleAuthManager sinh, nằm ở `~/airflow/simple_auth_manager_passwords.json.generated` (không ghi vào repo).
+- DAG đang ở trạng thái tạm dừng (`is_paused = True`, mặc định của Airflow); đã chạy thử bằng `airflow dags test hcmc_co_pipeline`: 3 task thành công, in "Đã xử lý và nạp thành công 3 bản ghi quan trắc CO". Lịch `0 8 * * *` chỉ chạy khi bỏ tạm dừng.
+- Backend dò Airflow 3 bằng `/api/v2/monitor/health` (Airflow 3 trả 404 ở `/health`, nên trước đó dashboard báo `down` dù Airflow chạy); nếu không có thì thử `/health` của Airflow 2.
+- Lưu ý khi tự viết lệnh khởi động: tiến trình nền khởi động từ một shell WSL thoát ngay có thể bị dọn mất; `airflow.sh start` giữ shell sống tới khi Airflow trả lời.
 
 Docker: chưa thấy trên máy, nên chưa có `docker-compose`. TODO nếu sau này cần.

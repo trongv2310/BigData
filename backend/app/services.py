@@ -90,8 +90,15 @@ async def _spark():
 
 
 async def _airflow():
-    ok, _ = await _http_json(f"{config.AIRFLOW_HTTP}/health")
-    return _status("Airflow", "airflow", "up" if ok else "down", config.AIRFLOW_HTTP, "DAG hcmc_co_pipeline")
+    # Airflow 3 (api-server): /api/v2/monitor/health, kèm trạng thái scheduler; Airflow 2: /health (Airflow 3 trả 404 ở đường dẫn này)
+    ok, body = await _http_json(f"{config.AIRFLOW_HTTP}/api/v2/monitor/health")
+    if not ok:
+        ok, body = await _http_json(f"{config.AIRFLOW_HTTP}/health")
+    detail = "DAG hcmc_co_pipeline"
+    sched = (body or {}).get("scheduler", {}).get("status") if isinstance(body, dict) else None
+    if ok and sched:
+        detail += f", scheduler {sched}"
+    return _status("Airflow", "airflow", "up" if ok else "down", config.AIRFLOW_HTTP, detail)
 
 
 async def check_all() -> list[dict]:
