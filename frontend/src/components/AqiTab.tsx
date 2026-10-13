@@ -439,7 +439,7 @@ export const AqiTab: React.FC = () => {
             2. Về Ngưỡng Đánh giá SAFE / WARNING / DANGER
           </h4>
           <p className="text-slate-400 leading-relaxed">
-            Mức nồng độ CO 500 và 1000 µg/m³ được kế thừa trực tiếp từ bộ lọc cảnh báo của consumer mẫu (`spark_streaming_consumer.py`). Đây là ngưỡng xử lý dữ liệu của luồng pipeline kỹ thuật, không phải quy chuẩn y tế công cộng chính thức của WHO. Frontend chỉ hiển thị trạng thái do backend trả về.
+            Trạng thái do backend phân loại theo thang CO của OpenWeather Air Pollution API: <code>SAFE</code> &lt; 4400 µg/m³ (mức Good), <code>WARNING</code> từ 4400 đến dưới 12400 µg/m³ (mức Fair, Moderate), <code>DANGER</code> ≥ 12400 µg/m³ (mức Poor, Very Poor). Mốc 4400 µg/m³ cũng xấp xỉ hướng dẫn nồng độ 24 giờ 4 mg/m³ của WHO 2021. Đây là thang phân cấp kỹ thuật của nguồn dữ liệu, không phải quy chuẩn pháp lý chính thức của Việt Nam. Frontend luôn hiển thị nguyên văn trạng thái từ backend, không tự tính toán.
           </p>
         </div>
       </div>
