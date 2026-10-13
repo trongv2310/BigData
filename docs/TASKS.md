@@ -49,6 +49,7 @@ Trạng thái: [ ] chưa, [~] đang làm, [x] xong. Người làm: C = Claude, A
 - [x] C: PR của backend đã gộp vào `main`; đã đọc lại frontend P4-P5, P9, P11-P12 (HANDOFF P9, P10, P13).
 
 ## Còn lại
-- [ ] Cả hai: kịch bản demo, ảnh chụp cho báo cáo, kiểm tra cuối (console, thu nhỏ/điện thoại).
+- [x] C: kịch bản demo và ảnh chụp (`docs/DEMO.md`, `docs/demo/`), kiểm tra cuối: console không lỗi; ở 390 px chỉ tab CO & AQI tràn ngang (xem dưới). Có ảnh luồng Kafka và Spark sáng (offset 34, 07:30 ngày 13/10).
+- [ ] A: tab CO & AQI tràn ngang ở 390 px: dòng "Nguồn: kaggle:hcmc_aqi_dataset_after_preprocess_final.csv ..." (thẻ biểu đồ chuỗi thời gian) không xuống dòng (`break-all` hoặc `min-w-0` cho thẻ cha).
 - [ ] A (nhẹ, từ rà soát P13): bỏ số viết cứng 1678-2508 và 35 064 trong SqlTab, sửa câu "đo quan sát thực tế" (nguồn là mô hình), chỉ giải thích lỗi `live` khi truy vấn thật sự dùng bảng `live`, reset `hasStreamReading` khi kết nối lại.
 - [ ] Người dùng: chốt D2, D3 (mọi giá trị Open-Meteo hiện bị gắn DANGER theo ngưỡng tạm), D4; Airflow (không đủ RAM, xem `infra/README.md`).
