@@ -77,8 +77,10 @@ def item(label: str, value, unit: str | None = None) -> dict:
 
 
 @contextmanager
-def step(step_id: str):
-    """Đánh dấu running, rồi done khi `yield` trả về (summary, detail) hoặc failed (kèm thông báo lỗi) khi có ngoại lệ. Dùng:
+def step(step_id: str, final_state: str = "done"):
+    """Đánh dấu running, rồi `final_state` (mặc định done) khi khối `with` kết thúc, hoặc failed (kèm thông báo lỗi) khi có ngoại lệ.
+    Bước gồm nhiều phần do nhiều script làm (cluster-and-model: 06a rồi 06b) dùng final_state="running" cho phần chưa phải cuối cùng,
+    và `detail` phải nói rõ phần nào xong, phần nào chưa. Dùng:
 
         with step("clean") as result:
             ...
@@ -97,7 +99,7 @@ def step(step_id: str):
             raise
         traceback.print_exc()
         sys.exit(1)
-    update_step(step_id, "done", res.summary, res.detail)
+    update_step(step_id, final_state, res.summary, res.detail)
 
 
 def spark_session(app_name: str):
