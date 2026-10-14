@@ -120,6 +120,11 @@ def msg(rec) -> tuple[bytes, int]:
     return json.dumps(rec).encode(), int(time.time() * 1000)
 
 
+def stamped(msgs):
+    """Gán timestamp Kafka tăng dần THEO VỊ TRÍ (offset), như broker thật; timestamp lấy từ lúc tạo tin sẽ sai khi chèn tin vào giữa danh sách."""
+    return [(value, 1_700_000_000_000 + i) for i, (value, _) in enumerate(msgs)]
+
+
 def replay_rec(n):
     return {"datetime": "2026-10-14 13:00:00", "originalDatetime": f"2025-07-01 {n % 24:02d}:00:00", "station": "Tram_Quan_1", "co": 300.0 + n,
             "wind_speed_kmh": 5.0, "temperature_C": 30.0, "provider": "replay-dataset"}
@@ -185,16 +190,16 @@ class LatestPerSource(unittest.TestCase):
         live = owm.to_record(AIR, WEATHER)
         msgs = [msg(replay_rec(i)) for i in range(1200)]
         msgs.insert(100, msg(live))  # dữ liệu thật nằm sau lưng hơn 1000 tin phát lại
-        c = FakeConsumer(msgs)
+        c = FakeConsumer(stamped(msgs))
         r = kafka_stream._latest(c, "live-openweather")
         self.assertEqual((r["source"], r["co"]), ("live-openweather", 251.31))
         self.assertEqual(kafka_stream._latest(c, None)["source"], "replay-dataset")  # tin mới nhất của topic
 
     def test_unknown_source_returns_none_and_incremental_read_sees_new_message(self):
-        msgs = [msg(replay_rec(i)) for i in range(50)]
+        msgs = stamped([msg(replay_rec(i)) for i in range(50)])
         c = FakeConsumer(msgs)
         self.assertIsNone(kafka_stream._latest(c, "live-openweather"))
-        msgs.append(msg(owm.to_record(AIR, WEATHER)))  # tin thật mới đến sau lần hỏi trước
+        msgs.append((msg(owm.to_record(AIR, WEATHER))[0], 1_700_000_000_000 + 50))  # tin thật mới đến sau lần hỏi trước
         self.assertEqual(kafka_stream._latest(c, "live-openweather")["source"], "live-openweather")
 
 
