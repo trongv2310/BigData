@@ -102,6 +102,8 @@ export const LiveTab: React.FC = () => {
       ]);
       if (rLatest.status === 'fulfilled') {
         setInitialReplay(rLatest.value);
+      } else {
+        setInitialReplay(null);
       }
       if (rStatus.status === 'fulfilled') {
         setReplayStatus(rStatus.value);
@@ -126,8 +128,14 @@ export const LiveTab: React.FC = () => {
       api.getAqiLatest('live-openweather'),
     ]).then(([rLatest, rStatus, lLatest]) => {
       if (ignore) return;
-      if (rLatest.status === 'fulfilled') setInitialReplay(rLatest.value);
-      if (rStatus.status === 'fulfilled') setReplayStatus(rStatus.value);
+      if (rLatest.status === 'fulfilled') {
+        setInitialReplay(rLatest.value);
+      } else {
+        setInitialReplay(null);
+      }
+      if (rStatus.status === 'fulfilled') {
+        setReplayStatus(rStatus.value);
+      }
       if (lLatest.status === 'fulfilled') {
         setInitialLive(lLatest.value);
       } else {

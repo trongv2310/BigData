@@ -249,83 +249,93 @@ export const PipelineTab: React.FC = () => {
         </div>
 
         {/* Lưới 9 bước pipeline (Có thể click để xem chi tiết) */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
-          {pipelineData?.steps.map((step) => {
-            const isSelected = step.id === selectedStepId;
-            const stateInfo = getStepStateBadge(step.state);
-            const StateIcon = stateInfo.icon;
+        {!pipelineData && !loading ? (
+          <div className="p-8 text-center bg-slate-900/60 rounded-xl border border-slate-800 text-slate-400">
+            <Layers className="w-10 h-10 text-slate-600 mx-auto mb-3" />
+            <p className="font-medium text-slate-300">Chưa có dữ liệu tiến độ pipeline 9 bước</p>
+            <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+              Backend chưa khởi tạo hoặc trả về mã 404 (GET /api/pipeline/steps). Bảng dữ liệu sẽ tự động hiển thị khi tiến trình pipeline hoàn tất.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+            {pipelineData?.steps.map((step) => {
+              const isSelected = step.id === selectedStepId;
+              const stateInfo = getStepStateBadge(step.state);
+              const StateIcon = stateInfo.icon;
 
-            return (
-              <div
-                key={step.id}
-                onClick={() => setSelectedStepId(step.id)}
-                className={`p-4 rounded-xl border transition cursor-pointer flex flex-col justify-between space-y-3 relative overflow-hidden ${
-                  isSelected
-                    ? 'bg-slate-800/90 border-sky-500 shadow-md shadow-sky-500/10 ring-1 ring-sky-500/30'
-                    : 'bg-slate-900/80 border-slate-800 hover:border-slate-700 hover:bg-slate-850'
-                }`}
-              >
-                {/* Header bước */}
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="w-6 h-6 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-xs font-bold font-mono text-slate-300 shrink-0">
-                      {step.order}
+              return (
+                <div
+                  key={step.id}
+                  onClick={() => setSelectedStepId(step.id)}
+                  className={`p-4 rounded-xl border transition cursor-pointer flex flex-col justify-between space-y-3 relative overflow-hidden ${
+                    isSelected
+                      ? 'bg-slate-800/90 border-sky-500 shadow-md shadow-sky-500/10 ring-1 ring-sky-500/30'
+                      : 'bg-slate-900/80 border-slate-800 hover:border-slate-700 hover:bg-slate-850'
+                  }`}
+                >
+                  {/* Header bước */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="w-6 h-6 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-xs font-bold font-mono text-slate-300 shrink-0">
+                        {step.order}
+                      </span>
+                      <h4 className="text-sm font-bold text-white tracking-tight leading-snug">
+                        {step.title}
+                      </h4>
+                    </div>
+                    <span
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium shrink-0 ${stateInfo.badgeClass}`}
+                    >
+                      <StateIcon className={`w-3 h-3 ${stateInfo.iconColor}`} />
+                      <span>{stateInfo.label}</span>
                     </span>
-                    <h4 className="text-sm font-bold text-white tracking-tight leading-snug">
-                      {step.title}
-                    </h4>
                   </div>
-                  <span
-                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium shrink-0 ${stateInfo.badgeClass}`}
-                  >
-                    <StateIcon className={`w-3 h-3 ${stateInfo.iconColor}`} />
-                    <span>{stateInfo.label}</span>
-                  </span>
-                </div>
 
-                {/* Số liệu chính (Summary) */}
-                <div className="space-y-1.5 pt-1">
-                  {step.summary && step.summary.length > 0 ? (
-                    <div className="flex flex-wrap gap-1.5">
-                      {step.summary.map((item, idx) => (
-                        <span
-                          key={idx}
-                          className="px-2 py-0.5 rounded text-[11px] bg-slate-800/80 text-slate-300 font-mono border border-slate-700/60"
-                        >
-                          <span className="text-slate-400">{item.label}: </span>
-                          <strong className="text-white">
-                            {typeof item.value === 'number'
-                              ? item.value.toLocaleString()
-                              : item.value ?? '—'}
-                          </strong>
-                          {item.unit ? ` ${item.unit}` : ''}
-                        </span>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-[11px] text-slate-500 italic">
-                      {step.state === 'notStarted'
-                        ? 'Chưa có số liệu (bước chưa bắt đầu)'
-                        : 'Không có số liệu tóm tắt'}
-                    </div>
-                  )}
-                </div>
+                  {/* Số liệu chính (Summary) */}
+                  <div className="space-y-1.5 pt-1">
+                    {step.summary && step.summary.length > 0 ? (
+                      <div className="flex flex-wrap gap-1.5">
+                        {step.summary.map((item, idx) => (
+                          <span
+                            key={idx}
+                            className="px-2 py-0.5 rounded text-[11px] bg-slate-800/80 text-slate-300 font-mono border border-slate-700/60"
+                          >
+                            <span className="text-slate-400">{item.label}: </span>
+                            <strong className="text-white">
+                              {typeof item.value === 'number'
+                                ? item.value.toLocaleString()
+                                : item.value ?? '—'}
+                            </strong>
+                            {item.unit ? ` ${item.unit}` : ''}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-[11px] text-slate-500 italic">
+                        {step.state === 'notStarted'
+                          ? 'Chưa có số liệu (bước chưa bắt đầu)'
+                          : 'Không có số liệu tóm tắt'}
+                      </div>
+                    )}
+                  </div>
 
-                {/* Footer bước: Thời điểm cập nhật */}
-                <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono pt-2 border-t border-slate-800/60">
-                  <span className="flex items-center gap-1">
-                    <Clock className="w-3 h-3 text-slate-500" />
-                    {step.updatedAt ? formatDateTime(step.updatedAt) : 'Chưa cập nhật'}
-                  </span>
-                  <span className="text-sky-400 text-[10px] font-semibold flex items-center gap-0.5">
-                    {isSelected ? 'Đang xem' : 'Chi tiết'}
-                    <ChevronRight className="w-3 h-3" />
-                  </span>
+                  {/* Footer bước: Thời điểm cập nhật */}
+                  <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono pt-2 border-t border-slate-800/60">
+                    <span className="flex items-center gap-1">
+                      <Clock className="w-3 h-3 text-slate-500" />
+                      {step.updatedAt ? formatDateTime(step.updatedAt) : 'Chưa cập nhật'}
+                    </span>
+                    <span className="text-sky-400 text-[10px] font-semibold flex items-center gap-0.5">
+                      {isSelected ? 'Đang xem' : 'Chi tiết'}
+                      <ChevronRight className="w-3 h-3" />
+                    </span>
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
 
         {/* Khung Chi tiết Bước Được Chọn */}
         {selectedStep && (
