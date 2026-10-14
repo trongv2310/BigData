@@ -326,8 +326,14 @@ export const PredictTab: React.FC = () => {
                     Mô hình: <strong className="text-slate-200">{result.model.name}</strong> v
                     {result.model.version}
                   </span>
-                  <span className="px-2 py-0.5 rounded bg-slate-800 text-purple-300 uppercase font-bold border border-slate-700">
-                    Loại: {result.model.kind}
+                  <span
+                    className={`px-2 py-0.5 rounded uppercase font-bold border ${
+                      result.model.kind === 'ml'
+                        ? 'bg-sky-500/20 text-sky-300 border-sky-500/40'
+                        : 'bg-slate-800 text-purple-300 border-slate-700'
+                    }`}
+                  >
+                    Loại: {result.model.kind.toUpperCase()}
                   </span>
                 </div>
 
@@ -343,6 +349,40 @@ export const PredictTab: React.FC = () => {
                   </div>
                 )}
               </div>
+
+              {/* Các đầu vào tự động điền (filledInputs) — bắt buộc khi backend trả về */}
+              {result.filledInputs && result.filledInputs.length > 0 && (
+                <div className="p-4 rounded-xl bg-sky-500/10 border border-sky-500/30 space-y-2.5 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-sky-300 flex items-center gap-1.5">
+                      <Info className="w-4 h-4 text-sky-400" />
+                      Các đầu vào tự động điền (filledInputs):
+                    </span>
+                    <span className="text-[11px] text-sky-400 font-mono">
+                      {result.filledInputs.length} trường
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-300">
+                    Mô hình ML cần thêm các biến độ trễ CO và nồng độ các chất khí khác. Những trường không có trong biểu mẫu đã được backend tự động điền kèm nguồn minh bạch:
+                  </p>
+                  <div className="space-y-1.5 pt-1">
+                    {result.filledInputs.map((item, idx) => (
+                      <div
+                        key={idx}
+                        className="p-2 rounded-lg bg-slate-900/60 border border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-[11px]"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-bold text-sky-400">{item.name}:</span>
+                          <span className="font-mono text-slate-200 font-semibold">{item.value}</span>
+                        </div>
+                        <div className="text-slate-400 italic text-[10px]">
+                          Nguồn: {item.origin}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="p-12 rounded-2xl bg-slate-900/40 border border-dashed border-slate-800 text-center space-y-3">

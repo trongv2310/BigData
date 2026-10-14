@@ -246,6 +246,36 @@ Mẫu:
 
 ## Frontend (Antigravity)
 
+### 2026-10-14 13:45 — Giai đoạn F2: Trang "Pipeline" (9 bước) & Chỉ số Mô hình
+- Xong:
+  + 1. Tạo trang mới `PipelineTab.tsx` ("Pipeline 9 bước & Chỉ số Mô hình"):
+    - **Tiến độ 9 bước Pipeline** (`GET /api/pipeline/steps`):
+      * Hiển thị đủ 9 bước theo thứ tự số `order` 1-9 với các icon và màu sắc trực quan theo 4 trạng thái: `done` (hoàn thành), `running` (đang chạy), `failed` (thất bại), `notStarted` (chưa chạy).
+      * Hiển thị thời điểm cập nhật (`updatedAt`) theo giờ Việt Nam (+07:00).
+      * Hiển thị nguyên văn mảng số liệu chính (`summary`) do chính bước đó ghi lại (ví dụ số dòng, số cột, thiếu giá trị, số truy vấn, số cụm...).
+      * **Bấm một bước thì xem chi tiết**: Cho phép click chọn bất kỳ bước nào để mở khung chi tiết đầy đủ gồm mã ID, mô tả thực thi `detail`, và bảng thẻ các chỉ số đo lường mở rộng.
+    - **Chỉ số Mô hình Dự đoán Khí CO** (`GET /api/model/metrics`):
+      * **Bảng so sánh trung thực các mô hình và 2 mốc cơ sở (Baselines)**: Bảng thống kê so sánh chi tiết RMSE, MAE, R² giữa 3 mô hình (`linear-regression`, `random-forest`, `gbt`) và 2 mốc so sánh (`previous-hour` và `hourly-mean`).
+      * **Quy tắc trung thực**: Nếu mô hình không đánh bại được mốc cơ sở (như kết quả mock cả 3 mô hình đều thua mốc lặp lại CO giờ trước `beatsPreviousHour: false`), giao diện hiển thị đúng nhãn đỏ "Không thắng" và nguyên văn kết luận từ pipeline (`conclusion`), tuyệt đối không làm đẹp số liệu.
+      * Gắn huy hiệu "Mô hình tốt nhất" cho mô hình được chọn (`isBest: true`).
+      * **Thông tin dữ liệu & Phân chia tập (Train / Test Split)**: Thẻ số liệu tập huấn luyện (28,032 dòng), tập kiểm tra (7,008 dòng), phương pháp chia theo chuỗi thời gian (`splitMethod`), căn cứ dữ liệu (`trainedOn`) và danh sách 15 đặc trưng đầu vào (`features`).
+      * **Xử lý điểm gãy 01/07/2025**: Hiển thị ngày điểm gãy, chiến lược `indicator-feature` (`after_2025_07_01`), mô tả xử lý và hiệu ứng đo lường (`effect`).
+      * **Xử lý trạng thái rỗng 404 `MODEL_NOT_TRAINED`**: Bắt lỗi 404 khi chưa huấn luyện mô hình, hiển thị khung thông báo trạng thái rỗng tường minh và hỗ trợ nút toggle mock variant (`?mock=untrained`) để kiểm thử cả hai trạng thái.
+  + 2. Cập nhật `PredictTab.tsx`:
+    - Hiển thị danh sách các đầu vào tự động điền `filledInputs` (`name`, `value`, `origin`) khi backend trả về (bắt buộc với mô hình ML để minh bạch các trường độ trễ CO và nồng độ khí do backend tự điền).
+    - Phân biệt trực quan huy hiệu loại mô hình `ML` vs `HEURISTIC`.
+  + 3. Cập nhật `Header.tsx` & `App.tsx`: Bổ sung tab `pipeline` ("Pipeline") vào thanh điều hướng desktop và mobile drawer.
+- Chạy thế nào:
+  + Mock server: `python mock/serve.py` (cổng 8010)
+  + Frontend dev: `cd frontend && npm run dev -- --port 5173 --strictPort` (truy cập `http://localhost:5173`)
+  + Build production: `npm run build` (thành công 0 lỗi, ~1.03s)
+  + Kiểm tra linter: `npm run lint` (0 warnings, 0 errors)
+  + Kiểm tra hợp đồng: `python docs/contract/validate_contract.py` (OK)
+- Chưa làm / chưa kiểm với backend thật:
+  + Trang Pipeline và Chỉ số Mô hình đã kiểm tra hoàn hảo với Mock Server cổng 8010 (cả chế độ có mô hình và variant `?mock=untrained`).
+  + Backend thật cổng 8000 hiện tại (sau Bước A1) mới có dữ liệu sống và phát lại, các route `/api/pipeline/steps` và `/api/model/metrics` đang trả 404 (sẽ được backend triển khai ở Bước A2 và A4). Sẽ kiểm tra nối thực tế ở Giai đoạn F3 khi Claude hoàn tất các route backend tương ứng.
+- Cần bên kia: Lead backend gộp PR của nhánh `feat/frontend-f2` vào `main`.
+
 ### 2026-10-14 13:00 — Giai đoạn F1: Trang "Dữ liệu sống" (hai cột song song: Phát lại & Dữ liệu thật)
 - Xong:
   + 1. `npm run generate:types`: Sinh lại toàn bộ kiểu dữ liệu từ hợp đồng OpenAPI 0.2.0 (`openapi.yaml`), bao gồm `ReadingSource`, `ReplayStatus`, `ReplayControlRequest`, `PipelineSteps`, `PipelineStep`, `ModelMetrics`, `ErrorMetrics`, `DataSplitInfo`, `AqiReading` (thêm `originalDatetime`, `coPredicted`, `modelVersion`).
