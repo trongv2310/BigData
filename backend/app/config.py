@@ -69,6 +69,9 @@ CO_DANGER_UG = float(_env("CO_DANGER_UG", "12400"))
 if not 0 < CO_WARNING_UG < CO_DANGER_UG:
     raise SystemExit(f"CO_WARNING_UG phải dương và nhỏ hơn CO_DANGER_UG (nhận: {CO_WARNING_UG}, {CO_DANGER_UG})")
 
+# Trạng thái 9 bước pipeline do các script trong pipeline/ ghi (backend chỉ đọc), xem app/pipeline_steps.py
+PIPELINE_SUMMARY_PATH = _env("PIPELINE_SUMMARY_PATH", "/co/output/step_summary.json")
+
 # Luồng PHÁT LẠI (infra/replay_kafka_producer.py): backend đọc trạng thái và ghi lệnh qua tệp cục bộ trong thư mục này (không qua HDFS/Kafka/Spark).
 # REPLAY_CONTROL=0 để backend không điều khiển được (chỉ xem trạng thái). Luồng dữ liệu thật không bao giờ bị điều khiển.
 REPLAY_STATE_DIR = _env("REPLAY_STATE_DIR", "/tmp/hcmc_replay")
