@@ -1,0 +1,11 @@
+{
+  "state": "running",
+  "speed": 10,
+  "baseIntervalSeconds": 10,
+  "intervalSeconds": 1,
+  "controllable": true,
+  "emittedCount": 128,
+  "lastOriginalDatetime": "2025-11-03T14:00:00+07:00",
+  "updatedAt": "2026-10-14T09:00:05+07:00",
+  "detail": null
+}

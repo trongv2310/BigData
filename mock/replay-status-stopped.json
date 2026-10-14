@@ -1,0 +1,11 @@
+{
+  "state": "stopped",
+  "speed": 1,
+  "baseIntervalSeconds": 10,
+  "intervalSeconds": 10,
+  "controllable": false,
+  "emittedCount": 0,
+  "lastOriginalDatetime": null,
+  "updatedAt": "2026-10-14T09:00:05+07:00",
+  "detail": "Không có tiến trình phát lại nào đang chạy (MOCK: ?mock=stopped)."
+}

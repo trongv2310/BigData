@@ -1,0 +1,14 @@
+{
+  "datetime": "2026-10-14T09:00:05+07:00",
+  "originalDatetime": "2025-11-03T14:00:00+07:00",
+  "station": "Quận 1",
+  "isSimulatedStation": true,
+  "source": "replay-dataset",
+  "co": 287.5,
+  "windSpeedKmh": 9.7,
+  "temperatureC": 31.2,
+  "coAccumulationIndex": 26.87,
+  "status": "SAFE",
+  "coPredicted": 301.2,
+  "modelVersion": "MOCK-1"
+}

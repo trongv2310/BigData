@@ -131,10 +131,13 @@ def last_reading(ds: Dataset) -> dict:
     co, wind = ds.cols["co"][i], ds.cols["wind_speed_kmh"][i]
     return {
         "datetime": timeutil.iso(ds.times[i]),
+        "originalDatetime": timeutil.iso(ds.times[i]),  # đây chính là thời điểm gốc của dòng lịch sử
         "station": "Bộ dữ liệu Kaggle (không có trạm)",
         "isSimulatedStation": True,  # quyết định D2 (tạm): luôn true
         "source": "replay-dataset",
         "co": co, "windSpeedKmh": wind, "temperatureC": ds.cols["temperature_C"][i],
         "coAccumulationIndex": round(co / (wind + 1.0), 2),
         "status": reading.status_for(co),
+        "coPredicted": None,
+        "modelVersion": None,
     }

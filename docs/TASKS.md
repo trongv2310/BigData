@@ -8,6 +8,8 @@ Trạng thái: [ ] chưa, [~] đang làm, [x] xong. Người làm: C = Claude, A
 
 **D2, D3, D4 đã chốt ngày 13/10/2026 (người dùng giao cho lead chọn phương án tối ưu).**
 
+**D5 (người dùng yêu cầu 14/10/2026): luồng DỮ LIỆU THẬT đổi từ Open-Meteo sang OpenWeather Air Pollution API** (cùng nguồn gốc với bộ Kaggle nên mô hình dự đoán áp dụng được); dashboard hiển thị hai luồng song song: PHÁT LẠI (`replay-dataset`) và DỮ LIỆU THẬT (`live-openweather`). Producer Open-Meteo giữ lại nhưng không bật mặc định. Vì vậy các câu về "luồng sống = Open-Meteo" ở D1, D2 phía dưới và trong HANDOFF P11 đến P18 là lịch sử, chỉ còn đúng cho tới khi làm xong Bước A1.
+
 - ~~**D1. Luồng thật là gì?**~~ Đã chốt (b): Producer → Kafka → Spark/backend, xem trên.
 - ~~**D2. Trạm giả và nguồn trộn.**~~ Chốt: giữ nhãn trạm nhưng luôn `isSimulatedStation=true` (UI phải ghi "mô phỏng"); luồng sống chỉ có một điểm "TP.HCM (Open-Meteo)", không có trạm; `source` tách `live-open-meteo` khỏi `replay-dataset`, và không trộn Open-Meteo với OpenWeather/Kaggle vào một chuỗi hay một truy vấn. Lý do: bỏ nhãn sẽ phải đổi hợp đồng và producer replay cũ của người dùng, trong khi nhãn kèm cờ mô phỏng đã đủ trung thực.
 - ~~**D3. Ngưỡng CO.**~~ Chốt: thang CO của OpenWeather Air Pollution API (nguồn của bộ lịch sử), đơn vị µg/m³: Good < 4400, Fair 4400..9400, Moderate 9400..12400, Poor 12400..15400, Very Poor ≥ 15400. Hợp đồng chỉ có ba mức nên: `SAFE` < 4400, `WARNING` 4400 đến dưới 12400, `DANGER` ≥ 12400 (mốc thuộc mức cao hơn). 4400 cũng xấp xỉ hướng dẫn 24 giờ 4 mg/m³ của WHO 2021. Cấu hình bằng `CO_WARNING_UG`, `CO_DANGER_UG`. Hệ quả cần nói thật: mọi giá trị đã thấy (Kaggle tối đa vài nghìn, Open-Meteo 1000 đến 2500) đều là `SAFE`; 500/1000 cũ chỉ là ngưỡng trong script mẫu của người dùng, không có căn cứ. Script cũ `spark_streaming_consumer.py` không bị sửa nên vẫn in nhãn theo 500/1000.
@@ -57,3 +59,14 @@ Trạng thái: [ ] chưa, [~] đang làm, [x] xong. Người làm: C = Claude, A
 - [x] A (PR #16, đã gộp): theo D3 mới, sửa đoạn chữ cố định "500 và 1000 µg/m³" ở `AqiTab.tsx` (~dòng 442) và các ghi chú ngưỡng khác (Tổng quan: "chưa có quy chuẩn chính thức"), chạy lại `npm run generate:types` (mô tả `CoStatus` trong openapi đã đổi). Chỉ hiển thị `status` backend trả; có thể nói ngưỡng theo thang OpenWeather.
 - [x] Airflow đã bật (13/10/2026, `bash infra/airflow.sh start`; DAG mẫu đang tạm dừng, xem `infra/README.md`) và dashboard báo UP.
 - [x] Cửa sổ lệnh đã thử trên giao diện thật (xem `docs/DEMO.md`).
+
+## Kế hoạch 14/10/2026 — bám pipeline 9 bước của giảng viên, đổi cho CO (C = Claude)
+Mỗi bước một nhánh từ `main`, một PR nhỏ; làm xong bước nào thì dừng, người dùng bảo mới làm bước kế.
+- [~] **Bước 0 — Hợp đồng 0.2.0** (nhánh `feat/contract-step0`): `originalDatetime`/`coPredicted`/`modelVersion`, `/api/aqi/latest?source=`, `/api/replay/*`, `/api/pipeline/steps`, `/api/model/metrics`, `/api/predict` kind=ml, mock, validator mở rộng. Validator OK, 126 test backend qua, mock thử 17 URL; chờ người dùng gộp, frontend chưa chạy lại `generate:types` (xem HANDOFF 14/10).
+- [ ] **A1 — Luồng sống OpenWeather**: `infra/live_producer_owm.py` (tọa độ lấy từ `scripts/fetch_owm_raw.py` ở thư mục cha, key chỉ từ biến môi trường `OWM_API_KEY`), chu kỳ hỏi theo hạn mức gói miễn phí, backend nhận cả hai nguồn, bản phát lại điền `originalDatetime`, điều khiển phát lại (`/api/replay/*`). Xong khi một bản ghi OpenWeather thật đi hết Kafka → Spark → HDFS `/live` → `/ws/stream`.
+- [ ] **A2 — HDFS và làm sạch (bước 1-4)**: `/co/raw`, `/co/processed`, `/co/output`; `pipeline/02_check_raw.py`, `pipeline/04_clean.py`; `step_summary.json`; `/api/pipeline/steps`.
+- [ ] **A3 — Phân tích (bước 5, 6a)**: `pipeline/05_sql_analysis.py`, `pipeline/06a_cluster_days.py` (K-Means trên hình dạng 24 giờ của ngày, chọn số cụm bằng tiêu chí ghi lại).
+- [ ] **A4 — Mô hình dự đoán (bước 6b, 7)**: `pipeline/06b_train.py`, chia theo thời gian, hai mốc, ba mô hình, xử lý điểm gãy 01/07/2025; `/api/model/metrics`, `/api/predict` kind=ml. **Cần người dùng quyết định cách chia 80/20 trước khi làm** (xem HANDOFF 14/10: điểm gãy nằm cách ranh giới 80% khoảng 17 ngày).
+- [ ] **A5 — Dự đoán trên luồng sống (bước 8)**: consumer Spark nạp mô hình, `co_predicted`/`model_version` vào Parquet `/live` và `/ws/stream`. Chỉ làm sau A4.
+- [ ] **A6 — Airflow (bước 9)**: DAG `hcmc_co_pipeline` mới nối bước 2, 4, 5, 6 bằng spark-submit, giữ DAG mẫu cũ; mặc định tạm dừng.
+- [ ] A (frontend, sau Bước 0): `generate:types`; hai cột phát lại / dữ liệu thật; điều khiển phát lại; trang bước pipeline; trang chỉ số mô hình; `filledInputs` ở dự đoán; nhãn "dữ liệu mẫu" khi mock trả `X-Mock: true`.

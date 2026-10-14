@@ -1,89 +1,50 @@
 {
-  "_note": "Ánh xạ route -> file mock -> schema trong openapi.yaml. {id} trong file được thay bằng tham số đường dẫn.",
+  "_note": "Ánh xạ route -> file mock -> schema trong openapi.yaml. {id} trong file được thay bằng tham số đường dẫn. 'variants' (tùy chọn): khi query khớp hết các cặp khóa/giá trị thì trả file/status khác; schema mặc định là schema của route khi status 200, và Error khi status >= 400. Query bắt đầu bằng 'mock' (ví dụ ?mock=stopped) là cách riêng của mock để xem trạng thái khó gặp, không có trong openapi. 'handler' (tùy chọn): route có trạng thái trong bộ nhớ của mock (replay). MỌI SỐ trong mock là minh họa, không phải kết quả thật; mock trả header X-Mock: true.",
   "routes": [
+    { "method": "GET", "path": "/api/services", "file": "services.json", "schema": "ServiceList" },
+    { "method": "GET", "path": "/api/hdfs/summary", "file": "hdfs-summary.json", "schema": "HdfsSummary" },
+    { "method": "GET", "path": "/api/hdfs/datanodes", "file": "hdfs-datanodes.json", "schema": "HdfsDataNodes" },
+    { "method": "GET", "path": "/api/hdfs/files", "file": "hdfs-files.json", "schema": "HdfsListing" },
+    { "method": "GET", "path": "/api/hdfs/blocks", "file": "hdfs-blocks.json", "schema": "HdfsFileBlocks" },
+    { "method": "GET", "path": "/api/kafka/topics", "file": "kafka-topics.json", "schema": "KafkaTopics" },
+    { "method": "GET", "path": "/api/spark/applications", "file": "spark-applications.json", "schema": "SparkApplications" },
     {
-      "method": "GET",
-      "path": "/api/services",
-      "file": "services.json",
-      "schema": "ServiceList"
+      "method": "GET", "path": "/api/aqi/latest", "file": "aqi-latest.json", "schema": "AqiReading",
+      "variants": [
+        { "query": { "source": "live-openweather" }, "status": 200, "file": "aqi-latest-live-openweather.json" },
+        { "query": { "source": "replay-dataset" }, "status": 200, "file": "aqi-latest-replay-dataset.json" },
+        { "query": { "source": "live-open-meteo" }, "status": 404, "file": "error-no-reading.json" }
+      ]
+    },
+    { "method": "GET", "path": "/api/aqi/series", "file": "aqi-series-month.json", "schema": "AqiSeries" },
+    { "method": "GET", "path": "/api/aqi/hourly-profile", "file": "aqi-hourly-profile.json", "schema": "HourlyProfile" },
+    {
+      "method": "POST", "path": "/api/predict", "file": "predict.json", "schema": "PredictResponse",
+      "variants": [
+        { "query": { "mock": "heuristic" }, "status": 200, "file": "predict-heuristic.json" }
+      ]
+    },
+    { "method": "POST", "path": "/api/sql", "file": "sql.json", "schema": "SqlResponse" },
+    { "method": "GET", "path": "/api/flows", "file": "flows.json", "schema": "FlowList" },
+    { "method": "GET", "path": "/api/flows/{id}", "file": "flow-{id}.json", "schema": "FlowDefinition" },
+    {
+      "method": "GET", "path": "/api/replay/status", "file": "replay-status.json", "schema": "ReplayStatus", "handler": "replay-status",
+      "variants": [
+        { "query": { "mock": "stopped" }, "status": 200, "file": "replay-status-stopped.json" }
+      ]
     },
     {
-      "method": "GET",
-      "path": "/api/hdfs/summary",
-      "file": "hdfs-summary.json",
-      "schema": "HdfsSummary"
+      "method": "POST", "path": "/api/replay/control", "file": "replay-status.json", "schema": "ReplayStatus", "handler": "replay-control",
+      "variants": [
+        { "query": { "mock": "unavailable" }, "status": 409, "file": "error-replay-unavailable.json" }
+      ]
     },
+    { "method": "GET", "path": "/api/pipeline/steps", "file": "pipeline-steps.json", "schema": "PipelineSteps" },
     {
-      "method": "GET",
-      "path": "/api/hdfs/datanodes",
-      "file": "hdfs-datanodes.json",
-      "schema": "HdfsDataNodes"
-    },
-    {
-      "method": "GET",
-      "path": "/api/hdfs/files",
-      "file": "hdfs-files.json",
-      "schema": "HdfsListing"
-    },
-    {
-      "method": "GET",
-      "path": "/api/hdfs/blocks",
-      "file": "hdfs-blocks.json",
-      "schema": "HdfsFileBlocks"
-    },
-    {
-      "method": "GET",
-      "path": "/api/kafka/topics",
-      "file": "kafka-topics.json",
-      "schema": "KafkaTopics"
-    },
-    {
-      "method": "GET",
-      "path": "/api/spark/applications",
-      "file": "spark-applications.json",
-      "schema": "SparkApplications"
-    },
-    {
-      "method": "GET",
-      "path": "/api/aqi/latest",
-      "file": "aqi-latest.json",
-      "schema": "AqiReading"
-    },
-    {
-      "method": "GET",
-      "path": "/api/aqi/series",
-      "file": "aqi-series-month.json",
-      "schema": "AqiSeries"
-    },
-    {
-      "method": "GET",
-      "path": "/api/aqi/hourly-profile",
-      "file": "aqi-hourly-profile.json",
-      "schema": "HourlyProfile"
-    },
-    {
-      "method": "POST",
-      "path": "/api/predict",
-      "file": "predict.json",
-      "schema": "PredictResponse"
-    },
-    {
-      "method": "POST",
-      "path": "/api/sql",
-      "file": "sql.json",
-      "schema": "SqlResponse"
-    },
-    {
-      "method": "GET",
-      "path": "/api/flows",
-      "file": "flows.json",
-      "schema": "FlowList"
-    },
-    {
-      "method": "GET",
-      "path": "/api/flows/{id}",
-      "file": "flow-{id}.json",
-      "schema": "FlowDefinition"
+      "method": "GET", "path": "/api/model/metrics", "file": "model-metrics.json", "schema": "ModelMetrics",
+      "variants": [
+        { "query": { "mock": "untrained" }, "status": 404, "file": "error-model-not-trained.json" }
+      ]
     }
   ]
 }

@@ -1,0 +1,6 @@
+{
+  "error": {
+    "code": "MODEL_NOT_TRAINED",
+    "message": "Chưa huấn luyện mô hình (bước 6 của pipeline chưa xong). Xem /api/pipeline/steps."
+  }
+}

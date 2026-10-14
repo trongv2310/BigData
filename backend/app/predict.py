@@ -70,5 +70,6 @@ def predict(model: Baseline, hour: int) -> dict:
         "unit": "µg/m³",
         "status": reading.status_for(co),
         "interval": {"low": round(_quantile(vals, 0.1), 1), "high": round(_quantile(vals, 0.9), 1)},
+        "filledInputs": [],  # heuristic chỉ dùng giờ, không tự điền đầu vào nào
         "model": {"name": NAME, "version": VERSION, "kind": "heuristic", "trainedOn": model.description},
     }

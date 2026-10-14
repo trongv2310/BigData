@@ -69,6 +69,9 @@ def main():
     bad = 0
     with httpx.Client(timeout=30) as http:
         for r, path, params, mock_file in cases(http):
+            if r["method"] == "POST" and path not in POST_BODIES:
+                print(f"--  POST {path}: bỏ qua (công cụ này chỉ đọc; route đổi trạng thái, ví dụ /api/replay/control, tự thử bằng tay)")
+                continue
             if r["method"] == "POST":
                 resp = http.post(BASE + path, json=POST_BODIES[path])
             else:

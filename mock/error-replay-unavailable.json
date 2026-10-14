@@ -1,0 +1,6 @@
+{
+  "error": {
+    "code": "REPLAY_UNAVAILABLE",
+    "message": "Không có tiến trình phát lại đang chạy nên không điều khiển được."
+  }
+}

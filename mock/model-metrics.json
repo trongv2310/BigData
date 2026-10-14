@@ -1,0 +1,107 @@
+{
+  "generatedAt": "2026-10-14T09:00:00+07:00",
+  "target": "[MOCK] CO (µg/m³) của giờ t, dự đoán từ thông tin đến giờ t-1 (độ trễ CO 1, 2, 3, 24 giờ) cộng giờ, tháng, nhiệt độ, gió, các chất khác.",
+  "horizonHours": 1,
+  "features": [
+    "hour",
+    "month",
+    "temperatureC",
+    "windSpeedKmh",
+    "no",
+    "no2",
+    "o3",
+    "so2",
+    "pm25",
+    "pm10",
+    "nh3",
+    "coLag1h",
+    "coLag2h",
+    "coLag3h",
+    "coLag24h"
+  ],
+  "trainedOn": "[MOCK, số minh họa, chưa huấn luyện thật] Bộ Kaggle (OpenWeather) 35064 dòng giờ, 04/2022 đến 03/2026, giờ +07:00, sau khi làm sạch; bỏ 24 dòng đầu vì thiếu độ trễ 24 giờ.",
+  "trainSet": {
+    "from": "2022-04-02T07:00:00+07:00",
+    "to": "2025-06-14T07:00:00+07:00",
+    "rows": 28032
+  },
+  "testSet": {
+    "from": "2025-06-14T08:00:00+07:00",
+    "to": "2026-04-01T07:00:00+07:00",
+    "rows": 7008
+  },
+  "splitMethod": "[MOCK] Theo thời gian: 80% đầu để huấn luyện, 20% cuối để kiểm tra, không xáo ngẫu nhiên.",
+  "models": [
+    {
+      "name": "Hồi quy tuyến tính",
+      "kind": "linear-regression",
+      "version": "MOCK-lr-1",
+      "isBest": false,
+      "test": {
+        "rmse": 71.4,
+        "mae": 38.2,
+        "r2": 0.62
+      },
+      "beatsPreviousHour": false,
+      "beatsHourlyMean": true,
+      "params": null
+    },
+    {
+      "name": "Random Forest",
+      "kind": "random-forest",
+      "version": "MOCK-rf-1",
+      "isBest": false,
+      "test": {
+        "rmse": 66.9,
+        "mae": 35.7,
+        "r2": 0.67
+      },
+      "beatsPreviousHour": false,
+      "beatsHourlyMean": true,
+      "params": "numTrees=100, maxDepth=8"
+    },
+    {
+      "name": "GBT",
+      "kind": "gbt",
+      "version": "MOCK-1",
+      "isBest": true,
+      "test": {
+        "rmse": 63.8,
+        "mae": 34.1,
+        "r2": 0.7
+      },
+      "beatsPreviousHour": false,
+      "beatsHourlyMean": true,
+      "params": "maxIter=100, maxDepth=5"
+    }
+  ],
+  "baselines": [
+    {
+      "id": "previous-hour",
+      "name": "CO giờ trước",
+      "description": "Dự đoán CO giờ t bằng đúng CO giờ t-1.",
+      "test": {
+        "rmse": 58.2,
+        "mae": 29.5,
+        "r2": 0.75
+      }
+    },
+    {
+      "id": "hourly-mean",
+      "name": "Trung bình theo giờ trong ngày",
+      "description": "Dự đoán bằng trung bình CO của cùng giờ trong tập huấn luyện.",
+      "test": {
+        "rmse": 118.6,
+        "mae": 80.3,
+        "r2": -0.04
+      }
+    }
+  ],
+  "conclusion": "[MOCK] Cả ba mô hình thắng mốc trung bình theo giờ nhưng không mô hình nào thắng mốc CO giờ trước: với dữ liệu này, lặp lại giá trị giờ trước đã khó bị đánh bại.",
+  "breakpoint": {
+    "date": "2025-07-01T00:00:00+07:00",
+    "strategy": "indicator-feature",
+    "description": "[MOCK] Thêm biến after_2025_07_01 làm đầu vào để mô hình biết mức CO trước và sau điểm gãy.",
+    "effect": null
+  }
+}

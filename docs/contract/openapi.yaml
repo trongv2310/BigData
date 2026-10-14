@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: CO HCMC Dashboard API
-  version: 0.1.0
+  version: 0.2.0
   description: |
     Hợp đồng giữa backend (Claude, lead) và frontend (Antigravity).
     Chỉ lead được sửa file này. Muốn thêm hoặc đổi trường: ghi vào docs/HANDOFF.md hoặc mở PR riêng sửa contract.
@@ -12,6 +12,10 @@ info:
     - Nồng độ khí: µg/m³. Dung lượng: byte.
     - Lỗi: HTTP 4xx/5xx kèm body Error.
     - Kênh thời gian thực (WebSocket) mô tả ở docs/contract/events.md; schema sự kiện là StreamEvent ở dưới.
+    - Hai luồng dữ liệu chạy song song và không bao giờ trộn vào một đường biểu đồ: PHÁT LẠI (`source=replay-dataset`, mô phỏng từ bộ lịch sử)
+      và DỮ LIỆU THẬT (`source=live-openweather`). `live-open-meteo` là nguồn khác, không bật mặc định.
+    - Thay đổi 0.2.0 (Bước 0): AqiReading thêm originalDatetime, coPredicted, modelVersion; /api/aqi/latest nhận `source`; thêm /api/replay/*,
+      /api/pipeline/steps, /api/model/metrics; /api/predict có thể trả kind=ml. Route mới có mock ngay, backend thật làm dần (xem docs/HANDOFF.md).
 servers:
   - url: http://localhost:8000
     description: Backend thật (chạy trong WSL Ubuntu)
@@ -111,14 +115,27 @@ paths:
               schema: { $ref: "#/components/schemas/SparkApplications" }
   /api/aqi/latest:
     get:
-      summary: Bản ghi đo mới nhất trong luồng
+      summary: Bản ghi đo mới nhất của một nguồn (hoặc của luồng nói chung)
       operationId: getAqiLatest
+      description: |
+        Có `source`: trả bản ghi mới nhất của đúng nguồn đó; chưa có bản ghi nào của nguồn đó thì 404 với mã `NO_READING_YET` (trạng thái rỗng rõ ràng,
+        không trả bản ghi của nguồn khác và không điền số thay thế). Không có `source`: bản ghi mới nhất của luồng bất kể nguồn (giữ cho tương thích).
+      parameters:
+        - name: source
+          in: query
+          required: false
+          schema: { $ref: "#/components/schemas/ReadingSource" }
       responses:
         "200":
           description: OK
           content:
             application/json:
               schema: { $ref: "#/components/schemas/AqiReading" }
+        "404":
+          description: Chưa có bản ghi nào của nguồn này (mã NO_READING_YET)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
   /api/aqi/series:
     get:
       summary: Chuỗi thời gian của một chỉ số, đã gộp theo giờ/ngày/tháng
@@ -221,6 +238,72 @@ paths:
               schema: { $ref: "#/components/schemas/FlowDefinition" }
         "404":
           description: Chưa có định nghĩa cho luồng này
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /api/replay/status:
+    get:
+      summary: Trạng thái luồng PHÁT LẠI (mô phỏng từ bộ lịch sử)
+      operationId: getReplayStatus
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReplayStatus" }
+  /api/replay/control:
+    post:
+      summary: Tạm dừng, tiếp tục, đổi tốc độ luồng PHÁT LẠI
+      operationId: controlReplay
+      description: |
+        Chỉ ảnh hưởng luồng phát lại (`source=replay-dataset`); luồng `live-openweather` không bao giờ bị dừng hay làm chậm.
+        Trả về trạng thái sau khi đổi. `speed` bỏ trống thì giữ tốc độ hiện tại. Nếu không điều khiển được (chưa chạy tiến trình phát lại,
+        hoặc điều khiển bị tắt) thì 409 với mã `REPLAY_UNAVAILABLE`; lý do nằm ở `message` và ở `ReplayStatus.detail`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReplayControlRequest" }
+      responses:
+        "200":
+          description: OK, trạng thái sau khi đổi
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReplayStatus" }
+        "400":
+          description: action hoặc speed không hợp lệ
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "409":
+          description: Không điều khiển được luồng phát lại lúc này (mã REPLAY_UNAVAILABLE)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  /api/pipeline/steps:
+    get:
+      summary: Trạng thái 9 bước của pipeline (chuẩn bị HDFS đến Airflow)
+      operationId: getPipelineSteps
+      description: Luôn trả đủ 9 bước theo thứ tự `order` 1 đến 9; bước chưa chạy có state `notStarted`.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PipelineSteps" }
+  /api/model/metrics:
+    get:
+      summary: Chỉ số của mô hình dự đoán CO trên tập kiểm tra, kèm hai mốc so sánh
+      operationId: getModelMetrics
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ModelMetrics" }
+        "404":
+          description: Chưa huấn luyện mô hình (mã MODEL_NOT_TRAINED)
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
@@ -416,22 +499,48 @@ components:
         4400 <= co < 12400 là WARNING (Fair, Moderate; 4400 cũng xấp xỉ hướng dẫn 24 giờ 4 mg/m³ của WHO 2021); co >= 12400 là DANGER (Poor, Very Poor).
         Backend đổi được bằng CO_WARNING_UG, CO_DANGER_UG. Đây là thang của OpenWeather, không phải quy chuẩn pháp lý của Việt Nam.
         Frontend chỉ hiển thị, không tự tính.
+    ReadingSource:
+      type: string
+      enum: [replay-dataset, live-openweather, live-open-meteo]
+      description: |
+        replay-dataset: PHÁT LẠI, mô phỏng từ bộ lịch sử (OpenWeather qua Kaggle), không phải đo lúc này.
+        live-openweather: DỮ LIỆU THẬT từ OpenWeather Air Pollution API (cùng nguồn gốc với bộ lịch sử, nên dùng chung mô hình được).
+        live-open-meteo: nguồn khác (mô hình CAMS), không bật mặc định; không trộn với hai nguồn trên và không dùng để dự đoán.
     AqiReading:
       type: object
       additionalProperties: false
-      required: [datetime, station, isSimulatedStation, source, co, windSpeedKmh, temperatureC, coAccumulationIndex, status]
+      required: [datetime, originalDatetime, station, isSimulatedStation, source, co, windSpeedKmh, temperatureC, coAccumulationIndex, status, coPredicted, modelVersion]
       properties:
-        datetime: { $ref: "#/components/schemas/DateTime" }
+        datetime:
+          $ref: "#/components/schemas/DateTime"
+          description: |
+            Thời điểm bản ghi này xảy ra theo nguồn của nó. live-*: thời điểm quan sát của nguồn (giờ +07:00). replay-dataset: thời điểm bản ghi được PHÁT LẠI
+            (giờ máy lúc phát), KHÔNG phải thời điểm đo; thời điểm đo gốc nằm ở `originalDatetime`.
+        originalDatetime:
+          description: |
+            Thời điểm gốc của bản ghi trong bộ lịch sử (đã đổi UTC sang +07:00). Luôn null với nguồn thật (live-*). Với replay-dataset phải có giá trị,
+            để giao diện không trình bày dữ liệu lịch sử như thể đo lúc này; riêng backend trước Bước A1 chưa điền được nên tạm trả null (xem docs/HANDOFF.md).
+          oneOf:
+            - { $ref: "#/components/schemas/DateTime" }
+            - { type: "null" }
         station: { type: string }
         isSimulatedStation:
           type: boolean
           description: true khi nhãn trạm chỉ là nhãn gán luân phiên của bản replay, không phải trạm đo thật. Frontend phải ghi chú rõ.
-        source: { type: string, enum: [replay-dataset, live-open-meteo, live-openweather] }
-        co: { type: number, description: "µg/m³" }
+        source: { $ref: "#/components/schemas/ReadingSource" }
+        co: { type: number, description: "µg/m³. Giá trị quan sát (replay: giá trị của bản ghi lịch sử)" }
         windSpeedKmh: { type: number, minimum: 0 }
         temperatureC: { type: number }
         coAccumulationIndex: { type: number, description: "co / (windSpeedKmh + 1), làm tròn 2 chữ số" }
         status: { $ref: "#/components/schemas/CoStatus" }
+        coPredicted:
+          type: [number, "null"]
+          description: |
+            µg/m³. CO mà mô hình dự đoán cho chính bản ghi này (cùng thời điểm với `co`, nên so sánh trực tiếp với `co`), tính từ CO của các giờ trước và các đầu vào
+            nêu ở ModelMetrics.features. null khi chưa có mô hình hoặc chưa đủ lịch sử (ví dụ chưa đủ độ trễ 24 giờ trên luồng sống): không bao giờ điền số thay thế.
+        modelVersion:
+          type: [string, "null"]
+          description: Phiên bản mô hình đã tạo `coPredicted` (trùng ModelMetrics.models[].version và PredictResponse.model.version); null khi coPredicted là null.
 
     AqiSeries:
       type: object
@@ -488,12 +597,36 @@ components:
         dayOfWeek: { type: integer, minimum: 0, maximum: 6, description: "0 là thứ Hai" }
         temperatureC: { type: number }
         windSpeedKmh: { type: number, minimum: 0 }
+        coLag1h: { type: number, minimum: 0, description: "CO (µg/m³) của 1 giờ trước. Chỉ mô hình ml dùng; bỏ trống thì backend tự điền và báo ở filledInputs" }
+        coLag2h: { type: number, minimum: 0, description: "CO của 2 giờ trước (xem coLag1h)" }
+        coLag3h: { type: number, minimum: 0, description: "CO của 3 giờ trước (xem coLag1h)" }
+        coLag24h: { type: number, minimum: 0, description: "CO của 24 giờ trước (xem coLag1h)" }
+        no: { type: number, minimum: 0, description: "µg/m³. Các chất khác: chỉ mô hình ml dùng, đúng những cái có trong ModelMetrics.features; bỏ trống thì backend tự điền và báo ở filledInputs" }
+        no2: { type: number, minimum: 0 }
+        o3: { type: number, minimum: 0 }
+        so2: { type: number, minimum: 0 }
+        pm25: { type: number, minimum: 0 }
+        pm10: { type: number, minimum: 0 }
+        nh3: { type: number, minimum: 0 }
     PredictResponse:
       type: object
       additionalProperties: false
-      required: [coPredicted, unit, status, model, interval]
+      required: [coPredicted, unit, status, model, interval, filledInputs]
       properties:
         coPredicted: { type: number }
+        filledInputs:
+          type: array
+          description: |
+            Các đầu vào mà yêu cầu bỏ trống và backend tự điền (mô hình ml cần cả độ trễ CO và các chất khác, nhưng form chỉ có giờ, tháng, nhiệt độ, gió).
+            Giao diện phải hiện danh sách này để người dùng biết kết quả dựa vào số nào. Rỗng với heuristic.
+          items:
+            type: object
+            additionalProperties: false
+            required: [name, value, origin]
+            properties:
+              name: { type: string, description: "Tên trường của PredictRequest, ví dụ coLag1h" }
+              value: { type: number }
+              origin: { type: string, description: "Số này lấy từ đâu, ví dụ: bản ghi live-openweather gần nhất; trung vị theo giờ của tập huấn luyện" }
         unit: { type: string, const: "µg/m³" }
         status: { $ref: "#/components/schemas/CoStatus" }
         interval:
@@ -513,7 +646,7 @@ components:
           properties:
             name: { type: string }
             version: { type: string }
-            kind: { type: string, enum: [heuristic, ml] }
+            kind: { type: string, enum: [heuristic, ml], description: "ml khi đã có mô hình huấn luyện (model.name/version khớp ModelMetrics); heuristic là thống kê theo giờ, không phải học máy" }
             trainedOn: { type: [string, "null"], description: "Mô tả dữ liệu mà mô hình hoặc heuristic dựa vào và những gì được/không được dùng; null nếu không dựa vào dữ liệu nào" }
 
     SqlRequest:
@@ -603,6 +736,158 @@ components:
               label: { type: string }
               channel: { type: string, enum: [data, control, background], description: "data: byte dữ liệu; control: lệnh RPC/metadata; background: việc chạy nền" }
               repeats: { type: [string, "null"], description: "Ví dụ: mỗi block. null nếu chạy một lần" }
+
+    ReplayControlRequest:
+      type: object
+      additionalProperties: false
+      required: [action]
+      properties:
+        action: { type: string, enum: [pause, resume] }
+        speed:
+          type: integer
+          enum: [1, 10, 60]
+          description: Hệ số tốc độ (1×, 10×, 60×) so với baseIntervalSeconds. Bỏ trống thì giữ tốc độ hiện tại.
+    ReplayStatus:
+      type: object
+      additionalProperties: false
+      required: [state, speed, baseIntervalSeconds, intervalSeconds, controllable, emittedCount, lastOriginalDatetime, updatedAt, detail]
+      properties:
+        state:
+          type: string
+          enum: [running, paused, stopped]
+          description: "running là đang phát, paused là đã tạm dừng, stopped là không có tiến trình phát lại nào đang chạy (không phải lỗi của luồng thật)"
+        speed: { type: integer, enum: [1, 10, 60] }
+        baseIntervalSeconds: { type: number, minimum: 0, description: "Giây thật giữa hai bản ghi khi speed = 1" }
+        intervalSeconds: { type: number, minimum: 0, description: "Giây thật giữa hai bản ghi ở tốc độ hiện tại = baseIntervalSeconds / speed" }
+        controllable: { type: boolean, description: "false khi không thể gọi /api/replay/control (lý do ở detail)" }
+        emittedCount: { type: integer, minimum: 0, description: "Số bản ghi đã phát kể từ lúc tiến trình phát lại bắt đầu" }
+        lastOriginalDatetime:
+          description: originalDatetime của bản ghi phát lại gần nhất; null nếu chưa phát bản ghi nào
+          oneOf:
+            - { $ref: "#/components/schemas/DateTime" }
+            - { type: "null" }
+        updatedAt: { $ref: "#/components/schemas/DateTime" }
+        detail: { type: [string, "null"], description: "Giải thích bằng chữ khi stopped hoặc không điều khiển được; null khi bình thường" }
+
+    PipelineStepState:
+      type: string
+      enum: [notStarted, running, done, failed]
+    PipelineStep:
+      type: object
+      additionalProperties: false
+      required: [order, id, title, state, updatedAt, summary, detail]
+      properties:
+        order: { type: integer, minimum: 1, maximum: 9 }
+        id:
+          type: string
+          enum: [prepare-hdfs, upload-raw, read-spark, clean, spark-sql, cluster-and-model, save-results, kafka-ingest, airflow-dag]
+          description: |
+            1 prepare-hdfs (chuẩn bị HDFS), 2 upload-raw (upload Dataset.csv), 3 read-spark (đọc bằng Spark), 4 clean (làm sạch), 5 spark-sql (Spark SQL),
+            6 cluster-and-model (thay RFM và K-Means của đề mẫu: phân cụm ngày theo hình dạng 24 giờ + mô hình dự đoán CO), 7 save-results (lưu kết quả),
+            8 kafka-ingest (Kafka ingest, kèm dự đoán trên luồng sống), 9 airflow-dag (Airflow DAG)
+        title: { type: string }
+        state: { $ref: "#/components/schemas/PipelineStepState" }
+        updatedAt:
+          description: Lần cuối bước đổi trạng thái hoặc ghi kết quả; null khi notStarted
+          oneOf:
+            - { $ref: "#/components/schemas/DateTime" }
+            - { type: "null" }
+        summary:
+          type: array
+          description: Các số liệu chính do chính bước đó ghi lại (số dòng, số cụm, chỉ số mô hình...). Rỗng khi chưa có. Giao diện hiển thị nguyên văn, không tự tính.
+          items:
+            type: object
+            additionalProperties: false
+            required: [label, value, unit]
+            properties:
+              label: { type: string }
+              value: { type: [string, number, "null"] }
+              unit: { type: [string, "null"] }
+        detail: { type: [string, "null"], description: "Mô tả, lưu ý hoặc lý do lỗi bằng chữ" }
+    PipelineSteps:
+      type: object
+      additionalProperties: false
+      required: [steps, generatedAt]
+      properties:
+        generatedAt: { $ref: "#/components/schemas/DateTime" }
+        steps:
+          type: array
+          minItems: 9
+          maxItems: 9
+          items: { $ref: "#/components/schemas/PipelineStep" }
+
+    ErrorMetrics:
+      type: object
+      additionalProperties: false
+      required: [rmse, mae, r2]
+      properties:
+        rmse: { type: number, description: "µg/m³" }
+        mae: { type: number, description: "µg/m³" }
+        r2: { type: number, description: "Có thể âm khi kém hơn dự đoán bằng trung bình" }
+    DataSplitInfo:
+      type: object
+      additionalProperties: false
+      required: [from, to, rows]
+      properties:
+        from: { $ref: "#/components/schemas/DateTime" }
+        to: { $ref: "#/components/schemas/DateTime" }
+        rows: { type: integer, minimum: 1 }
+    ModelMetrics:
+      type: object
+      additionalProperties: false
+      required: [generatedAt, target, horizonHours, features, trainedOn, trainSet, testSet, splitMethod, models, baselines, conclusion, breakpoint]
+      properties:
+        generatedAt: { $ref: "#/components/schemas/DateTime" }
+        target: { type: string, description: "Mô hình dự đoán đại lượng gì, ví dụ CO (µg/m³) của giờ t từ thông tin đến giờ t-1" }
+        horizonHours: { type: integer, minimum: 1 }
+        features:
+          type: array
+          description: Tên các đầu vào của mô hình (khớp trường của PredictRequest khi có)
+          items: { type: string }
+        trainedOn: { type: string, description: "Mô tả đúng dữ liệu và khoảng thời gian huấn luyện, nguồn, những gì đã loại bỏ" }
+        trainSet: { $ref: "#/components/schemas/DataSplitInfo" }
+        testSet: { $ref: "#/components/schemas/DataSplitInfo" }
+        splitMethod: { type: string, description: "Cách chia, phải theo thời gian (đầu huấn luyện, cuối kiểm tra), không xáo ngẫu nhiên" }
+        models:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            additionalProperties: false
+            required: [name, kind, version, isBest, test, beatsPreviousHour, beatsHourlyMean, params]
+            properties:
+              name: { type: string }
+              kind: { type: string, enum: [linear-regression, random-forest, gbt] }
+              version: { type: string }
+              isBest: { type: boolean, description: "Mô hình được lưu và dùng cho /api/predict và coPredicted; đúng một phần tử true" }
+              test: { $ref: "#/components/schemas/ErrorMetrics" }
+              beatsPreviousHour: { type: boolean, description: "RMSE trên tập kiểm tra thấp hơn mốc 'CO giờ trước' (do pipeline tính, giao diện không tự so)" }
+              beatsHourlyMean: { type: boolean, description: "RMSE trên tập kiểm tra thấp hơn mốc 'trung bình theo giờ trong ngày'" }
+              params: { type: [string, "null"], description: "Siêu tham số chính, nếu có" }
+        baselines:
+          type: array
+          description: Hai mốc so sánh, tính trên đúng tập kiểm tra của mô hình
+          minItems: 2
+          maxItems: 2
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, name, description, test]
+            properties:
+              id: { type: string, enum: [previous-hour, hourly-mean] }
+              name: { type: string }
+              description: { type: string }
+              test: { $ref: "#/components/schemas/ErrorMetrics" }
+        conclusion: { type: string, description: "Kết luận trung thực do pipeline ghi, kể cả khi không mô hình nào thắng mốc" }
+        breakpoint:
+          type: object
+          additionalProperties: false
+          required: [date, strategy, description, effect]
+          properties:
+            date: { $ref: "#/components/schemas/DateTime" }
+            strategy: { type: string, enum: [indicator-feature, separate-training, none] }
+            description: { type: string, description: "Cách xử lý điểm gãy 01/07/2025 (CO giảm mạnh)" }
+            effect: { type: [string, "null"], description: "Ảnh hưởng đã đo của cách xử lý lên chỉ số; null nếu chưa đo" }
 
     StreamEnvelope:
       type: object

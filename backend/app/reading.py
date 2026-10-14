@@ -31,6 +31,9 @@ def from_record(rec: dict) -> dict:
     station = rec.get("station") or ""
     return {
         "datetime": timeutil.iso(datetime.fromisoformat(rec["datetime"])),
+        # Hợp đồng 0.2.0: trước Bước A1 producer chưa gửi thời điểm gốc nên chưa điền được cho bản phát lại; không đoán. coPredicted/modelVersion
+        # chỉ có từ Bước A5 (chưa có mô hình), nên luôn null, không điền số thay thế.
+        "originalDatetime": None,
         "station": STATION_LABELS.get(station, station),
         # Quyết định D2 (TẠM): luôn true, kể cả luồng live (một điểm tọa độ chung, không phải trạm đo).
         "isSimulatedStation": True,
@@ -40,6 +43,8 @@ def from_record(rec: dict) -> dict:
         "temperatureC": float(rec["temperature_C"]),
         "coAccumulationIndex": round(co / (wind + 1.0), 2),
         "status": status_for(co),
+        "coPredicted": None,
+        "modelVersion": None,
     }
 
 
