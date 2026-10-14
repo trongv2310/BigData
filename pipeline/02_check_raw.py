@@ -81,12 +81,12 @@ def main() -> int:
                      c.item("Ô ngoài miền hợp lệ", total("outOfDomain"), "ô"), c.item("datetime không đọc được", tstats["unparsable"], "dòng"),
                      c.item("datetime trùng", duplicates, "dòng"), c.item("Giờ bị thiếu giữa hai đầu", missing_hours, "giờ"),
                      c.item("Từ (UTC)", str(t_min), None), c.item("Đến (UTC)", str(t_max), None)]
-        r.detail = ("Spark đọc /co/raw/Dataset.csv, toàn bộ cột là chuỗi, chỉ đếm, không sửa. "
+        r.detail = (f"Spark đọc {c.RAW_FILE}, toàn bộ cột là chuỗi, chỉ đếm, không sửa. "
                     + (f"Cột có vấn đề: {json.dumps(bad, ensure_ascii=False)}. " if bad else "Không cột nào có ô thiếu, không phải số hay ngoài miền của data_dictionary.csv. ")
                     + f"Cột hour/month/dayofweek trong file lệch với giờ UTC ở {tstats['hour_not_utc']}/{tstats['month_not_utc']}/{tstats['dow_not_utc']} dòng "
                       f"và lệch với giờ +07 ở {tstats['hour_not_vn']}/{tstats['month_not_vn']}/{tstats['dow_not_vn']} dòng. "
                     + f"Cờ is_event_anomaly=1: {anomalies['event']} dòng; o3_was_missing=1: {anomalies['o3_filled']} dòng (đã điền từ trước khi vào bước này). "
-                    + "Báo cáo đầy đủ: /co/output/check_raw.json.")
+                    + f"Báo cáo đầy đủ: {c.OUTPUT_DIR}/check_raw.json.")
         spark.stop()
     print(f"[02_check_raw] xong: {rows} dòng, thiếu {total('blank')}, không phải số {total('nonNumeric')}, ngoài miền {total('outOfDomain')}, "
           f"trùng {duplicates}, thiếu giờ {missing_hours}")

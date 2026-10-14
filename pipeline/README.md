@@ -13,7 +13,9 @@ Mỗi script ghi trạng thái và số liệu thật của chính nó vào `hdf
 | 6a (độ ổn định) | `06a_cluster_stability.py` (+ `stability.py`) | K-Means k=2..8 với 6 seed; silhouette và chỉ số Rand điều chỉnh (ARI) giữa các lần chạy cho k=2 và k=3; chi tiết k=3; ghi `/co/output/day_clusters_stability.json` và `day_clusters_k3` | `spark-submit --driver-memory 1g pipeline/06a_cluster_stability.py` |
 | 6b (mô hình) và 7 `save-results` | `06b_train.py` (+ `changepoint.py`, `modeling.py`) | xác định ranh giới chuyển tiếp theo dữ liệu (khử mùa vụ rồi khớp dốc), 3 phương án chia (chính: sau chuyển tiếp; chia 80/20 gốc; toàn bộ có biến chế độ), 3 mô hình, 2 mốc; lưu `/co/output/model_best`, `model_metrics.json`, `model_test_predictions`, `model_inputs_reference.json` | `spark-submit --driver-memory 2g pipeline/06b_train.py` |
 | 8 `kafka-ingest` | `08_check_stream.py` | KIỂM job Spark streaming (`infra/spark_kafka_consumer.py`): đọc `/live/co_stream`, sai số dự đoán trên luồng theo nguồn, đối chiếu với dự đoán offline; ghi bước 8 (`failed` nếu chưa có dòng nào được dự đoán) | `spark-submit --driver-memory 1g pipeline/08_check_stream.py` |
-| 9 | chưa có | Bước A6 | |
+| 9 `airflow-dag` | `09_record_dag.py` (do DAG gọi) + `infra/airflow_dags/hcmc_co_pipeline.py` | DAG Airflow nối các bước trên bằng spark-submit; tác vụ cuối ghi bước 9 (`done` khi mọi tác vụ thành công, `failed` khi có tác vụ lỗi) | `airflow dags test hcmc_co_pipeline <ngày> --conf '{"co_root":"/co_airflow_test","overwrite":true}'` (xem `infra/README.md`) |
+
+Thư mục gốc HDFS là `/co`, đổi bằng biến môi trường `CO_ROOT` (mọi script đọc qua `common.CO_ROOT`); DAG truyền tham số `co_root` vào đó để chạy thử mà không đụng kết quả đã giao ở `/co`.
 
 Quy tắc: không script nào điền số thay thế; chạy lại an toàn (bước 1-2 không ghi đè file khác nội dung, bước 4 dừng nếu `/co/processed/aqi_clean` đã có trừ khi `--overwrite`).
 Kiểm phép làm sạch: `backend/tests/test_a2.py` (bảng nhỏ có đủ loại lỗi, chạy bằng `cd backend && python3 -m unittest discover tests`).

@@ -152,7 +152,7 @@ def main() -> int:
                   "Độ nhạy với điểm bắt đầu giai đoạn sau: " + "; ".join(f"{s['label']} ({s['postStart']}): {s['test']['rmse']:.1f}" for s in sens) + ".")
         metrics_doc = {
             "generatedAt": c.now_iso(), "target": TARGET, "horizonHours": 1, "features": m.BASE_FEATURES,
-            "trainedOn": (f"Bộ Kaggle (OpenWeather) đã làm sạch (/co/processed/aqi_clean), CHỈ giai đoạn sau chuyển tiếp: từ {span_a_tr['from']} đến {span_a_tr['to']} ({span_a_tr['rows']} giờ), "
+            "trainedOn": (f"Bộ Kaggle (OpenWeather) đã làm sạch ({c.CLEAN_DIR}), CHỈ giai đoạn sau chuyển tiếp: từ {span_a_tr['from']} đến {span_a_tr['to']} ({span_a_tr['rows']} giờ), "
                           f"đã loại 24 giờ đầu của giai đoạn (độ trễ 24 giờ cần dữ liệu trong chính giai đoạn). Kiểm tra trên {span_a_te['from']} đến {span_a_te['to']} ({span_a_te['rows']} giờ), "
                           "chỉ phủ khoảng 2 tháng cuối (mùa vụ khác với phần huấn luyện). Dữ liệu gốc đã tiền xử lý từ trước (o3 điền ở 14,9% dòng, độ ẩm/nhiệt độ có dấu hiệu nội suy)."),
             "trainSet": span_a_tr, "testSet": span_a_te,
@@ -207,7 +207,7 @@ def main() -> int:
                       c.item("Chuyển tiếp theo dữ liệu (cửa sổ ±60 ngày)", f"{trans['main']['from']} đến {trans['main']['to']}", None),
                       c.item("Tập huấn luyện / kiểm tra (phương án chính)", f"{span_a_tr['rows']} / {span_a_te['rows']}", "giờ")]
         r6.detail = ("Bước đã xong cả 6a (phân cụm ngày, độ ổn định theo seed) và 6b (mô hình dự đoán CO). " + A["conclusion"] + " Nguyên nhân điểm gãy dữ liệu chưa xác định; "
-                     "không kết luận CO ngoài đời giảm thật. Chi tiết, hai phương án so sánh và độ nhạy ở /co/output/model_metrics.json.")
+                     f"không kết luận CO ngoài đời giảm thật. Chi tiết, hai phương án so sánh và độ nhạy ở {METRICS_JSON}.")
 
         # kiểm lại những gì đã lưu: nạp mô hình từ HDFS, dự đoán lại 200 dòng kiểm tra, so với bản trong bộ nhớ
         loaded = PipelineModel.load(f"{c.HDFS_URI}{MODEL_DIR}")

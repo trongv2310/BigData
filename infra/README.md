@@ -8,7 +8,7 @@ Môi trường hiện có của dự án (không do repo này cài):
 | Hadoop 3.3.6 | `/home/trong/hadoop`, HDFS `hdfs://localhost:9000`, NameNode UI `:9870`, DataNode `:9864`, YARN RM `:8088` |
 | Kafka | `/home/trong/kafka`, `localhost:9092`, topic `hcmc_co_stream` (`start-kafka.sh`, `stop-kafka.sh`) |
 | Spark | PySpark `local[*]` (`spark_streaming_consumer.py`) |
-| Airflow 3.3.2 | DAG `hcmc_co_pipeline` (bản sao của `test_airflow_dag.py`: extract, validate, load trên số liệu mẫu cố định, KHÔNG liên quan tới luồng Kafka/Spark thật), UI `:8080`; bật bằng `bash infra/airflow.sh start` |
+| Airflow 3.3.2 | hai DAG, đều tạm dừng: `hcmc_co_pipeline` (THẬT, bước 9: `infra/airflow_dags/hcmc_co_pipeline.py`, nối pipeline bằng spark-submit) và `hcmc_co_pipeline_sample` (DAG mẫu cũ `test_airflow_dag.py`: số liệu cố định, KHÔNG liên quan tới Kafka/Spark thật), UI `:8080`; bật bằng `bash infra/airflow.sh start` |
 | HDFS | `/stream_input` (file JSON của luồng), `/raw/Dataset.csv` |
 
 Quy ước: các script pipeline cũ nằm ở thư mục cha `BigData/`. Repo này **sao chép** khi cần, không di chuyển, để đồ án đang nộp không bị hỏng.
@@ -83,9 +83,14 @@ Bộ nhớ: máy WSL có ~7,7 GB; khi chạy HDFS (5 JVM), YARN, Kafka và Spark
 
 ### Airflow (bật ngày 13/10/2026)
 
-- `bash infra/airflow.sh start|stop|status` chạy `airflow standalone` (api-server, scheduler, dag-processor, triggerer). Không sửa `~/airflow/airflow.cfg`: tắt ví dụ mẫu bằng biến môi trường `AIRFLOW__CORE__LOAD_EXAMPLES=False`. Script sao chép `test_airflow_dag.py` vào `~/airflow/dags/hcmc_co_pipeline.py` nếu chưa có (bản gốc ở thư mục cha không bị đụng).
+- `bash infra/airflow.sh start|stop|status` chạy `airflow standalone` (api-server, scheduler, dag-processor, triggerer). Không sửa `~/airflow/airflow.cfg`: tắt ví dụ mẫu bằng biến môi trường `AIRFLOW__CORE__LOAD_EXAMPLES=False`. `airflow.sh start` (hoặc `install`, chỉ cài DAG) liên kết `infra/airflow_dags/hcmc_co_pipeline.py` vào `~/airflow/dags/` và tạo `hcmc_co_pipeline_sample.py` từ `test_airflow_dag.py` của thư mục cha chỉ với dòng `dag_id` đổi (bản gốc không bị đụng). Bản `~/airflow/dags/hcmc_co_pipeline.py` cũ (bản sao của DAG mẫu) chỉ bị thay khi còn giống hệt file gốc; khác thì script từ chối. Đặt `SAMPLE_DAG=<đường dẫn>` nếu file mẫu không nằm ở thư mục cha của repo (worktree Orca).
 - Mật khẩu đăng nhập UI do SimpleAuthManager sinh, nằm ở `~/airflow/simple_auth_manager_passwords.json.generated` (không ghi vào repo).
-- DAG đang ở trạng thái tạm dừng (`is_paused = True`, mặc định của Airflow); đã chạy thử bằng `airflow dags test hcmc_co_pipeline`: 3 task thành công, in "Đã xử lý và nạp thành công 3 bản ghi quan trắc CO". Lịch `0 8 * * *` chỉ chạy khi bỏ tạm dừng.
+- DAG mẫu cũ (nay `hcmc_co_pipeline_sample`, lịch `0 8 * * *`) đã chạy thử ngày 13/10 bằng `airflow dags test`: 3 task thành công, in "Đã xử lý và nạp thành công 3 bản ghi quan trắc CO"; chỉ chạy theo lịch khi bỏ tạm dừng.
+- **DAG thật `hcmc_co_pipeline` (A6, 14/10/2026):** 7 tác vụ nối tiếp `prepare_upload` (bước 1-2) -> `check_raw` (3) -> `clean` (4) -> `sql_analysis` (5) -> `cluster_days` (6a) -> `cluster_stability` (6a bổ sung) -> `train_model` (6b, 7), rồi `record_dag_success` (ghi bước 9 `done`) hoặc `record_dag_failure` (`failed`). Tạm dừng khi tạo, không lịch, `max_active_runs=1`, không thử lại. Tham số: `co_root` (mặc định `/co`), `overwrite` (mặc định false: bước nào đã có đầu ra thì dừng mã 2), `local_csv`. Cần HDFS; mỗi tác vụ Spark `local[*]` 1 đến 2 GB.
+  - Chạy thử KHÔNG đụng `/co` (không cần `airflow standalone`, tiết kiệm RAM; khoảng 8 phút):
+    `cd ~ && export HCMC_CO_REPO=<đường dẫn repo trong WSL> AIRFLOW__CORE__LOAD_EXAMPLES=False && airflow dags test hcmc_co_pipeline 2026-10-14 --conf '{"co_root":"/co_airflow_test","overwrite":true}'`
+  - Chạy qua giao diện `:8080`: bỏ tạm dừng rồi Trigger kèm tham số; với `co_root=/co` phải đặt `overwrite=true` (ghi đè kết quả đã giao, hỏi người dùng trước).
+  - Dọn dữ liệu thử (cần người dùng đồng ý): `hdfs dfs -rm -r -skipTrash /co_airflow_test`.
 - Backend dò Airflow 3 bằng `/api/v2/monitor/health` (Airflow 3 trả 404 ở `/health`, nên trước đó dashboard báo `down` dù Airflow chạy); nếu không có thì thử `/health` của Airflow 2.
 - Lưu ý khi tự viết lệnh khởi động: tiến trình nền khởi động từ một shell WSL thoát ngay có thể bị dọn mất; `airflow.sh start` giữ shell sống tới khi Airflow trả lời.
 
