@@ -14,11 +14,43 @@ import {
   HelpCircle,
   RefreshCw,
   ExternalLink,
+  PowerOff,
 } from 'lucide-react';
 import { api } from '../services/api';
 import { useStream } from '../context/useStream';
 import type { ServiceStatus, AqiReading } from '../types';
 import { formatDateTime, formatTimeOnly, getCoStatusBadge, getSourceLabel } from '../utils/format';
+
+// Cách hiển thị từng trạng thái dịch vụ. `disabled` (hợp đồng 0.6.0) = tắt chủ động theo cấu hình (vd. YARN để tiết kiệm RAM), KHÔNG phải lỗi.
+const SERVICE_STATE_UI: Record<ServiceStatus['state'], { label: string; badge: string; chip: string }> = {
+  up: {
+    label: 'UP',
+    badge: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30',
+    chip: 'bg-emerald-500/20 text-emerald-400',
+  },
+  down: {
+    label: 'DOWN',
+    badge: 'bg-rose-500/20 text-rose-400 border border-rose-500/30',
+    chip: 'bg-rose-500/20 text-rose-400',
+  },
+  unknown: {
+    label: 'UNKNOWN',
+    badge: 'bg-slate-700 text-slate-400 border border-slate-600',
+    chip: 'bg-slate-700 text-slate-400',
+  },
+  disabled: {
+    label: 'Tắt chủ động',
+    badge: 'bg-slate-800 text-slate-400 border border-dashed border-slate-600',
+    chip: 'bg-slate-800 text-slate-400 border border-dashed border-slate-600',
+  },
+};
+
+const ServiceStateIcon: React.FC<{ state: ServiceStatus['state'] }> = ({ state }) => {
+  if (state === 'up') return <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />;
+  if (state === 'down') return <XCircle className="w-3.5 h-3.5 text-rose-400" />;
+  if (state === 'disabled') return <PowerOff className="w-3.5 h-3.5 text-slate-500" />;
+  return <HelpCircle className="w-3.5 h-3.5 text-slate-400" />;
+};
 
 export const OverviewTab: React.FC = () => {
   const { latestReading: streamReading, hasStreamReading, serviceOverrides, events } = useStream();
@@ -108,6 +140,11 @@ export const OverviewTab: React.FC = () => {
     }
     return s;
   });
+
+  // Dịch vụ tắt chủ động không tính vào mẫu số "đang hoạt động"
+  const enabledServices = displayedServices.filter((s) => s.state !== 'disabled');
+  const upCount = enabledServices.filter((s) => s.state === 'up').length;
+  const disabledServices = displayedServices.filter((s) => s.state === 'disabled');
 
   const statusBadge = currentReading ? getCoStatusBadge(currentReading.status) : null;
 
@@ -293,37 +330,40 @@ export const OverviewTab: React.FC = () => {
               {displayedServices.slice(0, 6).map((svc) => (
                 <div
                   key={svc.name}
-                  className="flex items-center justify-between p-2 rounded-lg bg-slate-800/40 text-xs"
+                  title={svc.detail ?? undefined}
+                  className={`flex items-center justify-between p-2 rounded-lg text-xs ${
+                    svc.state === 'disabled' ? 'bg-slate-800/20' : 'bg-slate-800/40'
+                  }`}
                 >
                   <div className="flex items-center gap-2">
-                    {svc.state === 'up' ? (
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                    ) : svc.state === 'down' ? (
-                      <XCircle className="w-3.5 h-3.5 text-rose-400" />
-                    ) : (
-                      <HelpCircle className="w-3.5 h-3.5 text-slate-400" />
-                    )}
-                    <span className="font-medium text-slate-200">{svc.name}</span>
+                    <ServiceStateIcon state={svc.state} />
+                    <span
+                      className={`font-medium ${svc.state === 'disabled' ? 'text-slate-500' : 'text-slate-200'}`}
+                    >
+                      {svc.name}
+                    </span>
                   </div>
                   <span
-                    className={`px-2 py-0.5 rounded font-mono text-[10px] font-bold uppercase ${
-                      svc.state === 'up'
-                        ? 'bg-emerald-500/20 text-emerald-400'
-                        : svc.state === 'down'
-                        ? 'bg-rose-500/20 text-rose-400'
-                        : 'bg-slate-700 text-slate-400'
-                    }`}
+                    className={`px-2 py-0.5 rounded font-mono text-[10px] font-bold ${
+                      svc.state === 'disabled' ? '' : 'uppercase'
+                    } ${SERVICE_STATE_UI[svc.state].chip}`}
                   >
-                    {svc.state}
+                    {SERVICE_STATE_UI[svc.state].label}
                   </span>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="mt-4 pt-4 border-t border-slate-800 text-xs text-slate-400">
-            Tổng cộng: {displayedServices.filter((s) => s.state === 'up').length} /{' '}
-            {displayedServices.length} dịch vụ hoạt động tốt.
+          <div className="mt-4 pt-4 border-t border-slate-800 text-xs text-slate-400 space-y-1">
+            <div>
+              Tổng cộng: <strong className="text-slate-200">{upCount} / {enabledServices.length}</strong> dịch vụ đang bật hoạt động tốt.
+            </div>
+            {disabledServices.length > 0 && (
+              <div className="text-slate-500">
+                Tắt chủ động (không phải lỗi): {disabledServices.map((s) => s.name).join(', ')}.
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -341,7 +381,11 @@ export const OverviewTab: React.FC = () => {
           {displayedServices.map((svc) => (
             <div
               key={svc.name}
-              className="p-4 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 transition flex flex-col justify-between space-y-3"
+              className={`p-4 rounded-xl border transition flex flex-col justify-between space-y-3 ${
+                svc.state === 'disabled'
+                  ? 'bg-slate-900/50 border-dashed border-slate-700'
+                  : 'bg-slate-900 border-slate-800 hover:border-slate-700'
+              }`}
             >
               <div>
                 <div className="flex items-center justify-between mb-2">
@@ -349,20 +393,21 @@ export const OverviewTab: React.FC = () => {
                     {svc.kind}
                   </span>
                   <span
-                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold uppercase ${
-                      svc.state === 'up'
-                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                        : svc.state === 'down'
-                        ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
-                        : 'bg-slate-700 text-slate-400 border border-slate-600'
-                    }`}
+                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold ${
+                      svc.state === 'disabled' ? '' : 'uppercase'
+                    } ${SERVICE_STATE_UI[svc.state].badge}`}
                   >
                     {svc.state === 'up' && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />}
-                    {svc.state}
+                    {svc.state === 'disabled' && <PowerOff className="w-3 h-3" />}
+                    {SERVICE_STATE_UI[svc.state].label}
                   </span>
                 </div>
 
-                <h4 className="text-base font-bold text-slate-100 flex items-center gap-1.5">
+                <h4
+                  className={`text-base font-bold flex items-center gap-1.5 ${
+                    svc.state === 'disabled' ? 'text-slate-400' : 'text-slate-100'
+                  }`}
+                >
                   {svc.name}
                 </h4>
 
@@ -375,7 +420,7 @@ export const OverviewTab: React.FC = () => {
 
               <div className="pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px] text-slate-500">
                 <span>{formatTimeOnly(svc.checkedAt)}</span>
-                {svc.url && (
+                {svc.url && svc.state !== 'disabled' && (
                   <a
                     href={svc.url}
                     target="_blank"

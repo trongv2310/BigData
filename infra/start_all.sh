@@ -90,6 +90,7 @@ if pgrep -f "uvicorn app.main:ap[p]" > /dev/null; then
 else
   cd "$ROOT/backend" || exit 1
   READING_TOPIC="$([ "${ENRICH:-1}" = 0 ] && echo hcmc_co_stream || echo hcmc_co_enriched)" STREAM_SOURCE=kafka FLOWS_EXTRA=1 ALLOWED_ORIGINS="$ORIGINS" BACKEND_ALLOW_WRITES="${BACKEND_ALLOW_WRITES:-}" \
+    YARN_ENABLED="${WITH_YARN:-0}" AIRFLOW_ENABLED="${WITH_AIRFLOW:-1}" \
     setsid nohup python3 -m uvicorn app.main:app --host 127.0.0.1 --port 8000 > "$LOGDIR/backend.log" 2>&1 < /dev/null &
   echo "đã khởi động backend, log $LOGDIR/backend.log"
 fi

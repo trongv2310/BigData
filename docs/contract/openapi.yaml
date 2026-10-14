@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: CO HCMC Dashboard API
-  version: 0.5.0
+  version: 0.6.0
   description: |
     Hợp đồng giữa backend (Claude, lead) và frontend (Antigravity).
     Chỉ lead được sửa file này. Muốn thêm hoặc đổi trường: ghi vào docs/HANDOFF.md hoặc mở PR riêng sửa contract.
@@ -14,6 +14,7 @@ info:
     - Kênh thời gian thực (WebSocket) mô tả ở docs/contract/events.md; schema sự kiện là StreamEvent ở dưới.
     - Hai luồng dữ liệu chạy song song và không bao giờ trộn vào một đường biểu đồ: PHÁT LẠI (`source=replay-dataset`, mô phỏng từ bộ lịch sử)
       và DỮ LIỆU THẬT (`source=live-openweather`). `live-open-meteo` là nguồn khác, không bật mặc định.
+    - Thay đổi 0.6.0: ServiceStatus.state thêm `disabled`: dịch vụ được TẮT CHỦ ĐỘNG theo cấu hình (YARN mặc định, Airflow khi WITH_AIRFLOW=0) và không phản hồi; không phải lỗi.
     - Thay đổi 0.5.0: AqiReading thêm coIsForecast (boolean hoặc null, bắt buộc): `co` là điểm DỰ BÁO của OpenWeather chứ không phải quan sát.
     - Thay đổi 0.4.0: ModelMetrics có thêm transition (ranh giới chuyển tiếp theo dữ liệu), alternatives (hai phương án so sánh), breakpoint.cause; backend trả nguyên văn model_metrics.json.
     - Thay đổi 0.3.0: PipelineStepState thêm `partial`; thêm GET /api/analysis/sql và GET /api/analysis/day-clusters (kết quả bước 5 và 6a của pipeline).
@@ -397,7 +398,13 @@ components:
       properties:
         name: { type: string }
         kind: { type: string, enum: [namenode, datanode, resourcemanager, nodemanager, kafka, spark, airflow, backend] }
-        state: { type: string, enum: [up, down, unknown] }
+        state:
+          type: string
+          enum: [up, down, unknown, disabled]
+          description: |
+            up: phản hồi bình thường. down: được bật nhưng không phản hồi (lỗi). unknown: không xác định được.
+            disabled (0.6.0): tắt chủ động theo cấu hình (YARN_ENABLED=0, AIRFLOW_ENABLED=0) và không phản hồi. Giao diện không tính là lỗi
+            và không đưa vào mẫu số "đang hoạt động". Dịch vụ tắt theo cấu hình nhưng vẫn phản hồi thì báo up.
         url: { type: [string, "null"] }
         checkedAt: { $ref: "#/components/schemas/DateTime" }
         detail: { type: [string, "null"] }

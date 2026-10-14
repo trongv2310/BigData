@@ -381,8 +381,13 @@ export interface components {
             name: string;
             /** @enum {string} */
             kind: "namenode" | "datanode" | "resourcemanager" | "nodemanager" | "kafka" | "spark" | "airflow" | "backend";
-            /** @enum {string} */
-            state: "up" | "down" | "unknown";
+            /**
+             * @description up: phản hồi bình thường. down: được bật nhưng không phản hồi (lỗi). unknown: không xác định được.
+             *     disabled (0.6.0): tắt chủ động theo cấu hình (YARN_ENABLED=0, AIRFLOW_ENABLED=0) và không phản hồi. Giao diện không tính là lỗi
+             *     và không đưa vào mẫu số "đang hoạt động". Dịch vụ tắt theo cấu hình nhưng vẫn phản hồi thì báo up.
+             * @enum {string}
+             */
+            state: "up" | "down" | "unknown" | "disabled";
             url: string | null;
             checkedAt: components["schemas"]["DateTime"];
             detail: string | null;
