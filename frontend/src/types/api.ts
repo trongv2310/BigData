@@ -130,7 +130,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Bản ghi đo mới nhất trong luồng */
+        /**
+         * Bản ghi đo mới nhất của một nguồn (hoặc của luồng nói chung)
+         * @description Có `source`: trả bản ghi mới nhất của đúng nguồn đó; chưa có bản ghi nào của nguồn đó thì 404 với mã `NO_READING_YET` (trạng thái rỗng rõ ràng,
+         *     không trả bản ghi của nguồn khác và không điền số thay thế). Không có `source`: bản ghi mới nhất của luồng bất kể nguồn (giữ cho tương thích).
+         */
         get: operations["getAqiLatest"];
         put?: never;
         post?: never;
@@ -234,6 +238,82 @@ export interface paths {
         };
         /** Định nghĩa một luồng (thành phần và các bước) để frontend vẽ */
         get: operations["getFlow"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/replay/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Trạng thái luồng PHÁT LẠI (mô phỏng từ bộ lịch sử) */
+        get: operations["getReplayStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/replay/control": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Tạm dừng, tiếp tục, đổi tốc độ luồng PHÁT LẠI
+         * @description Chỉ ảnh hưởng luồng phát lại (`source=replay-dataset`); luồng `live-openweather` không bao giờ bị dừng hay làm chậm.
+         *     Trả về trạng thái sau khi đổi. `speed` bỏ trống thì giữ tốc độ hiện tại. Nếu không điều khiển được (chưa chạy tiến trình phát lại,
+         *     hoặc điều khiển bị tắt) thì 409 với mã `REPLAY_UNAVAILABLE`; lý do nằm ở `message` và ở `ReplayStatus.detail`.
+         */
+        post: operations["controlReplay"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/pipeline/steps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Trạng thái 9 bước của pipeline (chuẩn bị HDFS đến Airflow)
+         * @description Luôn trả đủ 9 bước theo thứ tự `order` 1 đến 9; bước chưa chạy có state `notStarted`.
+         */
+        get: operations["getPipelineSteps"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/model/metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Chỉ số của mô hình dự đoán CO trên tập kiểm tra, kèm hai mốc so sánh */
+        get: operations["getModelMetrics"];
         put?: never;
         post?: never;
         delete?: never;
@@ -374,20 +454,42 @@ export interface components {
          * @enum {string}
          */
         CoStatus: "SAFE" | "WARNING" | "DANGER";
+        /**
+         * @description replay-dataset: PHÁT LẠI, mô phỏng từ bộ lịch sử (OpenWeather qua Kaggle), không phải đo lúc này.
+         *     live-openweather: DỮ LIỆU THẬT từ OpenWeather Air Pollution API (cùng nguồn gốc với bộ lịch sử, nên dùng chung mô hình được).
+         *     live-open-meteo: nguồn khác (mô hình CAMS), không bật mặc định; không trộn với hai nguồn trên và không dùng để dự đoán.
+         * @enum {string}
+         */
+        ReadingSource: "replay-dataset" | "live-openweather" | "live-open-meteo";
         AqiReading: {
+            /**
+             * @description Thời điểm bản ghi này xảy ra theo nguồn của nó. live-*: thời điểm quan sát của nguồn (giờ +07:00). replay-dataset: thời điểm bản ghi được PHÁT LẠI
+             *     (giờ máy lúc phát), KHÔNG phải thời điểm đo; thời điểm đo gốc nằm ở `originalDatetime`.
+             */
             datetime: components["schemas"]["DateTime"];
+            /**
+             * @description Thời điểm gốc của bản ghi trong bộ lịch sử (đã đổi UTC sang +07:00). Luôn null với nguồn thật (live-*). Với replay-dataset phải có giá trị,
+             *     để giao diện không trình bày dữ liệu lịch sử như thể đo lúc này; riêng backend trước Bước A1 chưa điền được nên tạm trả null (xem docs/HANDOFF.md).
+             */
+            originalDatetime: components["schemas"]["DateTime"] | null;
             station: string;
             /** @description true khi nhãn trạm chỉ là nhãn gán luân phiên của bản replay, không phải trạm đo thật. Frontend phải ghi chú rõ. */
             isSimulatedStation: boolean;
-            /** @enum {string} */
-            source: "replay-dataset" | "live-open-meteo" | "live-openweather";
-            /** @description µg/m³ */
+            source: components["schemas"]["ReadingSource"];
+            /** @description µg/m³. Giá trị quan sát (replay: giá trị của bản ghi lịch sử) */
             co: number;
             windSpeedKmh: number;
             temperatureC: number;
             /** @description co / (windSpeedKmh + 1), làm tròn 2 chữ số */
             coAccumulationIndex: number;
             status: components["schemas"]["CoStatus"];
+            /**
+             * @description µg/m³. CO mà mô hình dự đoán cho chính bản ghi này (cùng thời điểm với `co`, nên so sánh trực tiếp với `co`), tính từ CO của các giờ trước và các đầu vào
+             *     nêu ở ModelMetrics.features. null khi chưa có mô hình hoặc chưa đủ lịch sử (ví dụ chưa đủ độ trễ 24 giờ trên luồng sống): không bao giờ điền số thay thế.
+             */
+            coPredicted: number | null;
+            /** @description Phiên bản mô hình đã tạo `coPredicted` (trùng ModelMetrics.models[].version và PredictResponse.model.version); null khi coPredicted là null. */
+            modelVersion: string | null;
         };
         AqiSeries: {
             /** @enum {string} */
@@ -426,9 +528,36 @@ export interface components {
             dayOfWeek?: number;
             temperatureC: number;
             windSpeedKmh: number;
+            /** @description CO (µg/m³) của 1 giờ trước. Chỉ mô hình ml dùng; bỏ trống thì backend tự điền và báo ở filledInputs */
+            coLag1h?: number;
+            /** @description CO của 2 giờ trước (xem coLag1h) */
+            coLag2h?: number;
+            /** @description CO của 3 giờ trước (xem coLag1h) */
+            coLag3h?: number;
+            /** @description CO của 24 giờ trước (xem coLag1h) */
+            coLag24h?: number;
+            /** @description µg/m³. Các chất khác: chỉ mô hình ml dùng, đúng những cái có trong ModelMetrics.features; bỏ trống thì backend tự điền và báo ở filledInputs */
+            no?: number;
+            no2?: number;
+            o3?: number;
+            so2?: number;
+            pm25?: number;
+            pm10?: number;
+            nh3?: number;
         };
         PredictResponse: {
             coPredicted: number;
+            /**
+             * @description Các đầu vào mà yêu cầu bỏ trống và backend tự điền (mô hình ml cần cả độ trễ CO và các chất khác, nhưng form chỉ có giờ, tháng, nhiệt độ, gió).
+             *     Giao diện phải hiện danh sách này để người dùng biết kết quả dựa vào số nào. Rỗng với heuristic.
+             */
+            filledInputs: {
+                /** @description Tên trường của PredictRequest, ví dụ coLag1h */
+                name: string;
+                value: number;
+                /** @description Số này lấy từ đâu, ví dụ: bản ghi live-openweather gần nhất; trung vị theo giờ của tập huấn luyện */
+                origin: string;
+            }[];
             /** @constant */
             unit: "µg/m³";
             status: components["schemas"]["CoStatus"];
@@ -440,7 +569,10 @@ export interface components {
             model: {
                 name: string;
                 version: string;
-                /** @enum {string} */
+                /**
+                 * @description ml khi đã có mô hình huấn luyện (model.name/version khớp ModelMetrics); heuristic là thống kê theo giờ, không phải học máy
+                 * @enum {string}
+                 */
                 kind: "heuristic" | "ml";
                 /** @description Mô tả dữ liệu mà mô hình hoặc heuristic dựa vào và những gì được/không được dùng; null nếu không dựa vào dữ liệu nào */
                 trainedOn: string | null;
@@ -505,6 +637,126 @@ export interface components {
                 /** @description Ví dụ: mỗi block. null nếu chạy một lần */
                 repeats: string | null;
             }[];
+        };
+        ReplayControlRequest: {
+            /** @enum {string} */
+            action: "pause" | "resume";
+            /**
+             * @description Hệ số tốc độ (1×, 10×, 60×) so với baseIntervalSeconds. Bỏ trống thì giữ tốc độ hiện tại.
+             * @enum {integer}
+             */
+            speed?: 1 | 10 | 60;
+        };
+        ReplayStatus: {
+            /**
+             * @description running là đang phát, paused là đã tạm dừng, stopped là không có tiến trình phát lại nào đang chạy (không phải lỗi của luồng thật)
+             * @enum {string}
+             */
+            state: "running" | "paused" | "stopped";
+            /** @enum {integer} */
+            speed: 1 | 10 | 60;
+            /** @description Giây thật giữa hai bản ghi khi speed = 1 */
+            baseIntervalSeconds: number;
+            /** @description Giây thật giữa hai bản ghi ở tốc độ hiện tại = baseIntervalSeconds / speed */
+            intervalSeconds: number;
+            /** @description false khi không thể gọi /api/replay/control (lý do ở detail) */
+            controllable: boolean;
+            /** @description Số bản ghi đã phát kể từ lúc tiến trình phát lại bắt đầu */
+            emittedCount: number;
+            /** @description originalDatetime của bản ghi phát lại gần nhất; null nếu chưa phát bản ghi nào */
+            lastOriginalDatetime: components["schemas"]["DateTime"] | null;
+            updatedAt: components["schemas"]["DateTime"];
+            /** @description Giải thích bằng chữ khi stopped hoặc không điều khiển được; null khi bình thường */
+            detail: string | null;
+        };
+        /** @enum {string} */
+        PipelineStepState: "notStarted" | "running" | "done" | "failed";
+        PipelineStep: {
+            order: number;
+            /**
+             * @description 1 prepare-hdfs (chuẩn bị HDFS), 2 upload-raw (upload Dataset.csv), 3 read-spark (đọc bằng Spark), 4 clean (làm sạch), 5 spark-sql (Spark SQL),
+             *     6 cluster-and-model (thay RFM và K-Means của đề mẫu: phân cụm ngày theo hình dạng 24 giờ + mô hình dự đoán CO), 7 save-results (lưu kết quả),
+             *     8 kafka-ingest (Kafka ingest, kèm dự đoán trên luồng sống), 9 airflow-dag (Airflow DAG)
+             * @enum {string}
+             */
+            id: "prepare-hdfs" | "upload-raw" | "read-spark" | "clean" | "spark-sql" | "cluster-and-model" | "save-results" | "kafka-ingest" | "airflow-dag";
+            title: string;
+            state: components["schemas"]["PipelineStepState"];
+            /** @description Lần cuối bước đổi trạng thái hoặc ghi kết quả; null khi notStarted */
+            updatedAt: components["schemas"]["DateTime"] | null;
+            /** @description Các số liệu chính do chính bước đó ghi lại (số dòng, số cụm, chỉ số mô hình...). Rỗng khi chưa có. Giao diện hiển thị nguyên văn, không tự tính. */
+            summary: {
+                label: string;
+                value: string | number | null;
+                unit: string | null;
+            }[];
+            /** @description Mô tả, lưu ý hoặc lý do lỗi bằng chữ */
+            detail: string | null;
+        };
+        PipelineSteps: {
+            generatedAt: components["schemas"]["DateTime"];
+            steps: components["schemas"]["PipelineStep"][];
+        };
+        ErrorMetrics: {
+            /** @description µg/m³ */
+            rmse: number;
+            /** @description µg/m³ */
+            mae: number;
+            /** @description Có thể âm khi kém hơn dự đoán bằng trung bình */
+            r2: number;
+        };
+        DataSplitInfo: {
+            from: components["schemas"]["DateTime"];
+            to: components["schemas"]["DateTime"];
+            rows: number;
+        };
+        ModelMetrics: {
+            generatedAt: components["schemas"]["DateTime"];
+            /** @description Mô hình dự đoán đại lượng gì, ví dụ CO (µg/m³) của giờ t từ thông tin đến giờ t-1 */
+            target: string;
+            horizonHours: number;
+            /** @description Tên các đầu vào của mô hình (khớp trường của PredictRequest khi có) */
+            features: string[];
+            /** @description Mô tả đúng dữ liệu và khoảng thời gian huấn luyện, nguồn, những gì đã loại bỏ */
+            trainedOn: string;
+            trainSet: components["schemas"]["DataSplitInfo"];
+            testSet: components["schemas"]["DataSplitInfo"];
+            /** @description Cách chia, phải theo thời gian (đầu huấn luyện, cuối kiểm tra), không xáo ngẫu nhiên */
+            splitMethod: string;
+            models: {
+                name: string;
+                /** @enum {string} */
+                kind: "linear-regression" | "random-forest" | "gbt";
+                version: string;
+                /** @description Mô hình được lưu và dùng cho /api/predict và coPredicted; đúng một phần tử true */
+                isBest: boolean;
+                test: components["schemas"]["ErrorMetrics"];
+                /** @description RMSE trên tập kiểm tra thấp hơn mốc 'CO giờ trước' (do pipeline tính, giao diện không tự so) */
+                beatsPreviousHour: boolean;
+                /** @description RMSE trên tập kiểm tra thấp hơn mốc 'trung bình theo giờ trong ngày' */
+                beatsHourlyMean: boolean;
+                /** @description Siêu tham số chính, nếu có */
+                params: string | null;
+            }[];
+            /** @description Hai mốc so sánh, tính trên đúng tập kiểm tra của mô hình */
+            baselines: {
+                /** @enum {string} */
+                id: "previous-hour" | "hourly-mean";
+                name: string;
+                description: string;
+                test: components["schemas"]["ErrorMetrics"];
+            }[];
+            /** @description Kết luận trung thực do pipeline ghi, kể cả khi không mô hình nào thắng mốc */
+            conclusion: string;
+            breakpoint: {
+                date: components["schemas"]["DateTime"];
+                /** @enum {string} */
+                strategy: "indicator-feature" | "separate-training" | "none";
+                /** @description Cách xử lý điểm gãy 01/07/2025 (CO giảm mạnh) */
+                description: string;
+                /** @description Ảnh hưởng đã đo của cách xử lý lên chỉ số; null nếu chưa đo */
+                effect: string | null;
+            };
         };
         /** @description Phần chung của mọi sự kiện WebSocket /ws/stream */
         StreamEnvelope: {
@@ -755,7 +1007,9 @@ export interface operations {
     };
     getAqiLatest: {
         parameters: {
-            query?: never;
+            query?: {
+                source?: components["schemas"]["ReadingSource"];
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -769,6 +1023,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AqiReading"];
+                };
+            };
+            /** @description Chưa có bản ghi nào của nguồn này (mã NO_READING_YET) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
         };
@@ -927,6 +1190,117 @@ export interface operations {
                 };
             };
             /** @description Chưa có định nghĩa cho luồng này */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getReplayStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReplayStatus"];
+                };
+            };
+        };
+    };
+    controlReplay: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReplayControlRequest"];
+            };
+        };
+        responses: {
+            /** @description OK, trạng thái sau khi đổi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReplayStatus"];
+                };
+            };
+            /** @description action hoặc speed không hợp lệ */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Không điều khiển được luồng phát lại lúc này (mã REPLAY_UNAVAILABLE) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getPipelineSteps: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PipelineSteps"];
+                };
+            };
+        };
+    };
+    getModelMetrics: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelMetrics"];
+                };
+            };
+            /** @description Chưa huấn luyện mô hình (mã MODEL_NOT_TRAINED) */
             404: {
                 headers: {
                     [name: string]: unknown;

@@ -15,6 +15,12 @@ export interface StreamContextType {
   events: StreamEvent[];
   latestReading: AqiReading | null;
   hasStreamReading: boolean; // true khi đã nhận ít nhất 1 sự kiện reading từ luồng thời gian thực
+  latestReplayReading: AqiReading | null;
+  latestLiveReading: AqiReading | null;
+  replayHistory: AqiReading[];
+  liveHistory: AqiReading[];
+  hasReplayReading: boolean;
+  hasLiveReading: boolean;
   latestKafkaStats: KafkaStatsEvent['data'] | null;
   latestSparkProgress: SparkProgressEvent['data'] | null;
   recentHdfsOps: HdfsOpEvent['data'][];
@@ -31,6 +37,12 @@ export const StreamContext = createContext<StreamContextType>({
   events: [],
   latestReading: null,
   hasStreamReading: false,
+  latestReplayReading: null,
+  latestLiveReading: null,
+  replayHistory: [],
+  liveHistory: [],
+  hasReplayReading: false,
+  hasLiveReading: false,
   latestKafkaStats: null,
   latestSparkProgress: null,
   recentHdfsOps: [],

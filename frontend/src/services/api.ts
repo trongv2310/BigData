@@ -15,9 +15,29 @@ import type {
   SqlResponse,
   PredictRequest,
   PredictResponse,
+  ReadingSource,
+  ReplayControlRequest,
+  ReplayStatus,
+  PipelineSteps,
+  ModelMetrics,
 } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8010';
+
+let mockDetected = false;
+const mockListeners = new Set<(isMock: boolean) => void>();
+
+export function isMockMode(): boolean {
+  return mockDetected;
+}
+
+export function onMockChange(cb: (isMock: boolean) => void): () => void {
+  mockListeners.add(cb);
+  cb(mockDetected);
+  return () => {
+    mockListeners.delete(cb);
+  };
+}
 
 export class ApiError extends Error {
   code?: string;
@@ -49,6 +69,12 @@ async function fetchJson<T>(
         ...options?.headers,
       },
     });
+
+    const isMock = res.headers.get('x-mock') === 'true';
+    if (isMock !== mockDetected) {
+      mockDetected = isMock;
+      mockListeners.forEach((cb) => cb(isMock));
+    }
 
     if (!res.ok) {
       let errorDetail = `Lỗi HTTP ${res.status}`;
@@ -96,8 +122,11 @@ export const api = {
   getKafkaTopics: () => fetchJson<KafkaTopics>('/api/kafka/topics'),
   getSparkApplications: () => fetchJson<SparkApplications>('/api/spark/applications'),
 
-  // P3: Dữ liệu CO & AQI
-  getAqiLatest: () => fetchJson<AqiReading>('/api/aqi/latest'),
+  // P3 & F1: Dữ liệu CO & AQI (hỗ trợ lọc theo source: replay-dataset | live-openweather)
+  getAqiLatest: (source?: ReadingSource) => {
+    const q = source ? `?source=${encodeURIComponent(source)}` : '';
+    return fetchJson<AqiReading>(`/api/aqi/latest${q}`);
+  },
   getAqiSeries: (params?: {
     metric?: string;
     granularity?: 'hour' | 'day' | 'month';
@@ -114,11 +143,31 @@ export const api = {
   },
   getAqiHourlyProfile: () => fetchJson<HourlyProfile>('/api/aqi/hourly-profile'),
 
+  // F1: Điều khiển và trạng thái luồng phát lại (Replay)
+  getReplayStatus: (mockVariant?: string) => {
+    const q = mockVariant ? `?mock=${encodeURIComponent(mockVariant)}` : '';
+    return fetchJson<ReplayStatus>(`/api/replay/status${q}`);
+  },
+  controlReplay: (req: ReplayControlRequest, mockVariant?: string) => {
+    const q = mockVariant ? `?mock=${encodeURIComponent(mockVariant)}` : '';
+    return fetchJson<ReplayStatus>(`/api/replay/control${q}`, {
+      method: 'POST',
+      body: JSON.stringify(req),
+    });
+  },
+
+  // F2: 9 bước Pipeline và Chỉ số Mô hình
+  getPipelineSteps: () => fetchJson<PipelineSteps>('/api/pipeline/steps'),
+  getModelMetrics: (mockVariant?: string) => {
+    const q = mockVariant ? `?mock=${encodeURIComponent(mockVariant)}` : '';
+    return fetchJson<ModelMetrics>(`/api/model/metrics${q}`);
+  },
+
   // P4: Sơ đồ luồng
   listFlows: () => fetchJson<FlowList>('/api/flows'),
   getFlow: (id: string) => fetchJson<FlowDefinition>(`/api/flows/${encodeURIComponent(id)}`),
 
-  // P5: SparkSQL & Dự đoán Heuristic
+  // P5: SparkSQL & Dự đoán Heuristic / ML
   runSql: (req: SqlRequest) =>
     fetchJson<SqlResponse>(
       '/api/sql',
@@ -128,9 +177,11 @@ export const api = {
       },
       65000 // Khởi động Spark lần đầu có thể mất 8-10 giây, timeout >= 60 giây
     ),
-  predictCo: (req: PredictRequest) =>
-    fetchJson<PredictResponse>('/api/predict', {
+  predictCo: (req: PredictRequest, mockVariant?: string) => {
+    const q = mockVariant ? `?mock=${encodeURIComponent(mockVariant)}` : '';
+    return fetchJson<PredictResponse>(`/api/predict${q}`, {
       method: 'POST',
       body: JSON.stringify(req),
-    }),
+    });
+  },
 };

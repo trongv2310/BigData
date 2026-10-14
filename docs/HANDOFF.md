@@ -230,6 +230,40 @@ Mẫu:
 
 ## Frontend (Antigravity)
 
+### 2026-10-14 13:00 — Giai đoạn F1: Trang "Dữ liệu sống" (hai cột song song: Phát lại & Dữ liệu thật)
+- Xong:
+  + 1. `npm run generate:types`: Sinh lại toàn bộ kiểu dữ liệu từ hợp đồng OpenAPI 0.2.0 (`openapi.yaml`), bao gồm `ReadingSource`, `ReplayStatus`, `ReplayControlRequest`, `PipelineSteps`, `PipelineStep`, `ModelMetrics`, `ErrorMetrics`, `DataSplitInfo`, `AqiReading` (thêm `originalDatetime`, `coPredicted`, `modelVersion`).
+  + 2. Tạo trang mới `LiveTab.tsx` ("Dữ liệu sống" - tab mặc định đầu tiên):
+    - Lưới 2 cột song song trên màn hình lớn (`grid-cols-2`), tự động xếp dọc trên điện thoại (`grid-cols-1`), hoàn toàn không tràn ngang ở 390 px.
+    - Cột trái: "MÔ PHỎNG: phát lại dữ liệu lịch sử" (`source = replay-dataset`):
+      * Bộ điều khiển phát lại: nút Tạm dừng/Tiếp tục (`pause`/`resume`), các mức tốc độ `1×`, `10×`, `60×` qua `POST /api/replay/control`; hiển thị trạng thái phát lại từ `GET /api/replay/status` (`running`, `paused`, `stopped`, chu kỳ, số bản ghi đã phát). Hiển thị lý do chi tiết khi `controllable === false` và bắt lỗi 409 `REPLAY_UNAVAILABLE`.
+      * Thẻ bản ghi mới nhất: CO thực tế, CO dự đoán (`coPredicted`, kèm phiên bản mô hình nếu có), trạng thái CO theo backend (thang OpenWeather, không tự tính), trạm (kèm nhãn "Trạm mô phỏng"), các thông số gió, nhiệt độ, tích lũy CO.
+      * **Đặc biệt về thời gian**: Hiển thị nổi bật `originalDatetime` là "Thời điểm đo gốc trong lịch sử", kèm ghi chú minh bạch thời điểm phát lại chỉ là giờ máy phát, không phải thời điểm đo.
+      * Biểu đồ riêng: Đường CO thực tế mô phỏng và đường CO dự đoán (nét đứt), trục hoành hiển thị mốc thời gian gốc.
+      * Dòng trạng thái đáy cột: Offset/lag Kafka topic `hcmc_co_stream` và micro-batch Spark Structured Streaming.
+    - Cột phải: "THẬT: OpenWeather" (`source = live-openweather`):
+      * Tiêu đề và nhãn nổi bật "THẬT", nguồn OpenWeather Air Pollution API.
+      * Thời điểm quan sát và tuổi dữ liệu ("Cập nhật cách đây X phút").
+      * Không có điều khiển tốc độ (luồng thật nhận theo chu kỳ API).
+      * **Xử lý trạng thái rỗng tường minh**: Khi chưa có bản ghi (API trả 404 `NO_READING_YET`), hiển thị thẻ trạng thái rỗng và biểu đồ rỗng rõ ràng, tuyệt đối không điền số giả, không lấy số từ luồng phát lại bù vào.
+      * Khi có bản ghi: Thẻ bản ghi mới nhất (CO thực tế, CO dự đoán nếu có, trạm, gió, nhiệt độ, tích lũy).
+      * Biểu đồ riêng: Đường CO quan sát thật (cyan) và đường CO dự đoán (amber, nét đứt). Tuyệt đối không vẽ chung luồng phát lại và luồng thật trên cùng một đường biểu đồ.
+      * Dòng trạng thái đáy cột: Kafka producer OpenWeather và Spark Structured Streaming Parquet `/live`.
+  + 3. Cập nhật `StreamContext`: Bổ sung theo dõi độc lập hai luồng `latestReplayReading`, `latestLiveReading`, `replayHistory`, `liveHistory`, `hasReplayReading`, `hasLiveReading`.
+  + 4. Cập nhật `api.ts`: Hỗ trợ tham số `source` cho `api.getAqiLatest(source)`, bổ sung `getReplayStatus()`, `controlReplay()`, `getPipelineSteps()`, `getModelMetrics()`, và tự động phát hiện header `X-Mock: true` để hiển thị nhãn "[DỮ LIỆU MẪU MOCK]".
+  + 5. Cập nhật `Header.tsx` & `App.tsx`: Bổ sung tab `live` ("Dữ liệu sống") và đặt làm tab khởi đầu mặc định.
+- Chạy thế nào:
+  + Mock server: `python mock/serve.py` (cổng 8010)
+  + Frontend dev: `cd frontend && npm run dev -- --port 5173 --strictPort` (truy cập `http://localhost:5173`)
+  + Build production: `npm run build` (thành công 0 lỗi, ~868ms)
+  + Kiểm tra linter: `npm run lint` (0 warnings, 0 errors)
+  + Kiểm tra hợp đồng: `python docs/contract/validate_contract.py` (OK)
+- Chưa làm / chưa kiểm với backend thật:
+  + Hiện tại đã kiểm tra hoàn hảo toàn bộ chức năng F1 với Mock Server cổng 8010 (cả 200, 404 `NO_READING_YET`, điều khiển `controlReplay` đổi speed và pause/resume, stream events).
+  + Backend thật cổng 8000 theo Bước 0 của Claude hiện chưa triển khai `/api/replay/*` (sẽ hoàn tất ở Bước A1) và `originalDatetime`/`coPredicted` hiện đang trả `null`. Sẽ kết nối và kiểm tra thực tế với backend thật ở Giai đoạn F3 khi Claude báo xong.
+  + Giai đoạn F2 (Trang Pipeline 9 bước và Chỉ số Mô hình) chưa làm, đang chờ người dùng cho phép trước khi tiếp tục.
+- Cần bên kia: Lead backend gộp PR của nhánh `feat/frontend-f1` vào `main`.
+
 ### 2026-10-13 08:50 — P15: Ngưỡng CO mới theo thang OpenWeather (D3 đã chốt)
 - Xong:
   + 1. `AqiTab`: Cập nhật mục "2. Về Ngưỡng Đánh giá SAFE / WARNING / DANGER" theo đúng thang CO của OpenWeather Air Pollution API (`SAFE` < 4400 µg/m³, `WARNING` 4400 đến dưới 12400 µg/m³, `DANGER` ≥ 12400 µg/m³; mốc 4400 µg/m³ xấp xỉ hướng dẫn 24 giờ 4 mg/m³ của WHO 2021). Nhấn mạnh đây là thang kỹ thuật của nguồn dữ liệu, không phải quy chuẩn pháp lý Việt Nam, và frontend luôn hiển thị status backend trả, không tự tính.

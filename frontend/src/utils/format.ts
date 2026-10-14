@@ -109,12 +109,47 @@ export function getSourceLabel(source?: string | null): string {
   if (!source) return 'Không rõ nguồn';
   switch (source) {
     case 'replay-dataset':
-      return 'Bản phát lại (Kaggle Replay)';
+      return 'Phát lại từ bộ lịch sử Kaggle (MÔ PHỎNG)';
     case 'live-open-meteo':
-      return 'Trực tiếp (Open-Meteo)';
+      return 'Open-Meteo CAMS (Mô hình)';
     case 'live-openweather':
-      return 'Trực tiếp (OpenWeather)';
+      return 'OpenWeather Air Pollution (THẬT)';
     default:
       return source;
   }
+}
+
+/**
+ * Định dạng thời gian ngắn gọn cho trục hoành biểu đồ (HH:mm hoặc HH:mm dd/MM)
+ */
+export function formatChartTime(isoString?: string | null): string {
+  if (!isoString) return '';
+  try {
+    const d = new Date(isoString);
+    if (isNaN(d.getTime())) return isoString;
+    return new Intl.DateTimeFormat('vi-VN', {
+      timeZone: 'Asia/Ho_Chi_Minh',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).format(d);
+  } catch {
+    return isoString;
+  }
+}
+
+/**
+ * Tính tuổi của dữ liệu so với hiện tại
+ */
+export function formatDataAge(datetimeStr?: string | null, currentTime: number = Date.now()): string {
+  if (!datetimeStr) return '—';
+  const recordTime = new Date(datetimeStr).getTime();
+  if (isNaN(recordTime)) return '—';
+  const diffMs = Math.max(0, currentTime - recordTime);
+  const diffMinutes = Math.floor(diffMs / (1000 * 60));
+  if (diffMinutes < 1) return 'vừa mới đây (< 1 phút)';
+  if (diffMinutes < 60) return `cách đây ${diffMinutes} phút`;
+  const diffHours = Math.floor(diffMinutes / 60);
+  const remMinutes = diffMinutes % 60;
+  return `cách đây ${diffHours} giờ ${remMinutes > 0 ? `${remMinutes} phút` : ''}`;
 }

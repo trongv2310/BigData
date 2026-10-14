@@ -15,6 +15,7 @@ export type KafkaTopics = Schemas['KafkaTopics'];
 export type SparkApplication = Schemas['SparkApplication'];
 export type SparkApplications = Schemas['SparkApplications'];
 export type CoStatus = Schemas['CoStatus'];
+export type ReadingSource = Schemas['ReadingSource'];
 export type AqiReading = Schemas['AqiReading'];
 export type AqiSeries = Schemas['AqiSeries'];
 export type HourlyProfile = Schemas['HourlyProfile'];
@@ -37,5 +38,14 @@ export type SqlResponse = Schemas['SqlResponse'];
 export type PredictRequest = Schemas['PredictRequest'];
 export type PredictResponse = Schemas['PredictResponse'];
 
+// F1 & F2: Replay, Pipeline, Model Metrics
+export type ReplayControlRequest = Schemas['ReplayControlRequest'];
+export type ReplayStatus = Schemas['ReplayStatus'];
+export type PipelineStepState = Schemas['PipelineStepState'];
+export type PipelineStep = Schemas['PipelineStep'];
+export type PipelineSteps = Schemas['PipelineSteps'];
+export type ErrorMetrics = Schemas['ErrorMetrics'];
+export type DataSplitInfo = Schemas['DataSplitInfo'];
+export type ModelMetrics = Schemas['ModelMetrics'];
 
 export type { paths, components };
