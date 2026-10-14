@@ -64,11 +64,23 @@ def read_summary() -> dict:
     return json.loads(hdfs_read_text(SUMMARY_PATH))
 
 
-def update_step(step_id: str, state: str, summary: list[dict] | None = None, detail: str | None = None) -> None:
-    """Ghi trạng thái một bước vào step_summary.json (đọc, sửa đúng bước đó, ghi lại). summary: [{"label", "value", "unit"}]."""
-    assert step_id in STEP_ORDER and state in ("running", "done", "failed"), (step_id, state)
+STATES = ("running", "partial", "done", "failed")
+
+
+def merge_items(old: list[dict], new: list[dict]) -> list[dict]:
+    """Giữ các mục cũ, mục mới cùng `label` thay mục cũ tại chỗ, mục mới chưa có thì thêm vào cuối."""
+    by_label = {i["label"]: i for i in new}
+    out = [by_label.pop(i["label"], i) for i in old]
+    return out + list(by_label.values())
+
+
+def update_step(step_id: str, state: str, summary: list[dict] | None = None, detail: str | None = None, merge: bool = False) -> None:
+    """Ghi trạng thái một bước vào step_summary.json (đọc, sửa đúng bước đó, ghi lại). summary: [{"label", "value", "unit"}].
+    merge=True: giữ summary cũ của bước và gộp `summary` mới vào (cho bước nhiều phần: cluster-and-model); không có summary mới thì giữ nguyên summary cũ."""
+    assert step_id in STEP_ORDER and state in STATES, (step_id, state)
     doc = read_summary()
-    doc["steps"][step_id] = {"state": state, "updatedAt": now_iso(), "summary": summary or [], "detail": detail}
+    old = (doc["steps"].get(step_id) or {}).get("summary", []) if merge else []
+    doc["steps"][step_id] = {"state": state, "updatedAt": now_iso(), "summary": merge_items(old, summary or []), "detail": detail}
     hdfs_write_text(SUMMARY_PATH, json.dumps(doc, ensure_ascii=False, indent=2) + "\n")
 
 
@@ -77,10 +89,10 @@ def item(label: str, value, unit: str | None = None) -> dict:
 
 
 @contextmanager
-def step(step_id: str, final_state: str = "done"):
+def step(step_id: str, final_state: str = "done", merge: bool = False):
     """Đánh dấu running, rồi `final_state` (mặc định done) khi khối `with` kết thúc, hoặc failed (kèm thông báo lỗi) khi có ngoại lệ.
-    Bước gồm nhiều phần do nhiều script làm (cluster-and-model: 06a rồi 06b) dùng final_state="running" cho phần chưa phải cuối cùng,
-    và `detail` phải nói rõ phần nào xong, phần nào chưa. Dùng:
+    Bước gồm nhiều phần do nhiều script làm (cluster-and-model: 06a, độ ổn định, rồi 06b) dùng final_state="partial" cho phần chưa phải cuối cùng
+    và merge=True để không xóa số liệu của các phần đã xong; `detail` phải nói rõ phần nào xong, phần nào chưa. Dùng:
 
         with step("clean") as result:
             ...
@@ -90,16 +102,16 @@ def step(step_id: str, final_state: str = "done"):
         summary: list[dict] = []
         detail: str | None = None
     res = Result()
-    update_step(step_id, "running")
+    update_step(step_id, "running", merge=merge)
     try:
         yield res
     except BaseException as e:  # kể cả SystemExit/KeyboardInterrupt: không để bước kẹt ở "running"
-        update_step(step_id, "failed", detail=f"{type(e).__name__}: {str(e)[:400]}")
+        update_step(step_id, "failed", detail=f"{type(e).__name__}: {str(e)[:400]}", merge=merge)
         if not isinstance(e, Exception):
             raise
         traceback.print_exc()
         sys.exit(1)
-    update_step(step_id, final_state, res.summary, res.detail)
+    update_step(step_id, final_state, res.summary, res.detail, merge=merge)
 
 
 def spark_session(app_name: str):

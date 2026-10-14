@@ -1,6 +1,6 @@
 """GET /api/pipeline/steps: trạng thái 9 bước pipeline, đọc từ /co/output/step_summary.json (backend CHỈ ĐỌC; các script trong pipeline/ ghi file này).
 
-Định dạng file: {"version": 1, "steps": {"<id>": {"state": "running|done|failed", "updatedAt": ISO, "summary": [{"label", "value", "unit"}], "detail": str|null}}}.
+Định dạng file: {"version": 1, "steps": {"<id>": {"state": "running|partial|done|failed", "updatedAt": ISO, "summary": [{"label", "value", "unit"}], "detail": str|null}}}.
 Bước không có trong file là `notStarted`. Backend không tự bịa trạng thái hay số liệu: mục nào hỏng định dạng thì bỏ riêng mục đó và nói rõ ở `detail`.
 """
 import json
@@ -20,7 +20,7 @@ STEPS = [
     ("airflow-dag", "Airflow DAG"),
 ]
 _DATETIME = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?([+-]\d{2}:\d{2}|Z)$")
-_STATES = ("running", "done", "failed")
+_STATES = ("running", "partial", "done", "failed")
 
 
 def _summary(items) -> tuple[list[dict], int]:
