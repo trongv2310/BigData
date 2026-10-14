@@ -17,7 +17,7 @@ Mỗi tin là một JSON:
 | `flow.step` | Một bước của luồng (xem `/api/flows/{id}`) bắt đầu, xong hoặc lỗi | flowId, runId, step, state |
 | `spark.progress` | Mỗi micro-batch của Structured Streaming | queryName, batchId, numInputRows, tốc độ. Backend thật không có số của Spark (REST không lộ StreamingQueryProgress) nên **suy ra** từ job/stage: `queryName` là tên ứng dụng, tốc độ xử lý chưa tính lập kế hoạch và commit, tốc độ vào = 0 khi chưa có batch trước (xem `backend/app/spark_progress.py`) |
 | `kafka.stats` | Định kỳ vài giây | topic, messagesPerSecond, lagTotal |
-| `service.state` | Một dịch vụ đổi trạng thái up/down | `ServiceStatus` |
+| `service.state` | Một dịch vụ đổi trạng thái up/down/unknown/disabled (`disabled` = tắt chủ động, hợp đồng 0.6.0) | `ServiceStatus` |
 
 Hai luồng `reading` cùng đi trên kênh này (hợp đồng 0.2.0):
 - `source = replay-dataset`: PHÁT LẠI, mô phỏng từ bộ lịch sử. `datetime` là lúc phát; thời điểm đo gốc nằm ở `originalDatetime`. Có thể tạm dừng và đổi tốc độ bằng `POST /api/replay/control`; tốc độ 60× của một bản ghi mỗi `baseIntervalSeconds` vẫn phải nằm dưới giới hạn 20 tin/giây.

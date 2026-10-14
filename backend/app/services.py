@@ -63,6 +63,11 @@ async def _datanode(info):
 async def _yarn():
     base = config.YARN_HTTP
     ok, _ = await _http_json(f"{base}/ws/v1/cluster/info")
+    if not ok and not config.YARN_ENABLED:
+        # Tắt chủ động (hợp đồng 0.6.0): không phải lỗi. Đang chạy thì vẫn báo "up" ở dưới, dù cấu hình nói tắt.
+        why = "Tắt chủ động để tiết kiệm RAM (WITH_YARN=1 để bật); Spark chạy local[*] nên không cần YARN"
+        return (_status("ResourceManager", "resourcemanager", "disabled", base, why),
+                _status("NodeManager", "nodemanager", "disabled", None, why))
     rm = _status("ResourceManager", "resourcemanager", "up" if ok else "down", base, None)
     if not ok:
         nm = _status("NodeManager", "nodemanager", "unknown", None, "Không hỏi được ResourceManager nên không biết")
@@ -98,6 +103,8 @@ async def _airflow():
     sched = (body or {}).get("scheduler", {}).get("status") if isinstance(body, dict) else None
     if ok and sched:
         detail += f", scheduler {sched}"
+    if not ok and not config.AIRFLOW_ENABLED:
+        return _status("Airflow", "airflow", "disabled", config.AIRFLOW_HTTP, "Tắt chủ động (WITH_AIRFLOW=0); DAG hcmc_co_pipeline vẫn chạy được bằng airflow dags test")
     return _status("Airflow", "airflow", "up" if ok else "down", config.AIRFLOW_HTTP, detail)
 
 

@@ -19,6 +19,10 @@ DATANODE_HTTP_PORTS = [int(p) for p in _env("DATANODE_HTTP_PORTS", "9864,9874,98
 YARN_HTTP = _env("YARN_RM", "http://localhost:8088")
 SPARK_UI_PORTS = [int(p) for p in _env("SPARK_UI_PORTS", "4040,4041,4042,4043").split(",")]
 AIRFLOW_HTTP = _env("AIRFLOW_UI", "http://localhost:8080")
+# Dịch vụ có được BẬT theo cấu hình không (hợp đồng 0.6.0). Tắt mà không phản hồi thì /api/services báo state "disabled" (tắt chủ động) thay vì "down" (hỏng).
+# Mặc định theo infra/start_all.sh: YARN tắt (WITH_YARN=1 để bật; Spark chạy local[*] nên không cần YARN), Airflow bật (WITH_AIRFLOW=0 để tắt).
+YARN_ENABLED = _env("YARN_ENABLED", "0").strip().lower() in ("1", "true", "yes")
+AIRFLOW_ENABLED = _env("AIRFLOW_ENABLED", "1").strip().lower() in ("1", "true", "yes")
 KAFKA_BOOTSTRAP = _env("KAFKA_BOOTSTRAP", "localhost:9092")
 KAFKA_TOPIC = _env("KAFKA_TOPIC", "hcmc_co_stream")
 # Topic mà backend đọc để phát `reading` và trả /api/aqi/latest. MẶC ĐỊNH (quyết định của người dùng 14/10/2026) là hcmc_co_enriched: bản ghi đã được Spark

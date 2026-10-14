@@ -19,18 +19,18 @@
     {
       "name": "ResourceManager",
       "kind": "resourcemanager",
-      "state": "up",
+      "state": "disabled",
       "url": "http://localhost:8088",
       "checkedAt": "2026-10-12T12:00:00+07:00",
-      "detail": null
+      "detail": "Tắt chủ động để tiết kiệm RAM (WITH_YARN=1 để bật); Spark chạy local[*] nên không cần YARN"
     },
     {
       "name": "NodeManager",
       "kind": "nodemanager",
-      "state": "up",
+      "state": "disabled",
       "url": null,
       "checkedAt": "2026-10-12T12:00:00+07:00",
-      "detail": null
+      "detail": "Tắt chủ động để tiết kiệm RAM (WITH_YARN=1 để bật); Spark chạy local[*] nên không cần YARN"
     },
     {
       "name": "Kafka",
