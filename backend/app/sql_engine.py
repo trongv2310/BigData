@@ -9,7 +9,9 @@ Cố ý bỏ các cột hour, month, dayofweek của file vì chúng tính theo 
 
 View thứ hai `live` (nếu có) là dữ liệu SỐNG Spark đã ghi từ Kafka vào HDFS (config.SQL_LIVE_URI, Parquet), dựng lại mỗi lần chạy truy vấn để thấy dữ liệu mới:
   datetime_vn timestamp (giờ Việt Nam, đúng như producer ghi), station, co, wind_speed_kmh, temperature_C, co_accumulation_index, canh_bao,
-  co_observed_at, weather_observed_at, provider (chuỗi), kafka_partition, kafka_offset, kafka_timestamp (UTC).
+  co_observed_at, weather_observed_at, provider (chuỗi: 'openweather' dữ liệu thật, 'replay-dataset' phát lại mô phỏng, 'open-meteo' tin cũ),
+  original_datetime_vn (chỉ bản phát lại), aqi, no, no2, o3, so2, pm2_5, pm10, nh3 (từ Bước A1; dòng cũ để null), kafka_partition, kafka_offset, kafka_timestamp (UTC).
+  Bảng chứa lẫn các nguồn: luôn lọc theo provider.
 Chưa có dữ liệu sống thì không có view này (truy vấn vào `live` trả lỗi SQL_ERROR như bảng không tồn tại).
 """
 import math
@@ -71,7 +73,8 @@ def _session():
     return spark
 
 
-LIVE_COLUMNS = ["station", "co", "wind_speed_kmh", "temperature_C", "co_accumulation_index", "canh_bao", "provider", "kafka_timestamp"]
+LIVE_COLUMNS = ["station", "co", "wind_speed_kmh", "temperature_C", "co_accumulation_index", "canh_bao", "provider", "kafka_timestamp",
+                "aqi", "no", "no2", "o3", "so2", "pm2_5", "pm10", "nh3"]
 
 
 def _refresh_live(spark) -> None:
@@ -79,7 +82,7 @@ def _refresh_live(spark) -> None:
     from pyspark.sql import functions as F
 
     try:
-        df = spark.read.parquet(config.SQL_LIVE_URI)
+        df = spark.read.option("mergeSchema", "true").parquet(config.SQL_LIVE_URI)  # file cũ thiếu các cột thêm từ Bước A1
         have = set(df.columns)
         if not {"datetime", "co"} <= have:
             raise ValueError("thiếu cột datetime/co")
@@ -89,6 +92,8 @@ def _refresh_live(spark) -> None:
         cols = [F.to_timestamp("datetime").alias("datetime_vn")] + [F.col(c) for c in LIVE_COLUMNS if c in have and c != "canh_bao"] + [warn]
         cols += [F.col(src).alias(dst) for src, dst in (("coObservedAt", "co_observed_at"), ("weatherObservedAt", "weather_observed_at"),
                                                          ("partition", "kafka_partition"), ("offset", "kafka_offset")) if src in have]
+        if "originalDatetime" in have:
+            cols.append(F.to_timestamp("originalDatetime").alias("original_datetime_vn"))
         df.select(*cols).createOrReplaceTempView("live")
     except Exception:  # đường dẫn chưa có, Parquet đang ghi dở, thiếu cột...
         spark.catalog.dropTempView("live")

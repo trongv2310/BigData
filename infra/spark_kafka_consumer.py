@@ -1,5 +1,8 @@
 """Spark Structured Streaming: đọc topic Kafka hcmc_co_stream, tính chỉ số tích tụ CO và mức cảnh báo, ghi Parquet vào HDFS.
 
+Topic chứa CẢ hai luồng: cột `provider` phân biệt 'openweather' (thật), 'replay-dataset' (phát lại, mô phỏng) và 'open-meteo' (tin cũ).
+Luôn lọc theo provider khi truy vấn /live, đừng trộn các nguồn vào một chuỗi.
+
 Thay cho spark_streaming_consumer.py ở thư mục cha (script cũ đọc file JSON trong HDFS, không bị sửa). Cùng phép tính:
   co_accumulation_index = co / (wind_speed_kmh + 1);  canh_bao theo thang CO của OpenWeather (quyết định D3, chốt 13/10/2026):
   từ 4400 µg/m³ là WARNING, từ 12400 là DANGER (cùng giá trị với CO_WARNING_UG, CO_DANGER_UG của backend). Script cũ dùng 500/1000.
@@ -16,7 +19,7 @@ import os
 
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
-from pyspark.sql.types import DoubleType, StringType, StructField, StructType
+from pyspark.sql.types import DoubleType, LongType, StringType, StructField, StructType
 
 os.environ.setdefault("HADOOP_CONF_DIR", "/home/trong/hadoop/etc/hadoop")
 
@@ -45,6 +48,17 @@ schema = StructType([
     StructField("coObservedAt", StringType(), True),
     StructField("weatherObservedAt", StringType(), True),
     StructField("provider", StringType(), True),
+    # Bước A1: bản phát lại có originalDatetime (giờ gốc của dòng lịch sử, +07); OpenWeather có owmDt, aqi và các chất khác. Tin cũ không có -> null.
+    StructField("originalDatetime", StringType(), True),
+    StructField("owmDt", LongType(), True),
+    StructField("aqi", LongType(), True),
+    StructField("no", DoubleType(), True),
+    StructField("no2", DoubleType(), True),
+    StructField("o3", DoubleType(), True),
+    StructField("so2", DoubleType(), True),
+    StructField("pm2_5", DoubleType(), True),
+    StructField("pm10", DoubleType(), True),
+    StructField("nh3", DoubleType(), True),
 ])
 
 raw = (spark.readStream.format("kafka")

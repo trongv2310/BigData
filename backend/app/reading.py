@@ -4,7 +4,8 @@ from datetime import datetime
 
 from . import config, timeutil
 
-LIVE_STATION = "Tram_TPHCM_Live_API"
+LIVE_STATION = "Tram_TPHCM_Live_API"      # Open-Meteo (infra/live_producer.py), không bật mặc định
+OWM_STATION = "Tram_TPHCM_OWM"            # OpenWeather (infra/live_producer_owm.py)
 # Nhãn trạm trong producer replay gán luân phiên theo số thứ tự dòng, không phải trạm đo thật.
 STATION_LABELS = {
     "Tram_Quan_1": "Quận 1",
@@ -12,7 +13,20 @@ STATION_LABELS = {
     "Tram_Thu_Duc": "Thủ Đức",
     "Tram_Quan_5": "Quận 5",
     LIVE_STATION: "TP.HCM (Open-Meteo)",
+    OWM_STATION: "TP.HCM (OpenWeather)",
 }
+
+
+def source_of(rec: dict) -> str:
+    """Nguồn của một bản ghi. Tin mới có `provider`; tin cũ (file /stream_input, Open-Meteo trước 14/10/2026) suy ra từ nhãn trạm."""
+    provider = rec.get("provider")
+    if provider == "replay-dataset":
+        return "replay-dataset"
+    if provider == "openweather" or rec.get("station") == OWM_STATION:
+        return "live-openweather"
+    if provider == "open-meteo" or rec.get("station") == LIVE_STATION:
+        return "live-open-meteo"
+    return "replay-dataset"  # producer replay cũ ghi file vào HDFS, không có provider
 
 
 def status_for(co: float) -> str:
@@ -25,24 +39,29 @@ def status_for(co: float) -> str:
 
 
 def from_record(rec: dict) -> dict:
-    """rec: {"datetime": "YYYY-MM-DD HH:MM:SS" (giờ hệ thống của máy chạy producer, WSL = +07), station, co, wind_speed_kmh, temperature_C}."""
+    """rec: {"datetime": "YYYY-MM-DD HH:MM:SS" (giờ hệ thống của máy chạy producer, WSL = +07), station, co, wind_speed_kmh, temperature_C,
+    tùy chọn: provider, originalDatetime (chỉ bản phát lại), ...}."""
     co = float(rec["co"])
     wind = float(rec["wind_speed_kmh"])
     station = rec.get("station") or ""
+    source = source_of(rec)
+    original = None
+    if source == "replay-dataset" and rec.get("originalDatetime"):  # thời điểm gốc của dòng lịch sử; nguồn thật luôn null
+        original = timeutil.iso(datetime.fromisoformat(rec["originalDatetime"]))
     return {
         "datetime": timeutil.iso(datetime.fromisoformat(rec["datetime"])),
-        # Hợp đồng 0.2.0: trước Bước A1 producer chưa gửi thời điểm gốc nên chưa điền được cho bản phát lại; không đoán. coPredicted/modelVersion
-        # chỉ có từ Bước A5 (chưa có mô hình), nên luôn null, không điền số thay thế.
-        "originalDatetime": None,
+        # Producer phát lại cũ (HDFS /stream_input) không gửi thời điểm gốc nên vẫn null; producer Kafka (Bước A1) có gửi.
+        "originalDatetime": original,
         "station": STATION_LABELS.get(station, station),
         # Quyết định D2 (TẠM): luôn true, kể cả luồng live (một điểm tọa độ chung, không phải trạm đo).
         "isSimulatedStation": True,
-        "source": "live-open-meteo" if station == LIVE_STATION else "replay-dataset",
+        "source": source,
         "co": co,
         "windSpeedKmh": wind,
         "temperatureC": float(rec["temperature_C"]),
         "coAccumulationIndex": round(co / (wind + 1.0), 2),
         "status": status_for(co),
+        # chỉ có từ Bước A5 (chưa có mô hình): null, không điền số thay thế
         "coPredicted": None,
         "modelVersion": None,
     }

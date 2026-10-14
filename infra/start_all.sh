@@ -1,5 +1,6 @@
 #!/bin/bash
 # Khởi động toàn bộ phần chạy trong WSL, đúng thứ tự, mỗi bước có kiểm tra: HDFS -> Kafka -> (YARN) -> Airflow -> dữ liệu sống -> backend.
+# Luồng dữ liệu thật cần: export OWM_API_KEY=... trước khi chạy (thiếu thì bước 5 báo rõ và bỏ qua producer OpenWeather).
 # Chạy trong WSL:  bash infra/start_all.sh
 # Biến tùy chọn:   WITH_YARN=1 (bật YARN, mặc định tắt để lấy RAM)   WITH_AIRFLOW=0 (không bật Airflow)
 #                  BACKEND_ALLOW_WRITES=1 (bật cửa sổ lệnh, mặc định tắt)   ALLOWED_ORIGINS=... (mặc định cho phép cổng 5173-5175)
@@ -70,7 +71,7 @@ else
   step "4. Airflow: bỏ qua (WITH_AIRFLOW=0)"
 fi
 
-# 5. Dữ liệu sống: producer Open-Meteo -> Kafka và Spark Structured Streaming -> HDFS /live
+# 5. Dữ liệu sống: producer OpenWeather (cần OWM_API_KEY) + producer phát lại -> Kafka, Spark Structured Streaming -> HDFS /live
 step "5. Dữ liệu sống"
 bash "$ROOT/infra/live_stack.sh" start
 for _ in $(seq 1 12); do pgrep -f 'infra/spark_kafka_[c]onsumer.py' > /dev/null && grep -q "SPARK STRUCTURED STREAMING" "$LOGDIR/spark_kafka.log" 2>/dev/null && break; sleep 5; done
