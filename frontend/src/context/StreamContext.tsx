@@ -16,6 +16,12 @@ export const StreamProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [events, setEvents] = useState<StreamEvent[]>([]);
   const [latestReading, setLatestReading] = useState<AqiReading | null>(null);
   const [hasStreamReading, setHasStreamReading] = useState<boolean>(false);
+  const [latestReplayReading, setLatestReplayReading] = useState<AqiReading | null>(null);
+  const [latestLiveReading, setLatestLiveReading] = useState<AqiReading | null>(null);
+  const [replayHistory, setReplayHistory] = useState<AqiReading[]>([]);
+  const [liveHistory, setLiveHistory] = useState<AqiReading[]>([]);
+  const [hasReplayReading, setHasReplayReading] = useState<boolean>(false);
+  const [hasLiveReading, setHasLiveReading] = useState<boolean>(false);
   const [latestKafkaStats, setLatestKafkaStats] = useState<KafkaStatsEvent['data'] | null>(null);
   const [latestSparkProgress, setLatestSparkProgress] = useState<SparkProgressEvent['data'] | null>(null);
   const [recentHdfsOps, setRecentHdfsOps] = useState<HdfsOpEvent['data'][]>([]);
@@ -33,6 +39,8 @@ export const StreamProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setStatus(s);
       if (s !== 'connected') {
         setHasStreamReading(false);
+        setHasReplayReading(false);
+        setHasLiveReading(false);
       }
     });
 
@@ -41,8 +49,19 @@ export const StreamProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setEvents((prev) => [event, ...prev.slice(0, 49)]);
 
       if (event.type === 'reading') {
-        setLatestReading(event.data);
+        const r = event.data;
+        setLatestReading(r);
         setHasStreamReading(true);
+
+        if (r.source === 'replay-dataset') {
+          setLatestReplayReading(r);
+          setReplayHistory((prev) => [...prev, r].slice(-30));
+          setHasReplayReading(true);
+        } else if (r.source === 'live-openweather') {
+          setLatestLiveReading(r);
+          setLiveHistory((prev) => [...prev, r].slice(-30));
+          setHasLiveReading(true);
+        }
       } else if (event.type === 'kafka.stats') {
         setLatestKafkaStats(event.data);
       } else if (event.type === 'spark.progress') {
@@ -122,6 +141,8 @@ export const StreamProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       // Ngắt nguồn khi cleanup để tránh giữ duplicate socket
       source.stop();
       setHasStreamReading(false);
+      setHasReplayReading(false);
+      setHasLiveReading(false);
     };
   }, []);
 
@@ -134,6 +155,12 @@ export const StreamProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         events,
         latestReading,
         hasStreamReading,
+        latestReplayReading,
+        latestLiveReading,
+        replayHistory,
+        liveHistory,
+        hasReplayReading,
+        hasLiveReading,
         latestKafkaStats,
         latestSparkProgress,
         recentHdfsOps,

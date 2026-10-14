@@ -17,6 +17,7 @@ import {
 import { useStream } from '../context/useStream';
 
 export type TabKey =
+  | 'live'
   | 'overview'
   | 'hdfs'
   | 'kafka'
@@ -40,6 +41,7 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, onTabChange }) => {
   const apiBase = import.meta.env.VITE_API_BASE || 'http://localhost:8010';
 
   const tabs: { key: TabKey; label: string; icon: React.FC<{ className?: string }> }[] = [
+    { key: 'live', label: 'Dữ liệu sống', icon: Radio },
     { key: 'overview', label: 'Tổng quan', icon: Activity },
     { key: 'hdfs', label: 'HDFS', icon: Database },
     { key: 'kafka', label: 'Kafka', icon: Radio },

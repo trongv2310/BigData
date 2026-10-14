@@ -3,6 +3,7 @@ import { StreamProvider } from './context/StreamContext';
 import { Header, type TabKey } from './components/Header';
 import { EventTicker } from './components/EventTicker';
 import { OverviewTab } from './components/OverviewTab';
+import { LiveTab } from './components/LiveTab';
 import { HdfsTab } from './components/HdfsTab';
 import { KafkaTab } from './components/KafkaTab';
 import { SparkTab } from './components/SparkTab';
@@ -13,7 +14,7 @@ import { PredictTab } from './components/PredictTab';
 import { TerminalTab } from './components/TerminalTab';
 
 const AppContent: React.FC = () => {
-  const [currentTab, setCurrentTab] = useState<TabKey>('overview');
+  const [currentTab, setCurrentTab] = useState<TabKey>('live');
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100 font-sans selection:bg-sky-500 selection:text-white">
@@ -23,6 +24,7 @@ const AppContent: React.FC = () => {
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+        {currentTab === 'live' && <LiveTab />}
         {currentTab === 'overview' && <OverviewTab />}
         {currentTab === 'hdfs' && <HdfsTab />}
         {currentTab === 'kafka' && <KafkaTab />}
