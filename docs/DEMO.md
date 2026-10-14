@@ -50,7 +50,7 @@ Nếu quan sát mới chưa tới lúc demo: Open-Meteo đổi thời tiết lú
 ## 4. Chưa làm hoặc còn hạn chế
 
 - Cửa sổ lệnh đã thử trên giao diện thật ngày 13/10/2026 (kết nối được, `echo`, `whoami`, `hdfs dfs -ls /raw` chạy đúng). Mỗi lần mở shell tương tác in một lỗi cú pháp từ `/etc/bash.bashrc` dòng 74 (PATH Windows có dấu ngoặc đơn, lỗi của cấu hình WSL, không phải của dự án); lệnh vẫn chạy bình thường.
-- Airflow đã bật (13/10/2026) nhưng DAG `hcmc_co_pipeline` chỉ là DAG mẫu của bạn (số liệu cố định), đang tạm dừng, không nối với luồng Kafka/Spark thật.
+- Airflow đã bật: DAG `hcmc_co_pipeline` (thật, từ 14/10/2026) chạy cả pipeline bằng spark-submit, đang tạm dừng và mặc định không ghi đè; DAG mẫu cũ của bạn nay là `hcmc_co_pipeline_sample` (số liệu cố định, không nối Kafka/Spark thật). Bước 9 trên `/api/pipeline/steps` chỉ thành `done` sau khi DAG chạy thật với `co_root=/co`.
 - D2, D3, D4 đã chốt ngày 13/10/2026 (xem `docs/TASKS.md`). Hệ quả cần nói thật: với ngưỡng OpenWeather (WARNING từ 4400, DANGER từ 12400 µg/m³), mọi số đã thấy (Open-Meteo 1000 đến 2500, Kaggle trung bình sau 07/2025 khoảng 300) đều SAFE, nên cảnh báo hiếm khi đổi màu.
 - Không có mô hình ML; dự đoán là heuristic.
 - Tuổi dữ liệu tính từ giờ quan sát thời tiết; CO của Open-Meteo có thể cũ hơn tới 1 giờ.

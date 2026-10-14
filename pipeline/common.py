@@ -1,6 +1,6 @@
 """Phần dùng chung của pipeline CO (bám 9 bước của giảng viên, đổi cho CO). Chạy trong WSL cùng Hadoop và Spark `local[*]`.
 
-- Đường dẫn HDFS của dự án: /co/raw (dữ liệu gốc), /co/processed (đã làm sạch), /co/output (kết quả và step_summary.json).
+- Đường dẫn HDFS của dự án: /co/raw (dữ liệu gốc), /co/processed (đã làm sạch), /co/output (kết quả và step_summary.json); thư mục gốc /co đổi được bằng biến môi trường CO_ROOT.
 - `step_summary.json` ở /co/output: mỗi bước pipeline ghi trạng thái và số liệu thật của chính nó; backend chỉ ĐỌC file này để trả
   `GET /api/pipeline/steps`. Không bước nào được ghi số liệu mà nó chưa tính.
 - Không có thư viện ngoài (chỉ chuẩn Python + PySpark); đọc/ghi HDFS bằng lệnh `hdfs dfs` để không phụ thuộc phiên Spark.
@@ -15,7 +15,8 @@ from datetime import datetime, timedelta, timezone
 
 HDFS_URI = os.environ.get("HDFS_URI", "hdfs://localhost:9000")
 HDFS_BIN = os.environ.get("HDFS_BIN", os.path.expanduser("~/hadoop/bin/hdfs"))
-RAW_DIR, PROCESSED_DIR, OUTPUT_DIR = "/co/raw", "/co/processed", "/co/output"
+CO_ROOT = "/" + os.environ.get("CO_ROOT", "/co").strip("/")  # mặc định /co; đổi (ví dụ /co_airflow_test) để chạy cả pipeline ở nơi khác mà không đụng /co
+RAW_DIR, PROCESSED_DIR, OUTPUT_DIR = f"{CO_ROOT}/raw", f"{CO_ROOT}/processed", f"{CO_ROOT}/output"
 RAW_FILE = f"{RAW_DIR}/Dataset.csv"
 CLEAN_DIR = f"{PROCESSED_DIR}/aqi_clean"
 SUMMARY_PATH = f"{OUTPUT_DIR}/step_summary.json"
