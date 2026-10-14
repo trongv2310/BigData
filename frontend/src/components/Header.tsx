@@ -13,11 +13,13 @@ import {
   GitCommit,
   Sparkles,
   Terminal,
+  Layers,
 } from 'lucide-react';
 import { useStream } from '../context/useStream';
 
 export type TabKey =
   | 'live'
+  | 'pipeline'
   | 'overview'
   | 'hdfs'
   | 'kafka'
@@ -42,6 +44,7 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, onTabChange }) => {
 
   const tabs: { key: TabKey; label: string; icon: React.FC<{ className?: string }> }[] = [
     { key: 'live', label: 'Dữ liệu sống', icon: Radio },
+    { key: 'pipeline', label: 'Pipeline', icon: Layers },
     { key: 'overview', label: 'Tổng quan', icon: Activity },
     { key: 'hdfs', label: 'HDFS', icon: Database },
     { key: 'kafka', label: 'Kafka', icon: Radio },
