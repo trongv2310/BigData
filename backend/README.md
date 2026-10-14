@@ -39,7 +39,8 @@ python3 backend/tools/check_live.py http://127.0.0.1:8000       # backend đang 
 | `/api/aqi/*` | bộ Kaggle (D4), cộng 7 giờ vì cột `datetime` gốc là UTC; riêng `/api/aqi/latest[?source=]` lấy tin mới nhất của luồng (hoặc của đúng một nguồn, bộ nhớ đệm theo nguồn trong `app/kafka_stream.py`) theo `STREAM_SOURCE` (Kafka và/hoặc `/stream_input`), không có thì dòng cuối bộ Kaggle (`source: replay-dataset`) |
 | `/api/predict` | heuristic từ bộ Kaggle (`app/predict.py`), không phải ML |
 | `/api/replay/status`, `POST /api/replay/control` | luồng PHÁT LẠI (mô phỏng): đọc nhịp tim `status.json`, ghi lệnh `control.json` trong `REPLAY_STATE_DIR` (không qua HDFS/Kafka/Spark; `REPLAY_CONTROL=0` để chỉ xem); producer: `infra/replay_kafka_producer.py` (`app/replay.py`) |
-| `/api/pipeline/steps`, `/api/model/metrics` | CHƯA có (hợp đồng 0.2.0 đã khai báo, mock có; làm ở Bước A2, A4). Gọi vào backend thật hiện trả 404 |
+| `/api/pipeline/steps` | 9 bước pipeline, đọc `/co/output/step_summary.json` trên HDFS (chỉ đọc; các script trong `pipeline/` ghi file này). Chưa có file thì cả 9 bước `notStarted`; HDFS tắt hoặc file hỏng thì 503, không đoán (`app/pipeline_steps.py`) |
+| `/api/model/metrics` | CHƯA có (hợp đồng 0.2.0 đã khai báo, mock có; làm ở Bước A4). Gọi vào backend thật hiện trả 404 |
 | `/api/sql` | SparkSQL `local[2]` trong tiến trình backend, view `aqi` từ HDFS `/raw/Dataset.csv` |
 | `/ws/terminal` | pty bash; TẮT mặc định, bật bằng `BACKEND_ALLOW_WRITES=1`; token in ra console lúc khởi động |
 | `/api/flows` | định nghĩa trong `app/flows.py` (trùng mock) |
