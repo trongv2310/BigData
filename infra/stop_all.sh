@@ -16,5 +16,5 @@ if [ "${KEEP_INFRA:-0}" != 1 ]; then
   echo "== HDFS"; bash "$HOME/stop-4nodes.sh" 2>&1 | grep -v 'No such file or directory'
 fi
 sleep 3
-echo "== còn chạy:"; pgrep -af "[j]ava|[u]vicorn|[a]irflow (standalone|api|scheduler|worker)|[l]ive_producer" | cut -c1-100 || true
+echo "== còn chạy:"; pgrep -af "[j]ava|[u]vicorn|[a]irflow (standalone|api|scheduler|worker)|[l]ive_producer|[r]eplay_kafka" | cut -c1-100 || true
 echo "(hết)"

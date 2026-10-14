@@ -1,5 +1,7 @@
 # Kịch bản demo (khoảng 8 phút)
 
+> **Cập nhật 14/10/2026 (Bước A1):** luồng dữ liệu thật nay là OpenWeather (cần `export OWM_API_KEY=...` trước `infra/start_all.sh`) và có thêm luồng PHÁT LẠI qua Kafka; Open-Meteo không còn bật mặc định. Các mục dưới đây nói về Open-Meteo là kịch bản cũ ngày 13/10 và chưa được viết lại; xem `infra/README.md` và `docs/HANDOFF.md`.
+
 Ảnh chụp (13/10/2026, backend thật) nằm trong `docs/demo/`. Kịch bản này chỉ nói những gì đã chạy và quan sát được; phần nào là suy ra hoặc mô phỏng thì có ghi rõ để nói đúng khi trình bày.
 
 ## 1. Chuẩn bị (làm trước, khoảng 2 phút; đã thử khởi động nguội ngày 13/10/2026)

@@ -31,21 +31,23 @@ def _time(name: str, value: str | None):
 async def aqi_latest(source: Literal["replay-dataset", "live-openweather", "live-open-meteo"] | None = None):
     """Bản ghi mới nhất của luồng (theo STREAM_SOURCE: tin Kafka và/hoặc file /stream_input).
 
-    Không có `source`: nếu luồng trống hoặc nguồn tắt thì lấy dòng cuối bộ dữ liệu (source=replay-dataset, datetime cũ), như trước.
-    Có `source`: chỉ trả bản ghi của đúng nguồn đó, không bao giờ thay bằng nguồn khác hay dòng bộ dữ liệu; không có thì 404 NO_READING_YET.
-    GIỚI HẠN (đến Bước A1): backend mới chỉ biết bản ghi mới nhất của cả luồng, nên 404 cũng có thể xảy ra khi bản ghi mới nhất thuộc nguồn khác
-    dù trước đó nguồn này từng có bản ghi.
+    Không có `source`: bản ghi mới nhất của luồng bất kể nguồn; nếu luồng trống hoặc nguồn tắt thì lấy dòng cuối bộ dữ liệu
+    (source=replay-dataset, datetime cũ), như trước.
+    Có `source`: bản ghi mới nhất của đúng nguồn đó (Kafka: bộ nhớ đệm theo nguồn, đọc lùi tối đa kafka_stream.BACKFILL_MAX tin),
+    không bao giờ thay bằng nguồn khác hay dòng bộ dữ liệu; không có thì 404 NO_READING_YET.
     """
     r = None
     if config.STREAM_SOURCE in ("kafka", "both"):
         try:
-            r = await kafka_stream.latest_reading()
+            r = await (kafka_stream.latest_reading(source) if source else kafka_stream.latest_reading())
         except KafkaUnreachable:
             r = None
     if r is None and config.STREAM_SOURCE in ("hdfs", "both"):
         try:
             r = await stream_input.latest_reading()
         except (hdfs.HdfsUnreachable, hdfs.HdfsError):
+            r = None
+        if r is not None and source and r["source"] != source:
             r = None
     if source is not None:
         if r is None or r["source"] != source:

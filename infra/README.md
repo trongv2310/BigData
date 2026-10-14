@@ -13,7 +13,23 @@ Môi trường hiện có của dự án (không do repo này cài):
 
 Quy ước: các script pipeline cũ nằm ở thư mục cha `BigData/`. Repo này **sao chép** khi cần, không di chuyển, để đồ án đang nộp không bị hỏng.
 
-## Dữ liệu SỐNG qua Kafka (D1 phương án b)
+## Hai luồng song song qua Kafka (từ 14/10/2026, quyết định D5, Bước A1)
+
+```
+OpenWeather Air Pollution + Current Weather ─▶ infra/live_producer_owm.py ──┐                       ┌─▶ backend (STREAM_SOURCE=kafka) ─▶ /ws/stream, /api/aqi/latest?source=
+Bộ Kaggle (lịch sử, MÔ PHỎNG) ─▶ infra/replay_kafka_producer.py ───────────┴─▶ Kafka hcmc_co_stream ─┤
+                                                                                                       └─▶ infra/spark_kafka_consumer.py ─▶ HDFS /live/co_stream (Parquet)
+```
+
+- Chạy: `export OWM_API_KEY=...` (chỉ trong shell WSL, không ghi vào repo hay log; ví dụ `export OWM_API_KEY=$(tr -d '\r\n' < /mnt/f/HK1_Nam04/BigData/own_key.txt)`), rồi `bash infra/start_all.sh` hoặc `bash infra/live_stack.sh start`. Thiếu `OWM_API_KEY` thì script báo rõ và bỏ qua producer OpenWeather (không có luồng dữ liệu thật), phần còn lại vẫn chạy. `WITH_REPLAY=0` tắt luồng phát lại; `WITH_OPEN_METEO=1` bật thêm producer Open-Meteo cũ.
+- **Luồng DỮ LIỆU THẬT** (`source=live-openweather`): `live_producer_owm.py` gọi `air_pollution` (CO và 7 chất khí, µg/m³) và `weather` (`units=metric`) của chính OpenWeather tại (10.8231, 106.6297), đúng tọa độ của `scripts/fetch_owm_raw.py`. Air Pollution API không có nhiệt độ và gió nên hai số đó lấy từ Current Weather (gió đổi từ m/s sang km/h, nhân 3,6); thiếu một trong hai phản hồi thì bỏ qua lần đó, không điền số. Lưu ý nguồn thời tiết: các cột nhiệt độ, độ ẩm, gió trong bộ Kaggle có thể không đến từ Current Weather của OpenWeather (không có tài liệu nói rõ), nên "cùng nguồn gốc" chỉ chắc chắn với CO và các chất khí.
+- **Hạn mức gói miễn phí** (openweathermap.org/price, đọc ngày 14/10/2026): 60 lời gọi/phút và 1.000.000 lời gọi/tháng, gồm cả Air Pollution và Current Weather. Mỗi lần hỏi tốn 2 lời gọi; mặc định hỏi mỗi **300 giây** = 576 lời gọi/ngày (khoảng 17 300/tháng, 1,7% hạn mức). Gặp 429 thì chờ ít nhất 120 giây, 401 thì chờ 600 giây, lỗi khác thì chờ lùi dần tới 15 phút; không thoát và không bịa số.
+- **Nhịp cập nhật thật của nguồn (đo 14/10/2026, xem HANDOFF)**: tài liệu OpenWeather không nói. `dt` trả về KHÔNG đơn điệu và không phải thời điểm quan sát đáng tin (có lúc bằng đúng "bây giờ", có lúc cũ hơn lần hỏi trước, trong khi CO và các chất khác y hệt). Vì vậy producer chỉ gửi khi `dt` mới hơn `dt` đã gửi VÀ bộ số liệu khí khác bộ đã gửi, và ghi lý do mỗi lần bỏ qua. Khởi động lại thì đọc 200 tin cuối của topic để không gửi lại.
+- **Luồng PHÁT LẠI** (`source=replay-dataset`, MÔ PHỎNG): `replay_kafka_producer.py` phát từng dòng giờ của bộ Kaggle từ 01/07/2025 (giai đoạn sau điểm gãy), mặc định cách nhau 10 giây ở tốc độ 1 (10× = 1 giây, 60× = khoảng 6 bản ghi/giây, dưới giới hạn 20 tin/giây của `/ws/stream`), hết dữ liệu thì quay lại đầu. `datetime` là lúc phát, `originalDatetime` là giờ gốc của dòng lịch sử (+07:00). Điều khiển bằng `POST /api/replay/control`: backend ghi `control.json`, producer ghi nhịp tim `status.json` mỗi 2 giây vào `/tmp/hcmc_replay` (`REPLAY_STATE_DIR`); không có nhịp tim mới trong 10 giây thì trạng thái là `stopped`. Luồng thật không đọc các tệp này nên không bao giờ bị ảnh hưởng. Mỗi bản ghi phát lại đi qua Spark và thành một dòng Parquet trong `/live`: tối đa khoảng 2 880 file nhỏ mỗi ngày (một file mỗi lần trigger 30 giây có dữ liệu; suy ra từ trigger, chưa đếm đủ một ngày); tắt bằng `WITH_REPLAY=0` khi không cần.
+- **`/live` chứa cả hai luồng**: lọc theo cột `provider` (`openweather` thật, `replay-dataset` phát lại, `open-meteo` tin cũ); không trộn vào một chuỗi. Spark consumer đã thêm các cột `originalDatetime`, `owmDt`, `aqi`, `no`, `no2`, `o3`, `so2`, `pm2_5`, `pm10`, `nh3`; dòng cũ để null, view `live` của `/api/sql` gộp schema (`mergeSchema`) nên đọc được cả file cũ lẫn mới.
+- **Open-Meteo** (`infra/live_producer.py`) vẫn còn nhưng KHÔNG bật mặc định (`WITH_OPEN_METEO=1` mới bật). Đây là nguồn KHÁC (mô hình CAMS, CO cao hơn nhiều so với OpenWeather); backend gắn `source=live-open-meteo`, không trộn với `live-openweather` và không dùng để dự đoán. Các phần dưới đây về Open-Meteo là lịch sử của D1 và còn đúng cho nguồn đó.
+
+## Dữ liệu sống Open-Meteo qua Kafka (D1 phương án b, lịch sử; nguồn này nay KHÔNG bật mặc định)
 
 ```
 Open-Meteo API ──▶ infra/live_producer.py ──▶ Kafka hcmc_co_stream ─┬─▶ backend (STREAM_SOURCE=kafka) ──▶ /ws/stream, /api/aqi/latest ──▶ dashboard

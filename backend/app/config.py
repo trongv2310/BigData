@@ -69,6 +69,12 @@ CO_DANGER_UG = float(_env("CO_DANGER_UG", "12400"))
 if not 0 < CO_WARNING_UG < CO_DANGER_UG:
     raise SystemExit(f"CO_WARNING_UG phải dương và nhỏ hơn CO_DANGER_UG (nhận: {CO_WARNING_UG}, {CO_DANGER_UG})")
 
+# Luồng PHÁT LẠI (infra/replay_kafka_producer.py): backend đọc trạng thái và ghi lệnh qua tệp cục bộ trong thư mục này (không qua HDFS/Kafka/Spark).
+# REPLAY_CONTROL=0 để backend không điều khiển được (chỉ xem trạng thái). Luồng dữ liệu thật không bao giờ bị điều khiển.
+REPLAY_STATE_DIR = _env("REPLAY_STATE_DIR", "/tmp/hcmc_replay")
+REPLAY_CONTROL = _env("REPLAY_CONTROL", "1").strip().lower() in ("1", "true", "yes")
+REPLAY_BASE_INTERVAL = float(_env("REPLAY_BASE_INTERVAL", "10"))  # giây giữa hai bản ghi ở tốc độ 1; dùng khi producer chưa chạy
+
 # Ghi lên HDFS/Kafka/Spark: mặc định TẮT (xem app/writeguard.py)
 ALLOW_WRITES = _flag("BACKEND_ALLOW_WRITES")
 
