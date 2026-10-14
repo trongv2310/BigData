@@ -11,7 +11,7 @@ View thứ hai `live` (nếu có) là dữ liệu SỐNG Spark đã ghi từ Kaf
   datetime_vn timestamp (giờ Việt Nam, đúng như producer ghi), station, co, wind_speed_kmh, temperature_C, co_accumulation_index, canh_bao,
   co_observed_at, weather_observed_at, provider (chuỗi: 'openweather' dữ liệu thật, 'replay-dataset' phát lại mô phỏng, 'open-meteo' tin cũ),
   original_datetime_vn (chỉ bản phát lại), aqi, no, no2, o3, so2, pm2_5, pm10, nh3 (từ Bước A1; dòng cũ để null), kafka_partition, kafka_offset, kafka_timestamp (UTC).
-  co_actual (= co), co_predicted, model_version (null nếu bản ghi thiếu đầu vào cho mô hình hoặc ghi trước Bước A5), feature_note (cách dựng đầu vào của mô hình).
+  co_actual (= co), co_is_forecast (true nếu co là điểm dự báo của OpenWeather), co_predicted, model_version (null nếu bản ghi thiếu đầu vào cho mô hình hoặc ghi trước Bước A5), feature_note (cách dựng đầu vào của mô hình).
   Bảng chứa lẫn các nguồn: luôn lọc theo provider.
 Chưa có dữ liệu sống thì không có view này (truy vấn vào `live` trả lỗi SQL_ERROR như bảng không tồn tại).
 """
@@ -75,7 +75,7 @@ def _session():
 
 
 LIVE_COLUMNS = ["station", "co", "wind_speed_kmh", "temperature_C", "co_accumulation_index", "canh_bao", "provider", "kafka_timestamp",
-                "aqi", "no", "no2", "o3", "so2", "pm2_5", "pm10", "nh3", "co_actual", "co_predicted", "model_version", "feature_note"]
+                "aqi", "no", "no2", "o3", "so2", "pm2_5", "pm10", "nh3", "co_actual", "co_predicted", "model_version", "co_is_forecast", "feature_note"]
 
 
 def _refresh_live(spark) -> None:

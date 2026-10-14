@@ -49,6 +49,16 @@ def locate_current(history: list[dict], current_components: dict, tolerance: flo
     return None
 
 
+def forecast_flag(history: list[dict], current_components: dict, observed_dt: int | None) -> bool | None:
+    """True nếu điểm lịch sử khớp giá trị hiện tại nằm SAU `dt` của API (giá trị hiện tại thực ra là điểm DỰ BÁO của giờ kế tiếp), False nếu không (giờ hiện hành hoặc đã qua),
+    None nếu không xác định được (không biết dt, hoặc không có điểm lịch sử khớp). Đây là giá trị của trường `coIsForecast`."""
+    if observed_dt is None:
+        return None
+    pts = sorted(history, key=lambda h: h["dt"])
+    j = locate_current(pts, current_components)
+    return None if j is None else pts[j]["dt"] > observed_dt
+
+
 def from_history(history: list[dict], current_components: dict, weather: dict, observed_dt: int | None = None) -> tuple[dict | None, str]:
     """history: điểm theo giờ của OpenWeather {dt (unix), components}, sắp tăng dần; weather = {temperatureC, windSpeedKmh} (hiện tại).
     Trả (modelInputs hoặc None, ghi chú cho người đọc). Nhiệt độ và gió là của quan sát hiện tại chứ không phải giờ trước (API lịch sử không có thời tiết): xấp xỉ, ghi ở ghi chú.

@@ -142,10 +142,10 @@ class ExtraFlows(unittest.TestCase):
     """Luồng kafka-produce và spark-streaming: chỉ có khi FLOWS_EXTRA; mặc định tắt (chỉ có ý nghĩa khi STREAM_SOURCE=kafka)."""
 
     def setUp(self):
-        self.old = config.FLOWS_EXTRA
+        self.old = (config.FLOWS_EXTRA, config.READING_TOPIC)
 
     def tearDown(self):
-        config.FLOWS_EXTRA = self.old
+        config.FLOWS_EXTRA, config.READING_TOPIC = self.old
 
     def client(self):
         from fastapi.testclient import TestClient
@@ -197,8 +197,10 @@ class ExtraFlows(unittest.TestCase):
         return asyncio.run(scenario())
 
     def test_hub_emits_kafka_steps_per_new_offset_only_when_on(self):
+        """Chỉ khi backend đọc topic THÔ (offset là offset ACK của producer); topic làm giàu (mặc định) thì không phát bước kafka-produce, xem test dưới."""
         old = (config.STREAM_SOURCE, hubmod.KAFKA_READ_POLL_SECONDS)
         config.STREAM_SOURCE, hubmod.KAFKA_READ_POLL_SECONDS = "kafka", 0.05
+        config.READING_TOPIC = config.KAFKA_TOPIC
         calls = []
 
         async def end():
@@ -215,6 +217,27 @@ class ExtraFlows(unittest.TestCase):
                 got = self.run_hub("_poll_kafka_readings", [mock.patch.object(kafka_stream, "end_offsets", end),
                                                             mock.patch.object(kafka_stream, "read_new", reads)])
                 self.assertEqual([(d["runId"], d["step"]) for t, d in got if t == "flow.step"], expect, on)
+        finally:
+            config.STREAM_SOURCE, hubmod.KAFKA_READ_POLL_SECONDS = old
+
+    def test_no_kafka_produce_steps_when_reading_the_enriched_topic(self):
+        old = (config.STREAM_SOURCE, hubmod.KAFKA_READ_POLL_SECONDS)
+        config.STREAM_SOURCE, hubmod.KAFKA_READ_POLL_SECONDS = "kafka", 0.05
+        config.FLOWS_EXTRA = True
+        self.assertEqual(config.READING_TOPIC, "hcmc_co_enriched")  # mặc định đọc topic làm giàu (quyết định 14/10/2026)
+        config.READING_TOPIC = "hcmc_co_enriched"
+        calls = []
+
+        async def end():
+            return {0: 10}
+
+        async def reads(pos):
+            calls.append(1)
+            return ([], {0: 12}) if len(calls) == 1 else ([], pos)
+
+        try:
+            got = self.run_hub("_poll_kafka_readings", [mock.patch.object(kafka_stream, "end_offsets", end), mock.patch.object(kafka_stream, "read_new", reads)])
+            self.assertEqual([d for t, d in got if t == "flow.step"], [])  # offset của topic làm giàu không phải offset ACK của producer
         finally:
             config.STREAM_SOURCE, hubmod.KAFKA_READ_POLL_SECONDS = old
 

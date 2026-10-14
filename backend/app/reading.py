@@ -47,6 +47,8 @@ def from_record(rec: dict) -> dict:
     source = source_of(rec)
     predicted, version = rec.get("co_predicted"), rec.get("model_version")
     predicted = float(predicted) if isinstance(predicted, (int, float)) and not isinstance(predicted, bool) and isinstance(version, str) and version else None
+    flag = rec.get("co_is_forecast", rec.get("coIsForecast"))  # bản ghi làm giàu của Spark dùng tên snake_case, bản ghi thô của producer dùng camelCase
+    flag = flag if isinstance(flag, bool) else None  # chỉ nhận boolean thật; thiếu hoặc kiểu khác là null (không suy ra)
     original = None
     if source == "replay-dataset" and rec.get("originalDatetime"):  # thời điểm gốc của dòng lịch sử; nguồn thật luôn null
         original = timeutil.iso(datetime.fromisoformat(rec["originalDatetime"]))
@@ -66,6 +68,7 @@ def from_record(rec: dict) -> dict:
         # do Spark (infra/spark_kafka_consumer.py) thêm vào bản ghi đã làm giàu; bản ghi thô, hoặc thiếu đầu vào cho mô hình: null, không điền số thay thế
         "coPredicted": predicted,
         "modelVersion": version if predicted is not None else None,
+        "coIsForecast": flag,
     }
 
 

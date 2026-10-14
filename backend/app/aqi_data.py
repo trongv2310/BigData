@@ -140,4 +140,5 @@ def last_reading(ds: Dataset) -> dict:
         "status": reading.status_for(co),
         "coPredicted": None,
         "modelVersion": None,
+        "coIsForecast": False,  # dòng lịch sử của bộ dữ liệu: không bao giờ là điểm dự báo
     }

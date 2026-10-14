@@ -15,6 +15,7 @@ Cùng nhà cung cấp với bản raw `scripts/fetch_owm_raw.py` (thư mục cha
 Bước A5: mỗi lần GỬI (tối đa một lần mỗi giờ) producer gọi thêm air_pollution/history (1 lời gọi) để dựng `modelInputs` cho mô hình dự đoán CO: CO và các chất khí của
 các giờ trước lấy từ điểm theo giờ của lịch sử, tìm điểm có ĐÚNG giá trị của quan sát hiện tại (xem model_inputs.py). Nhờ vậy bản ghi sống đầu tiên đã có đủ độ trễ 24 giờ,
 không cần "khởi động nóng". Không lấy được lịch sử hoặc lịch sử không khớp thì vẫn gửi bản ghi, không có `modelInputs` (không dự đoán), kèm `featureNote` nói lý do.
+Cũng ghi `coIsForecast` (true nếu giá trị hiện tại khớp điểm lịch sử NẰM SAU `dt` của API, tức là điểm dự báo của giờ kế tiếp; false nếu không; không ghi nếu không xác định).
 Nhiệt độ và gió của `modelInputs` là của quan sát hiện tại (API lịch sử không có thời tiết): xấp xỉ, có ghi ở `featureNote`.
 
 Chạy (WSL, Kafka đang chạy):  export OWM_API_KEY=...   rồi   python3 infra/live_producer_owm.py [--interval 300] [--once]
@@ -120,6 +121,9 @@ def attach_model_inputs(rec: dict, key: str, session=None, history_fn=None) -> d
         rec["featureNote"] = f"không lấy được lịch sử OpenWeather ({type(e).__name__}) nên không có dự đoán cho bản ghi này"
         return rec
     comps = {"co": rec["co"], **{n: rec.get(n) for n in POLLUTANTS}}
+    flag = mi.forecast_flag(history, comps, rec["owmDt"])
+    if flag is not None:  # không xác định được thì không ghi trường (backend coi là null), không đoán
+        rec["coIsForecast"] = flag
     inputs, note = mi.from_history(history, comps, {"temperatureC": rec["temperature_C"], "windSpeedKmh": rec["wind_speed_kmh"]}, observed_dt=rec["owmDt"])
     rec["featureNote"] = note
     if inputs is not None:
