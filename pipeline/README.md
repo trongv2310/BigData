@@ -11,7 +11,8 @@ Mỗi script ghi trạng thái và số liệu thật của chính nó vào `hdf
 | 5 `spark-sql` | `05_sql_analysis.py` (+ `analysis.py`) | CO theo giờ/tháng, trước/sau 01/07/2025 (thô và cùng tháng lịch), diễn biến theo ngày quanh điểm gãy, tương quan; ghi `/co/output/sql_analysis.json` | `spark-submit --driver-memory 1g pipeline/05_sql_analysis.py` |
 | 6a (của `cluster-and-model`) | `06a_cluster_days.py` (+ `day_clusters.py`) | K-Means MLlib trên hình dạng 24 giờ của từng ngày; k chọn bằng silhouette lớn nhất (k=2..8); ghi `/co/output/day_clusters` (Parquet) và `day_clusters.json`. Bước 6 ở trạng thái `partial` cho tới khi 6b xong | `spark-submit --driver-memory 1g pipeline/06a_cluster_days.py` |
 | 6a (độ ổn định) | `06a_cluster_stability.py` (+ `stability.py`) | K-Means k=2..8 với 6 seed; silhouette và chỉ số Rand điều chỉnh (ARI) giữa các lần chạy cho k=2 và k=3; chi tiết k=3; ghi `/co/output/day_clusters_stability.json` và `day_clusters_k3` | `spark-submit --driver-memory 1g pipeline/06a_cluster_stability.py` |
-| 6b, 7 đến 9 | chưa có | Bước A4 trở đi | |
+| 6b (mô hình) và 7 `save-results` | `06b_train.py` (+ `changepoint.py`, `modeling.py`) | xác định ranh giới chuyển tiếp theo dữ liệu (khử mùa vụ rồi khớp dốc), 3 phương án chia (chính: sau chuyển tiếp; chia 80/20 gốc; toàn bộ có biến chế độ), 3 mô hình, 2 mốc; lưu `/co/output/model_best`, `model_metrics.json`, `model_test_predictions`, `model_inputs_reference.json` | `spark-submit --driver-memory 2g pipeline/06b_train.py` |
+| 8, 9 | chưa có | Bước A5, A6 | |
 
 Quy tắc: không script nào điền số thay thế; chạy lại an toàn (bước 1-2 không ghi đè file khác nội dung, bước 4 dừng nếu `/co/processed/aqi_clean` đã có trừ khi `--overwrite`).
 Kiểm phép làm sạch: `backend/tests/test_a2.py` (bảng nhỏ có đủ loại lỗi, chạy bằng `cd backend && python3 -m unittest discover tests`).

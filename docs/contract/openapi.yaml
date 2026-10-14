@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: CO HCMC Dashboard API
-  version: 0.3.0
+  version: 0.4.0
   description: |
     Hợp đồng giữa backend (Claude, lead) và frontend (Antigravity).
     Chỉ lead được sửa file này. Muốn thêm hoặc đổi trường: ghi vào docs/HANDOFF.md hoặc mở PR riêng sửa contract.
@@ -14,6 +14,7 @@ info:
     - Kênh thời gian thực (WebSocket) mô tả ở docs/contract/events.md; schema sự kiện là StreamEvent ở dưới.
     - Hai luồng dữ liệu chạy song song và không bao giờ trộn vào một đường biểu đồ: PHÁT LẠI (`source=replay-dataset`, mô phỏng từ bộ lịch sử)
       và DỮ LIỆU THẬT (`source=live-openweather`). `live-open-meteo` là nguồn khác, không bật mặc định.
+    - Thay đổi 0.4.0: ModelMetrics có thêm transition (ranh giới chuyển tiếp theo dữ liệu), alternatives (hai phương án so sánh), breakpoint.cause; backend trả nguyên văn model_metrics.json.
     - Thay đổi 0.3.0: PipelineStepState thêm `partial`; thêm GET /api/analysis/sql và GET /api/analysis/day-clusters (kết quả bước 5 và 6a của pipeline).
     - Thay đổi 0.2.0 (Bước 0): AqiReading thêm originalDatetime, coPredicted, modelVersion; /api/aqi/latest nhận `source`; thêm /api/replay/*,
       /api/pipeline/steps, /api/model/metrics; /api/predict có thể trả kind=ml. Route mới có mock ngay, backend thật làm dần (xem docs/HANDOFF.md).
@@ -192,6 +193,11 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
+        "503":
+          description: Có mô hình đã huấn luyện nhưng không nạp hoặc chạy được (mã PREDICT_UNAVAILABLE), hoặc thiếu bộ dữ liệu cho heuristic
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
   /api/sql:
     post:
       summary: Chạy SparkSQL chỉ đọc (chỉ SELECT, có giới hạn số dòng)
@@ -354,6 +360,11 @@ paths:
               schema: { $ref: "#/components/schemas/ModelMetrics" }
         "404":
           description: Chưa huấn luyện mô hình (mã MODEL_NOT_TRAINED)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "503":
+          description: Không đọc được HDFS hoặc model_metrics.json hỏng (mã MODEL_UNAVAILABLE)
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
@@ -640,6 +651,9 @@ components:
     PredictRequest:
       type: object
       additionalProperties: false
+      description: |
+        Dự đoán CO của giờ `hour` (giờ +07). Với mô hình ml, temperatureC, windSpeedKmh và các chất khí là giá trị của giờ NGAY TRƯỚC giờ được dự đoán (đúng như lúc huấn luyện);
+        đầu vào bỏ trống được backend điền bằng trung vị của tập huấn luyện và báo ở filledInputs. `dayOfWeek` hiện không mô hình nào dùng.
       required: [hour, month, temperatureC, windSpeedKmh]
       properties:
         hour: { type: integer, minimum: 0, maximum: 23 }
@@ -1121,62 +1135,144 @@ components:
         from: { $ref: "#/components/schemas/DateTime" }
         to: { $ref: "#/components/schemas/DateTime" }
         rows: { type: integer, minimum: 1 }
+    ModelResult:
+      type: object
+      additionalProperties: false
+      required: [name, kind, version, isBest, test, beatsPreviousHour, beatsHourlyMean, params]
+      properties:
+        name: { type: string }
+        kind: { type: string, enum: [linear-regression, random-forest, gbt] }
+        version: { type: string, description: "Ví dụ random-forest-20261014; trùng AqiReading.modelVersion và PredictResponse.model.version khi là mô hình được dùng" }
+        isBest:
+          type: boolean
+          description: |
+            Mô hình tốt nhất của phương án, chọn theo RMSE trên đoạn kiểm định (20% cuối của tập huấn luyện), KHÔNG chọn trên tập kiểm tra; đúng một phần tử true mỗi phương án.
+            Ở phương án chính đây là mô hình được lưu và dùng cho /api/predict và coPredicted. Mô hình có RMSE kiểm tra thấp nhất có thể khác mô hình isBest.
+        test: { $ref: "#/components/schemas/ErrorMetrics" }
+        beatsPreviousHour: { type: boolean, description: "RMSE trên tập kiểm tra thấp hơn mốc 'CO giờ trước' (do pipeline tính, giao diện không tự so)" }
+        beatsHourlyMean: { type: boolean, description: "RMSE trên tập kiểm tra thấp hơn mốc 'trung bình theo giờ trong ngày'" }
+        params: { type: [string, "null"], description: "Siêu tham số chính và RMSE kiểm định, nếu có" }
+    BaselineResult:
+      type: object
+      additionalProperties: false
+      required: [id, name, description, test]
+      properties:
+        id: { type: string, enum: [previous-hour, hourly-mean] }
+        name: { type: string }
+        description: { type: string, description: "Cách tính mốc; mốc trung bình theo giờ lấy từ tập huấn luyện của đúng phương án đó" }
+        test: { $ref: "#/components/schemas/ErrorMetrics" }
+    ModelSetup:
+      type: object
+      additionalProperties: false
+      required: [id, title, description, features, trainSet, testSet, splitMethod, models, baselines, conclusion]
+      description: Một phương án chia dữ liệu và kết quả của nó (ngoài phương án chính); chỉ để so sánh, mô hình của các phương án này không được lưu
+      properties:
+        id: { type: string, enum: [full-80-20, full-with-regime] }
+        title: { type: string }
+        description: { type: string, description: "Mô tả đúng cách chia, những gì loại bỏ, và hạn chế của phương án" }
+        features: { type: array, items: { type: string } }
+        trainSet: { $ref: "#/components/schemas/DataSplitInfo" }
+        testSet: { $ref: "#/components/schemas/DataSplitInfo" }
+        splitMethod: { type: string }
+        models: { type: array, minItems: 1, items: { $ref: "#/components/schemas/ModelResult" } }
+        baselines: { type: array, minItems: 2, maxItems: 2, items: { $ref: "#/components/schemas/BaselineResult" } }
+        conclusion: { type: string }
+    ModelTransition:
+      type: object
+      additionalProperties: false
+      required: [method, referenceEnd, seasonHalfWidthDays, stepDate, stepResidualBefore, stepResidualAfter, windows, main, monthlyResidual, excludedDays, excludedFrom, excludedTo, postStart, sensitivity, note]
+      description: |
+        Ranh giới chuyển tiếp của điểm gãy dữ liệu, xác định theo DỮ LIỆU (không theo mốc 01/07/2025). Ranh giới KHÔNG duy nhất: các cửa sổ khớp cho các khoảng khác nhau.
+      properties:
+        method: { type: string }
+        referenceEnd: { type: string, description: "Ngày cuối (yyyy-MM-dd) của các năm tham chiếu dùng để khử mùa vụ" }
+        seasonHalfWidthDays: { type: integer }
+        stepDate: { type: string, description: "Điểm cắt tốt nhất của bước đơn trên chuỗi đã khử mùa vụ (yyyy-MM-dd)" }
+        stepResidualBefore: { type: number, description: "Phần dư trung bình (log CO) trước điểm cắt" }
+        stepResidualAfter: { type: number }
+        windows:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [halfWidthDays, from, to, lengthDays, residualBefore, residualAfter]
+            properties:
+              halfWidthDays: { type: integer }
+              from: { type: string }
+              to: { type: string }
+              lengthDays: { type: integer }
+              residualBefore: { type: number }
+              residualAfter: { type: number }
+        main:
+          type: object
+          additionalProperties: false
+          required: [halfWidthDays, from, to]
+          properties: { halfWidthDays: { type: integer }, from: { type: string }, to: { type: string } }
+        monthlyResidual:
+          type: array
+          description: Phần dư trung bình theo tháng (log CO trừ mùa vụ) từ sau các năm tham chiếu; cho thấy CO giảm dần chứ không nhảy một bước
+          items:
+            type: object
+            additionalProperties: false
+            required: [month, meanLogResidual, days]
+            properties: { month: { type: string }, meanLogResidual: { type: number }, days: { type: integer } }
+        excludedDays: { type: integer, minimum: 0, description: "Số ngày chuyển tiếp bị loại khỏi tập huấn luyện của phương án chính và phương án có biến chế độ" }
+        excludedFrom: { type: string }
+        excludedTo: { type: string }
+        postStart: { type: string, description: "Ngày đầu của giai đoạn sau chuyển tiếp (yyyy-MM-dd) dùng cho phương án chính" }
+        sensitivity:
+          type: array
+          description: Phương án chính huấn luyện lại với điểm bắt đầu giai đoạn sau khác nhau, cùng tập kiểm tra
+          items:
+            type: object
+            additionalProperties: false
+            required: [label, postStart, trainRows, kind, test]
+            properties:
+              label: { type: string }
+              postStart: { type: string }
+              trainRows: { type: integer }
+              kind: { type: string, enum: [linear-regression, random-forest, gbt] }
+              test: { $ref: "#/components/schemas/ErrorMetrics" }
+        note: { type: string }
     ModelMetrics:
       type: object
       additionalProperties: false
-      required: [generatedAt, target, horizonHours, features, trainedOn, trainSet, testSet, splitMethod, models, baselines, conclusion, breakpoint]
+      required: [generatedAt, target, horizonHours, features, trainedOn, trainSet, testSet, splitMethod, models, baselines, conclusion, breakpoint, transition, alternatives]
+      description: |
+        Phương án CHÍNH (huấn luyện và kiểm tra trong giai đoạn sau chuyển tiếp) nằm ở các trường cấp cao nhất; các phương án so sánh nằm ở `alternatives`.
+        Nguyên nhân của điểm gãy dữ liệu chưa xác định (breakpoint.cause); không được diễn giải là CO ngoài đời giảm thật.
       properties:
         generatedAt: { $ref: "#/components/schemas/DateTime" }
-        target: { type: string, description: "Mô hình dự đoán đại lượng gì, ví dụ CO (µg/m³) của giờ t từ thông tin đến giờ t-1" }
+        target: { type: string, description: "Mô hình dự đoán đại lượng gì: CO (µg/m³) của giờ t từ thông tin đến giờ t-1" }
         horizonHours: { type: integer, minimum: 1 }
         features:
           type: array
-          description: Tên các đầu vào của mô hình (khớp trường của PredictRequest khi có)
+          description: Tên các đầu vào của mô hình (khớp trường của PredictRequest khi có); temperatureC, windSpeedKmh và các chất khác là của giờ ngay trước giờ được dự đoán
           items: { type: string }
         trainedOn: { type: string, description: "Mô tả đúng dữ liệu và khoảng thời gian huấn luyện, nguồn, những gì đã loại bỏ" }
         trainSet: { $ref: "#/components/schemas/DataSplitInfo" }
         testSet: { $ref: "#/components/schemas/DataSplitInfo" }
         splitMethod: { type: string, description: "Cách chia, phải theo thời gian (đầu huấn luyện, cuối kiểm tra), không xáo ngẫu nhiên" }
-        models:
-          type: array
-          minItems: 1
-          items:
-            type: object
-            additionalProperties: false
-            required: [name, kind, version, isBest, test, beatsPreviousHour, beatsHourlyMean, params]
-            properties:
-              name: { type: string }
-              kind: { type: string, enum: [linear-regression, random-forest, gbt] }
-              version: { type: string }
-              isBest: { type: boolean, description: "Mô hình được lưu và dùng cho /api/predict và coPredicted; đúng một phần tử true" }
-              test: { $ref: "#/components/schemas/ErrorMetrics" }
-              beatsPreviousHour: { type: boolean, description: "RMSE trên tập kiểm tra thấp hơn mốc 'CO giờ trước' (do pipeline tính, giao diện không tự so)" }
-              beatsHourlyMean: { type: boolean, description: "RMSE trên tập kiểm tra thấp hơn mốc 'trung bình theo giờ trong ngày'" }
-              params: { type: [string, "null"], description: "Siêu tham số chính, nếu có" }
+        models: { type: array, minItems: 1, items: { $ref: "#/components/schemas/ModelResult" } }
         baselines:
           type: array
-          description: Hai mốc so sánh, tính trên đúng tập kiểm tra của mô hình
+          description: Hai mốc so sánh, tính trên đúng tập kiểm tra của phương án
           minItems: 2
           maxItems: 2
-          items:
-            type: object
-            additionalProperties: false
-            required: [id, name, description, test]
-            properties:
-              id: { type: string, enum: [previous-hour, hourly-mean] }
-              name: { type: string }
-              description: { type: string }
-              test: { $ref: "#/components/schemas/ErrorMetrics" }
+          items: { $ref: "#/components/schemas/BaselineResult" }
         conclusion: { type: string, description: "Kết luận trung thực do pipeline ghi, kể cả khi không mô hình nào thắng mốc" }
         breakpoint:
           type: object
           additionalProperties: false
-          required: [date, strategy, description, effect]
+          required: [date, strategy, description, effect, cause]
           properties:
-            date: { $ref: "#/components/schemas/DateTime" }
+            date: { $ref: "#/components/schemas/DateTime", description: "Thời điểm bắt đầu giai đoạn sau chuyển tiếp dùng cho phương án chính (không phải mốc 01/07)" }
             strategy: { type: string, enum: [indicator-feature, separate-training, none] }
-            description: { type: string, description: "Cách xử lý điểm gãy 01/07/2025 (CO giảm mạnh)" }
+            description: { type: string, description: "Cách xử lý điểm gãy" }
             effect: { type: [string, "null"], description: "Ảnh hưởng đã đo của cách xử lý lên chỉ số; null nếu chưa đo" }
+            cause: { type: string, description: "Nguyên nhân của điểm gãy dữ liệu: hiện là CHƯA XÁC ĐỊNH, kèm những gì đã kiểm" }
+        transition: { $ref: "#/components/schemas/ModelTransition" }
+        alternatives: { type: array, items: { $ref: "#/components/schemas/ModelSetup" } }
 
     StreamEnvelope:
       type: object

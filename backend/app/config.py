@@ -72,6 +72,10 @@ if not 0 < CO_WARNING_UG < CO_DANGER_UG:
 # Trạng thái 9 bước pipeline do các script trong pipeline/ ghi (backend chỉ đọc), xem app/pipeline_steps.py
 PIPELINE_SUMMARY_PATH = _env("PIPELINE_SUMMARY_PATH", "/co/output/step_summary.json")
 # Kết quả bước 5 và 6a (backend chỉ đọc, xem app/routes/analysis.py)
+# Mô hình dự đoán đã huấn luyện (backend chỉ đọc): thư mục PipelineModel và tệp trung vị đặc trưng, xem app/ml_predict.py
+MODEL_DIR_URI = _env("MODEL_DIR_URI", "hdfs://localhost:9000/co/output/model_best")
+MODEL_REFERENCE_PATH = _env("MODEL_REFERENCE_PATH", "/co/output/model_inputs_reference.json")
+MODEL_METRICS_PATH = _env("MODEL_METRICS_PATH", "/co/output/model_metrics.json")  # chỉ số mô hình do 06b ghi (backend chỉ đọc)
 ANALYSIS_SQL_PATH = _env("ANALYSIS_SQL_PATH", "/co/output/sql_analysis.json")
 ANALYSIS_CLUSTERS_PATH = _env("ANALYSIS_CLUSTERS_PATH", "/co/output/day_clusters.json")
 ANALYSIS_CLUSTERS_STABILITY_PATH = _env("ANALYSIS_CLUSTERS_STABILITY_PATH", "/co/output/day_clusters_stability.json")

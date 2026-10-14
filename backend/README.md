@@ -37,11 +37,11 @@ python3 backend/tools/check_live.py http://127.0.0.1:8000       # backend đang 
 | `/api/kafka/topics` | kafka-python (admin + offset), chỉ đọc |
 | `/api/spark/applications` | Spark REST `:4040/api/v1` |
 | `/api/aqi/*` | bộ Kaggle (D4), cộng 7 giờ vì cột `datetime` gốc là UTC; riêng `/api/aqi/latest[?source=]` lấy tin mới nhất của luồng (hoặc của đúng một nguồn, bộ nhớ đệm theo nguồn trong `app/kafka_stream.py`) theo `STREAM_SOURCE` (Kafka và/hoặc `/stream_input`), không có thì dòng cuối bộ Kaggle (`source: replay-dataset`) |
-| `/api/predict` | heuristic từ bộ Kaggle (`app/predict.py`), không phải ML |
+| `/api/predict` | có mô hình đã huấn luyện thì dùng mô hình (`kind=ml`: `app/ml_predict.py`, `app/ml_engine.py`, nạp PipelineModel từ HDFS bằng JVM Spark dùng chung với `/api/sql`; đầu vào bỏ trống điền bằng trung vị huấn luyện và báo ở `filledInputs`); chưa có mô hình thì heuristic từ bộ Kaggle (`app/predict.py`), không phải ML |
 | `/api/replay/status`, `POST /api/replay/control` | luồng PHÁT LẠI (mô phỏng): đọc nhịp tim `status.json`, ghi lệnh `control.json` trong `REPLAY_STATE_DIR` (không qua HDFS/Kafka/Spark; `REPLAY_CONTROL=0` để chỉ xem); producer: `infra/replay_kafka_producer.py` (`app/replay.py`) |
 | `/api/pipeline/steps` | 9 bước pipeline, đọc `/co/output/step_summary.json` trên HDFS (chỉ đọc; các script trong `pipeline/` ghi file này). Chưa có file thì cả 9 bước `notStarted`; HDFS tắt hoặc file hỏng thì 503, không đoán (`app/pipeline_steps.py`) |
 | `/api/analysis/sql`, `/api/analysis/day-clusters` | kết quả bước 5 và 6a: trả nguyên văn `/co/output/sql_analysis.json`, `day_clusters.json` (+ `stability` từ `day_clusters_stability.json`, null nếu chưa chạy); chưa có thì 404 `ANALYSIS_NOT_READY`, HDFS tắt hoặc tệp hỏng thì 503 (`app/routes/analysis.py`) |
-| `/api/model/metrics` | CHƯA có (hợp đồng 0.2.0 đã khai báo, mock có; làm ở Bước A4). Gọi vào backend thật hiện trả 404 |
+| `/api/model/metrics` | chỉ số mô hình dự đoán CO: trả nguyên văn `/co/output/model_metrics.json` (`app/routes/model.py`); chưa huấn luyện thì 404 `MODEL_NOT_TRAINED`, HDFS tắt hoặc tệp hỏng thì 503 |
 | `/api/sql` | SparkSQL `local[2]` trong tiến trình backend, view `aqi` từ HDFS `/raw/Dataset.csv` |
 | `/ws/terminal` | pty bash; TẮT mặc định, bật bằng `BACKEND_ALLOW_WRITES=1`; token in ra console lúc khởi động |
 | `/api/flows` | định nghĩa trong `app/flows.py` (trùng mock) |

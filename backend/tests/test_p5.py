@@ -69,10 +69,13 @@ class Predict(unittest.TestCase):
         config.AQI_CSV_PATH = str(d / "p.csv")
         aqi_data._cache = None
         predict_route._cache = None
+        self._nn = config.NAMENODE_HTTP
+        config.NAMENODE_HTTP = "http://127.0.0.1:1"  # heuristic: không đọc HDFS thật (máy có thể đã có mô hình ml, /api/predict sẽ dùng nó)
         self.client = TestClient(create_app())
 
     def tearDown(self):
         self.client.close()
+        config.NAMENODE_HTTP = self._nn
         config.AQI_CSV_PATH = self._old
         aqi_data._cache = None
         predict_route._cache = None

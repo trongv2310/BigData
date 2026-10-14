@@ -1,29 +1,69 @@
 {
-  "coPredicted": 298.7,
+  "coPredicted": 258.4,
   "unit": "µg/m³",
   "status": "SAFE",
   "interval": null,
   "filledInputs": [
     {
-      "name": "coLag1h",
-      "value": 312.4,
-      "origin": "[MOCK] CO của bản ghi live-openweather gần nhất"
-    },
-    {
-      "name": "coLag2h",
-      "value": 305.1,
-      "origin": "[MOCK] CO của bản ghi live-openweather trước đó 1 giờ"
+      "name": "no",
+      "value": 0.0,
+      "origin": "trung vị của tập huấn luyện (giai đoạn sau chuyển tiếp), vì yêu cầu bỏ trống"
     },
     {
       "name": "no2",
-      "value": 18.3,
-      "origin": "[MOCK] trung vị NO2 theo giờ của tập huấn luyện"
+      "value": 3.39,
+      "origin": "trung vị của tập huấn luyện (giai đoạn sau chuyển tiếp), vì yêu cầu bỏ trống"
+    },
+    {
+      "name": "o3",
+      "value": 39.38,
+      "origin": "trung vị của tập huấn luyện (giai đoạn sau chuyển tiếp), vì yêu cầu bỏ trống"
+    },
+    {
+      "name": "so2",
+      "value": 1.2,
+      "origin": "trung vị của tập huấn luyện (giai đoạn sau chuyển tiếp), vì yêu cầu bỏ trống"
+    },
+    {
+      "name": "pm25",
+      "value": 9.75,
+      "origin": "trung vị của tập huấn luyện (giai đoạn sau chuyển tiếp), vì yêu cầu bỏ trống"
+    },
+    {
+      "name": "pm10",
+      "value": 15.81,
+      "origin": "trung vị của tập huấn luyện (giai đoạn sau chuyển tiếp), vì yêu cầu bỏ trống"
+    },
+    {
+      "name": "nh3",
+      "value": 2.42,
+      "origin": "trung vị của tập huấn luyện (giai đoạn sau chuyển tiếp), vì yêu cầu bỏ trống"
+    },
+    {
+      "name": "coLag1h",
+      "value": 256.23,
+      "origin": "trung vị của tập huấn luyện (giai đoạn sau chuyển tiếp), vì yêu cầu bỏ trống"
+    },
+    {
+      "name": "coLag2h",
+      "value": 256.25,
+      "origin": "trung vị của tập huấn luyện (giai đoạn sau chuyển tiếp), vì yêu cầu bỏ trống"
+    },
+    {
+      "name": "coLag3h",
+      "value": 256.25,
+      "origin": "trung vị của tập huấn luyện (giai đoạn sau chuyển tiếp), vì yêu cầu bỏ trống"
+    },
+    {
+      "name": "coLag24h",
+      "value": 256.18,
+      "origin": "trung vị của tập huấn luyện (giai đoạn sau chuyển tiếp), vì yêu cầu bỏ trống"
     }
   ],
   "model": {
-    "name": "GBT",
-    "version": "MOCK-1",
+    "name": "Random Forest",
+    "version": "random-forest-20261014",
     "kind": "ml",
-    "trainedOn": "[MOCK, số minh họa, chưa huấn luyện thật] GBT huấn luyện trên bộ Kaggle (OpenWeather) 04/2022 đến 06/2025 (80% đầu theo thời gian). Không có khoảng dự đoán. Xem /api/model/metrics."
+    "trainedOn": "[MOCK] Tên và phiên bản mô hình là thật (xem /api/model/metrics); giá trị coPredicted, filledInputs ở đây là MINH HỌA, chưa có route dự đoán thật dùng mô hình. Bộ Kaggle (OpenWeather) đã làm sạch (/co/processed/aqi_clean), CHỈ giai đoạn sau chuyển tiếp: từ 2025-07-13T00:00:00+07:00 đến 2026-02-07T19:00:00+07:00 (5036 giờ), đã loại 24 giờ đầu của giai đoạn (độ trễ 24 giờ cần dữ liệu trong chính giai đoạn). Kiểm tra trên 2026-02-07T20:00:00+07:00 đến 2026-04-01T06:00:00+07:00 (1259 giờ), chỉ phủ khoảng 2 tháng cuối (mùa vụ khác với phần huấn luyện). Dữ liệu gốc đã tiền xử lý từ trước (o3 điền ở 14,9% dòng, độ ẩm/nhiệt độ có dấu hiệu nội suy)."
   }
 }

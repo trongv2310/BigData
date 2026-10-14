@@ -10,5 +10,5 @@
   "coAccumulationIndex": 26.87,
   "status": "SAFE",
   "coPredicted": 301.2,
-  "modelVersion": "MOCK-1"
+  "modelVersion": "random-forest-20261014"
 }
