@@ -305,6 +305,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/analysis/sql": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Kết quả bước 5 (Spark SQL) của pipeline - CO theo giờ, tháng, trước/sau điểm gãy, tương quan
+         * @description Nội dung /co/output/sql_analysis.json do pipeline/05_sql_analysis.py ghi. Giao diện hiển thị nguyên văn, không tự tính lại.
+         */
+        get: operations["getSqlAnalysis"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/analysis/day-clusters": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Kết quả bước 6a - phân cụm ngày theo hình dạng 24 giờ, kèm độ ổn định theo seed nếu đã chạy
+         * @description Nội dung /co/output/day_clusters.json (06a_cluster_days.py), cộng trường `stability` lấy từ /co/output/day_clusters_stability.json
+         *     (06a_cluster_stability.py), null nếu chưa chạy. Nhãn từng ngày nằm ở Parquet trên HDFS, không có trong phản hồi này.
+         */
+        get: operations["getDayClusters"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/model/metrics": {
         parameters: {
             query?: never;
@@ -488,6 +529,14 @@ export interface components {
              *     nêu ở ModelMetrics.features. null khi chưa có mô hình hoặc chưa đủ lịch sử (ví dụ chưa đủ độ trễ 24 giờ trên luồng sống): không bao giờ điền số thay thế.
              */
             coPredicted: number | null;
+            /**
+             * @description Cho biết `co` có phải điểm DỰ BÁO của nguồn chứ không phải quan sát hay giá trị lịch sử.
+             *     true: `co` là điểm dự báo của OpenWeather cho một giờ chưa tới (đo ngày 14/10/2026: lúc 16:30 nguồn trả giá trị của điểm 17:00); khi đó `coPredicted` là dự đoán của mô hình ta cho giờ đó,
+             *     và giao diện phải ghi rõ "giá trị dự báo của OpenWeather", không gọi là quan sát.
+             *     false: `co` thuộc giờ hiện hành hoặc đã qua (luồng live-openweather) hoặc là giá trị lịch sử của bộ dữ liệu (luồng replay-dataset, luôn false).
+             *     null: không xác định (bản ghi cũ trước khi có trường này, nguồn live-open-meteo, hoặc không lấy/không khớp được lịch sử OpenWeather để kiểm). Giao diện không được suy ra true hay false từ null.
+             */
+            coIsForecast: boolean | null;
             /** @description Phiên bản mô hình đã tạo `coPredicted` (trùng ModelMetrics.models[].version và PredictResponse.model.version); null khi coPredicted là null. */
             modelVersion: string | null;
         };
@@ -521,6 +570,10 @@ export interface components {
                 values: number[];
             }[];
         };
+        /**
+         * @description Dự đoán CO của giờ `hour` (giờ +07). Với mô hình ml, temperatureC, windSpeedKmh và các chất khí là giá trị của giờ NGAY TRƯỚC giờ được dự đoán (đúng như lúc huấn luyện);
+         *     đầu vào bỏ trống được backend điền bằng trung vị của tập huấn luyện và báo ở filledInputs. `dayOfWeek` hiện không mô hình nào dùng.
+         */
         PredictRequest: {
             hour: number;
             month: number;
@@ -586,6 +639,7 @@ export interface components {
              *     Có thể có thêm bảng `live` (Spark ghi từ Kafka vào HDFS /live/co_stream; chưa có dữ liệu thì bảng này không tồn tại) với các cột:
              *     datetime_vn (timestamp, giờ Việt Nam), station, co, wind_speed_kmh, temperature_C, co_accumulation_index, canh_bao,
              *     co_observed_at, weather_observed_at, provider, original_datetime_vn (chỉ bản phát lại), aqi, no, no2, o3, so2, pm2_5, pm10, nh3 (từ Bước A1, dòng cũ null),
+             *     co_actual (= co), co_is_forecast, co_predicted, model_version, feature_note (từ Bước A5; co_predicted và model_version null nếu bản ghi thiếu đầu vào cho mô hình hoặc ghi trước A5),
              *     kafka_partition, kafka_offset, kafka_timestamp (UTC). `provider` phân biệt 'openweather' (dữ liệu thật), 'replay-dataset' (phát lại, mô phỏng) và
              *     'open-meteo' (tin cũ): bảng chứa lẫn các nguồn nên luôn lọc theo provider, không trộn vào một chuỗi. Khác bộ Kaggle, nên cũng không trộn với bảng `aqi`.
              *     Giá trị timestamp trả về dạng chuỗi "yyyy-MM-dd HH:mm:ss". Lần gọi đầu tiên khởi động Spark nên có thể mất 10 giây trở lên.
@@ -671,8 +725,12 @@ export interface components {
             /** @description Giải thích bằng chữ khi stopped hoặc không điều khiển được; null khi bình thường */
             detail: string | null;
         };
-        /** @enum {string} */
-        PipelineStepState: "notStarted" | "running" | "done" | "failed";
+        /**
+         * @description notStarted: chưa chạy. running: đang chạy. partial: một phần của bước đã xong nhưng bước chưa xong (ví dụ cluster-and-model mới có phân cụm ngày 6a, chưa có mô hình 6b);
+         *     không có tiến trình nào đang chạy, và `detail` nói rõ phần nào xong, phần nào chưa. done: xong. failed: lỗi, lý do ở `detail`.
+         * @enum {string}
+         */
+        PipelineStepState: "notStarted" | "running" | "partial" | "done" | "failed";
         PipelineStep: {
             order: number;
             /**
@@ -699,6 +757,186 @@ export interface components {
             generatedAt: components["schemas"]["DateTime"];
             steps: components["schemas"]["PipelineStep"][];
         };
+        SqlAnalysisStat: {
+            n: number;
+            /** @description µg/m³ */
+            mean: number | null;
+            /** @description µg/m³ */
+            median: number | null;
+        };
+        SqlAnalysisHour: {
+            /** @description Giờ +07 */
+            hour: number;
+            n: number;
+            mean: number | null;
+            median: number | null;
+        };
+        SqlAnalysisPeriod: {
+            n: number;
+            mean: number | null;
+            std: number | null;
+            min: number | null;
+            max: number | null;
+            p10: number | null;
+            median: number | null;
+            p90: number | null;
+        };
+        /** @description Hệ số Pearson của CO với từng biến (khóa là tên biến); null khi không tính được (ví dụ biến hằng số) */
+        SqlAnalysisCorrelation: {
+            [key: string]: number | null;
+        };
+        SqlAnalysis: {
+            generatedAt: components["schemas"]["DateTime"];
+            /** @description Đường dẫn HDFS của dữ liệu đã làm sạch */
+            source: string;
+            rows: number;
+            /** @description Mốc điểm gãy theo giờ +07, dạng yyyy-MM-dd HH:mm. Là quy ước; xem dailyAroundBreak */
+            breakVn: string;
+            hourly: {
+                all: components["schemas"]["SqlAnalysisHour"][];
+                before: components["schemas"]["SqlAnalysisHour"][];
+                after: components["schemas"]["SqlAnalysisHour"][];
+            };
+            /** @description CO theo tháng; tháng đầu và cuối chỉ có một phần dữ liệu (xem n) */
+            monthly: {
+                year: number;
+                month: number;
+                n: number;
+                mean: number | null;
+                median: number | null;
+                max: number | null;
+            }[];
+            periods: {
+                before: components["schemas"]["SqlAnalysisPeriod"];
+                after: components["schemas"]["SqlAnalysisPeriod"];
+                /** @description Thay đổi CO trung bình trước -> sau, % (so thô, không loại mùa vụ) */
+                meanChangePct?: number | null;
+                medianChangePct?: number | null;
+            };
+            /** @description So cùng tháng lịch với cùng tháng lịch (giai đoạn sau chỉ phủ các tháng trong `months`) */
+            seasonalLikeForLike: {
+                before: components["schemas"]["SqlAnalysisStat"];
+                after: components["schemas"]["SqlAnalysisStat"];
+                months: number[];
+                meanChangePct?: number | null;
+            };
+            seasonalByMonth: {
+                month: number;
+                before: null | {
+                    n: number;
+                    mean: number | null;
+                };
+                after: null | {
+                    n: number;
+                    mean: number | null;
+                };
+                /** @description null khi thiếu một bên, không bịa */
+                changePct: number | null;
+            }[];
+            /** @description CO trung bình từng ngày (+07) quanh điểm gãy; cho thấy mức giảm là chuyển tiếp kéo dài chứ không phải một bước nhảy tức thời */
+            dailyAroundBreak: {
+                date: string;
+                n: number;
+                mean: number | null;
+            }[];
+            /** @description Tương quan Pearson của CO với từng biến. `all` trộn hai mức CO của hai giai đoạn nên không thay được `before` và `after`. Tương quan không phải nhân quả. */
+            correlation: {
+                variables: string[];
+                all: components["schemas"]["SqlAnalysisCorrelation"];
+                before: components["schemas"]["SqlAnalysisCorrelation"];
+                after: components["schemas"]["SqlAnalysisCorrelation"];
+            };
+        };
+        DayClusterInfo: {
+            cluster: number;
+            days: number;
+            /** @description µg/m³, trung bình của CO trung bình mỗi ngày trong cụm */
+            meanDailyCo: number;
+            medianDailyCo: number;
+            /** @description Tỷ lệ ngày trong cụm thuộc giai đoạn sau điểm gãy */
+            afterBreakShare: number;
+            weekendShare: number;
+            /** @description Tâm cụm = hình dạng 24 giờ (CO từng giờ / CO trung bình ngày); phần tử i là giờ +07 thứ i */
+            center: number[];
+            peakHour: number;
+            troughHour: number;
+            /** @description Tâm cụm: giá trị cao nhất chia thấp nhất */
+            peakToTrough: number;
+        };
+        DayClusterStabilityK: {
+            silhouetteBySeed: {
+                [key: string]: number;
+            };
+            silhouetteMin: number;
+            silhouetteMean: number;
+            silhouetteMax: number;
+            /** @description Chỉ số Rand điều chỉnh so với seed gốc, theo seed (1 = giống hệt, gần 0 = như ngẫu nhiên) */
+            ariVsBaseSeed: {
+                [key: string]: number;
+            };
+            ariPairwiseMin: number;
+            ariPairwiseMean: number;
+            sizesBySeed: {
+                [key: string]: number[];
+            };
+        };
+        DayClusterStability: {
+            generatedAt: components["schemas"]["DateTime"];
+            source: string;
+            seeds: number[];
+            baseSeed: number;
+            daysUsed: number;
+            /** @description k được chọn (silhouette lớn nhất) theo từng seed */
+            chosenKBySeed: {
+                [key: string]: number;
+            };
+            silhouetteTableBySeed: {
+                [key: string]: {
+                    k: number;
+                    silhouette: number;
+                }[];
+            };
+            /** @description Khóa là k (chỉ có "2" và "3") */
+            stability: {
+                [key: string]: components["schemas"]["DayClusterStabilityK"];
+            };
+            k3: {
+                silhouette: number;
+                clusters: components["schemas"]["DayClusterInfo"][];
+            };
+            notes: string[];
+        };
+        DayClusters: {
+            generatedAt: components["schemas"]["DateTime"];
+            source: string;
+            /** @description Điểm phân cụm là gì (hình dạng đã chuẩn hóa theo trung bình ngày, không phải CO thô) */
+            mode: string;
+            /** @description Tiêu chí chọn k */
+            criterion: string;
+            seed: number;
+            maxIter: number;
+            daysUsed: number;
+            daysExcludedIncomplete: number;
+            daysTotal: number;
+            firstDay: string;
+            lastDay: string;
+            /** @description Số cụm được chọn theo tiêu chí */
+            k: number;
+            silhouette: number;
+            /** @description Nhãn chữ cho silhouette (rõ, yếu, gần như không có cấu trúc cụm) */
+            structure: string;
+            /** @description Silhouette của từng k đã thử (seed gốc) */
+            selection: {
+                k: number;
+                silhouette: number;
+                wssse: number;
+                sizes: number[];
+            }[];
+            clusters: components["schemas"]["DayClusterInfo"][];
+            notes: string[];
+            /** @description Độ ổn định theo seed và kết quả k=3; null nếu chưa chạy 06a_cluster_stability.py */
+            stability: null | components["schemas"]["DayClusterStability"];
+        };
         ErrorMetrics: {
             /** @description µg/m³ */
             rmse: number;
@@ -712,12 +950,105 @@ export interface components {
             to: components["schemas"]["DateTime"];
             rows: number;
         };
+        ModelResult: {
+            name: string;
+            /** @enum {string} */
+            kind: "linear-regression" | "random-forest" | "gbt";
+            /** @description Ví dụ random-forest-20261014; trùng AqiReading.modelVersion và PredictResponse.model.version khi là mô hình được dùng */
+            version: string;
+            /**
+             * @description Mô hình tốt nhất của phương án, chọn theo RMSE trên đoạn kiểm định (20% cuối của tập huấn luyện), KHÔNG chọn trên tập kiểm tra; đúng một phần tử true mỗi phương án.
+             *     Ở phương án chính đây là mô hình được lưu và dùng cho /api/predict và coPredicted. Mô hình có RMSE kiểm tra thấp nhất có thể khác mô hình isBest.
+             */
+            isBest: boolean;
+            test: components["schemas"]["ErrorMetrics"];
+            /** @description RMSE trên tập kiểm tra thấp hơn mốc 'CO giờ trước' (do pipeline tính, giao diện không tự so) */
+            beatsPreviousHour: boolean;
+            /** @description RMSE trên tập kiểm tra thấp hơn mốc 'trung bình theo giờ trong ngày' */
+            beatsHourlyMean: boolean;
+            /** @description Siêu tham số chính và RMSE kiểm định, nếu có */
+            params: string | null;
+        };
+        BaselineResult: {
+            /** @enum {string} */
+            id: "previous-hour" | "hourly-mean";
+            name: string;
+            /** @description Cách tính mốc; mốc trung bình theo giờ lấy từ tập huấn luyện của đúng phương án đó */
+            description: string;
+            test: components["schemas"]["ErrorMetrics"];
+        };
+        /** @description Một phương án chia dữ liệu và kết quả của nó (ngoài phương án chính); chỉ để so sánh, mô hình của các phương án này không được lưu */
+        ModelSetup: {
+            /** @enum {string} */
+            id: "full-80-20" | "full-with-regime";
+            title: string;
+            /** @description Mô tả đúng cách chia, những gì loại bỏ, và hạn chế của phương án */
+            description: string;
+            features: string[];
+            trainSet: components["schemas"]["DataSplitInfo"];
+            testSet: components["schemas"]["DataSplitInfo"];
+            splitMethod: string;
+            models: components["schemas"]["ModelResult"][];
+            baselines: components["schemas"]["BaselineResult"][];
+            conclusion: string;
+        };
+        /** @description Ranh giới chuyển tiếp của điểm gãy dữ liệu, xác định theo DỮ LIỆU (không theo mốc 01/07/2025). Ranh giới KHÔNG duy nhất: các cửa sổ khớp cho các khoảng khác nhau. */
+        ModelTransition: {
+            method: string;
+            /** @description Ngày cuối (yyyy-MM-dd) của các năm tham chiếu dùng để khử mùa vụ */
+            referenceEnd: string;
+            seasonHalfWidthDays: number;
+            /** @description Điểm cắt tốt nhất của bước đơn trên chuỗi đã khử mùa vụ (yyyy-MM-dd) */
+            stepDate: string;
+            /** @description Phần dư trung bình (log CO) trước điểm cắt */
+            stepResidualBefore: number;
+            stepResidualAfter: number;
+            windows: {
+                halfWidthDays: number;
+                from: string;
+                to: string;
+                lengthDays: number;
+                residualBefore: number;
+                residualAfter: number;
+            }[];
+            main: {
+                halfWidthDays: number;
+                from: string;
+                to: string;
+            };
+            /** @description Phần dư trung bình theo tháng (log CO trừ mùa vụ) từ sau các năm tham chiếu; cho thấy CO giảm dần chứ không nhảy một bước */
+            monthlyResidual: {
+                month: string;
+                meanLogResidual: number;
+                days: number;
+            }[];
+            /** @description Số ngày chuyển tiếp bị loại khỏi tập huấn luyện của phương án chính và phương án có biến chế độ */
+            excludedDays: number;
+            excludedFrom: string;
+            excludedTo: string;
+            /** @description Ngày đầu của giai đoạn sau chuyển tiếp (yyyy-MM-dd) dùng cho phương án chính */
+            postStart: string;
+            /** @description Phương án chính huấn luyện lại với điểm bắt đầu giai đoạn sau khác nhau, cùng tập kiểm tra */
+            sensitivity: {
+                label: string;
+                postStart: string;
+                trainRows: number;
+                /** @enum {string} */
+                kind: "linear-regression" | "random-forest" | "gbt";
+                test: components["schemas"]["ErrorMetrics"];
+            }[];
+            note: string;
+        };
+        /**
+         * @description Phương án CHÍNH (huấn luyện và kiểm tra trong giai đoạn sau chuyển tiếp) nằm ở các trường cấp cao nhất; các phương án so sánh nằm ở `alternatives`.
+         *     Nguyên nhân của điểm gãy dữ liệu chưa xác định (breakpoint.cause); không được diễn giải là CO ngoài đời giảm thật.
+         */
         ModelMetrics: {
             generatedAt: components["schemas"]["DateTime"];
-            /** @description Mô hình dự đoán đại lượng gì, ví dụ CO (µg/m³) của giờ t từ thông tin đến giờ t-1 */
+            /** @description Mô hình dự đoán đại lượng gì: CO (µg/m³) của giờ t từ thông tin đến giờ t-1 */
             target: string;
             horizonHours: number;
-            /** @description Tên các đầu vào của mô hình (khớp trường của PredictRequest khi có) */
+            /** @description Tên các đầu vào của mô hình (khớp trường của PredictRequest khi có); temperatureC, windSpeedKmh và các chất khác là của giờ ngay trước giờ được dự đoán */
             features: string[];
             /** @description Mô tả đúng dữ liệu và khoảng thời gian huấn luyện, nguồn, những gì đã loại bỏ */
             trainedOn: string;
@@ -725,40 +1056,25 @@ export interface components {
             testSet: components["schemas"]["DataSplitInfo"];
             /** @description Cách chia, phải theo thời gian (đầu huấn luyện, cuối kiểm tra), không xáo ngẫu nhiên */
             splitMethod: string;
-            models: {
-                name: string;
-                /** @enum {string} */
-                kind: "linear-regression" | "random-forest" | "gbt";
-                version: string;
-                /** @description Mô hình được lưu và dùng cho /api/predict và coPredicted; đúng một phần tử true */
-                isBest: boolean;
-                test: components["schemas"]["ErrorMetrics"];
-                /** @description RMSE trên tập kiểm tra thấp hơn mốc 'CO giờ trước' (do pipeline tính, giao diện không tự so) */
-                beatsPreviousHour: boolean;
-                /** @description RMSE trên tập kiểm tra thấp hơn mốc 'trung bình theo giờ trong ngày' */
-                beatsHourlyMean: boolean;
-                /** @description Siêu tham số chính, nếu có */
-                params: string | null;
-            }[];
-            /** @description Hai mốc so sánh, tính trên đúng tập kiểm tra của mô hình */
-            baselines: {
-                /** @enum {string} */
-                id: "previous-hour" | "hourly-mean";
-                name: string;
-                description: string;
-                test: components["schemas"]["ErrorMetrics"];
-            }[];
+            models: components["schemas"]["ModelResult"][];
+            /** @description Hai mốc so sánh, tính trên đúng tập kiểm tra của phương án */
+            baselines: components["schemas"]["BaselineResult"][];
             /** @description Kết luận trung thực do pipeline ghi, kể cả khi không mô hình nào thắng mốc */
             conclusion: string;
             breakpoint: {
+                /** @description Thời điểm bắt đầu giai đoạn sau chuyển tiếp dùng cho phương án chính (không phải mốc 01/07) */
                 date: components["schemas"]["DateTime"];
                 /** @enum {string} */
                 strategy: "indicator-feature" | "separate-training" | "none";
-                /** @description Cách xử lý điểm gãy 01/07/2025 (CO giảm mạnh) */
+                /** @description Cách xử lý điểm gãy */
                 description: string;
                 /** @description Ảnh hưởng đã đo của cách xử lý lên chỉ số; null nếu chưa đo */
                 effect: string | null;
+                /** @description Nguyên nhân của điểm gãy dữ liệu: hiện là CHƯA XÁC ĐỊNH, kèm những gì đã kiểm */
+                cause: string;
             };
+            transition: components["schemas"]["ModelTransition"];
+            alternatives: components["schemas"]["ModelSetup"][];
         };
         /** @description Phần chung của mọi sự kiện WebSocket /ws/stream */
         StreamEnvelope: {
@@ -1116,6 +1432,15 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            /** @description Có mô hình đã huấn luyện nhưng không nạp hoặc chạy được (mã PREDICT_UNAVAILABLE), hoặc thiếu bộ dữ liệu cho heuristic */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
     runSql: {
@@ -1282,6 +1607,91 @@ export interface operations {
                     "application/json": components["schemas"]["PipelineSteps"];
                 };
             };
+            /** @description Không đọc được HDFS hoặc step_summary.json hỏng (mã PIPELINE_UNAVAILABLE); backend không đoán trạng thái */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getSqlAnalysis: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SqlAnalysis"];
+                };
+            };
+            /** @description Chưa chạy bước 5 (mã ANALYSIS_NOT_READY) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Không đọc được HDFS hoặc tệp hỏng (mã ANALYSIS_UNAVAILABLE) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getDayClusters: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DayClusters"];
+                };
+            };
+            /** @description Chưa chạy bước 6a (mã ANALYSIS_NOT_READY) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Không đọc được HDFS hoặc tệp hỏng (mã ANALYSIS_UNAVAILABLE) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
     getModelMetrics: {
@@ -1304,6 +1714,15 @@ export interface operations {
             };
             /** @description Chưa huấn luyện mô hình (mã MODEL_NOT_TRAINED) */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Không đọc được HDFS hoặc model_metrics.json hỏng (mã MODEL_UNAVAILABLE) */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

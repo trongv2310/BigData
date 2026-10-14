@@ -153,3 +153,36 @@ export function formatDataAge(datetimeStr?: string | null, currentTime: number =
   const remMinutes = diffMinutes % 60;
   return `cách đây ${diffHours} giờ ${remMinutes > 0 ? `${remMinutes} phút` : ''}`;
 }
+
+/**
+ * Trả về thông tin nhãn và phong cách cho cờ coIsForecast
+ * - true: giá trị dự báo của OpenWeather cho giờ tới (nhận sớm ~30 phút)
+ * - false: giá trị quan sát của nguồn (hoặc dữ liệu lịch sử)
+ * - null: chưa rõ là quan sát hay dự báo (không tự suy đoán)
+ */
+export function getForecastStatus(coIsForecast?: boolean | null): {
+  label: string;
+  badgeClass: string;
+  description: string;
+} {
+  if (coIsForecast === true) {
+    return {
+      label: 'giá trị dự báo của OpenWeather',
+      badgeClass: 'bg-amber-500/20 text-amber-300 border border-amber-500/40',
+      description: 'Giá trị dự báo của OpenWeather cho giờ tới (nhận sớm ~30 phút), không phải quan sát',
+    };
+  }
+  if (coIsForecast === false) {
+    return {
+      label: 'giá trị quan sát của nguồn',
+      badgeClass: 'bg-cyan-500/10 text-cyan-300 border border-cyan-500/30',
+      description: 'Số từ mô hình khí quyển của OpenWeather, không phải cảm biến mặt đất',
+    };
+  }
+  return {
+    label: 'chưa rõ là quan sát hay dự báo',
+    badgeClass: 'bg-slate-800 text-slate-400 border border-slate-700',
+    description: 'Chưa xác định cờ dự báo từ nguồn hoặc bản ghi cũ, không tự suy đoán',
+  };
+}
+
