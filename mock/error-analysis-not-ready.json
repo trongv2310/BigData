@@ -1,0 +1,6 @@
+{
+  "error": {
+    "code": "ANALYSIS_NOT_READY",
+    "message": "Chưa có kết quả phân tích này trên HDFS (/co/output); chạy bước 5 hoặc 6a của pipeline. Xem /api/pipeline/steps."
+  }
+}

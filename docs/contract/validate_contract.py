@@ -132,6 +132,40 @@ if [s_["id"] for s_ in steps] != want_ids:
 for s_ in steps:
     if s_["state"] == "notStarted" and (s_["updatedAt"] is not None or s_["summary"]):
         err(f"pipeline-steps.json: bước {s_['order']} notStarted nhưng có updatedAt hoặc summary")
+    if s_["state"] != "notStarted" and s_["updatedAt"] is None:
+        err(f"pipeline-steps.json: bước {s_['order']} đã bắt đầu ({s_['state']}) nhưng thiếu updatedAt")
+    if s_["state"] == "partial" and not s_["detail"]:
+        err(f"pipeline-steps.json: bước {s_['order']} partial phải có detail nói rõ phần nào xong, phần nào chưa")
+
+# kết quả phân tích (số thật của pipeline): các tổng phải khớp nhau
+sa = load("analysis-sql.json")
+if sa["periods"]["before"]["n"] + sa["periods"]["after"]["n"] != sa["rows"]:
+    err("analysis-sql.json: n trước + n sau phải bằng rows")
+if sum(h["n"] for h in sa["hourly"]["all"]) != sa["rows"] or len(sa["hourly"]["all"]) != 24:
+    err("analysis-sql.json: hourly.all phải đủ 24 giờ và tổng n bằng rows")
+if sum(m["n"] for m in sa["monthly"]) != sa["rows"]:
+    err("analysis-sql.json: tổng n theo tháng phải bằng rows")
+for name in ("analysis-day-clusters.json", "analysis-day-clusters-nostability.json"):
+    dcm = load(name)
+    if len(dcm["clusters"]) != dcm["k"] or sorted(c_["cluster"] for c_ in dcm["clusters"]) != list(range(dcm["k"])):
+        err(f"{name}: số cụm phải bằng k và đánh số 0..k-1")
+    if sum(c_["days"] for c_ in dcm["clusters"]) != dcm["daysUsed"]:
+        err(f"{name}: tổng số ngày của các cụm phải bằng daysUsed")
+    if dcm["daysUsed"] + dcm["daysExcludedIncomplete"] != dcm["daysTotal"]:
+        err(f"{name}: daysUsed + daysExcludedIncomplete phải bằng daysTotal")
+    sel = {t["k"]: t["silhouette"] for t in dcm["selection"]}
+    if sel.get(dcm["k"]) != dcm["silhouette"] or dcm["silhouette"] != max(sel.values()):
+        err(f"{name}: k đã chọn phải có silhouette lớn nhất trong selection")
+    if any(len(c_["center"]) != 24 for c_ in dcm["clusters"]):
+        err(f"{name}: tâm cụm phải có 24 giá trị")
+    stab = dcm["stability"]
+    if stab is not None:
+        if sorted(stab["chosenKBySeed"]) != sorted(str(x) for x in stab["seeds"]) or str(stab["baseSeed"]) not in stab["chosenKBySeed"]:
+            err(f"{name}: chosenKBySeed phải có đủ các seed")
+        if sum(c_["days"] for c_ in stab["k3"]["clusters"]) != stab["daysUsed"]:
+            err(f"{name}: tổng ngày của các cụm k=3 phải bằng daysUsed")
+        if stab["stability"]["2"]["silhouetteBySeed"][str(stab["baseSeed"])] != dcm["silhouette"] and dcm["k"] == 2:
+            err(f"{name}: silhouette k=2 của seed gốc trong stability phải bằng silhouette của kết quả chính")
 
 mm = load("model-metrics.json")
 best = [m_ for m_ in mm["models"] if m_["isBest"]]

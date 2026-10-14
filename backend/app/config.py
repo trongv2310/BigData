@@ -71,6 +71,10 @@ if not 0 < CO_WARNING_UG < CO_DANGER_UG:
 
 # Trạng thái 9 bước pipeline do các script trong pipeline/ ghi (backend chỉ đọc), xem app/pipeline_steps.py
 PIPELINE_SUMMARY_PATH = _env("PIPELINE_SUMMARY_PATH", "/co/output/step_summary.json")
+# Kết quả bước 5 và 6a (backend chỉ đọc, xem app/routes/analysis.py)
+ANALYSIS_SQL_PATH = _env("ANALYSIS_SQL_PATH", "/co/output/sql_analysis.json")
+ANALYSIS_CLUSTERS_PATH = _env("ANALYSIS_CLUSTERS_PATH", "/co/output/day_clusters.json")
+ANALYSIS_CLUSTERS_STABILITY_PATH = _env("ANALYSIS_CLUSTERS_STABILITY_PATH", "/co/output/day_clusters_stability.json")
 
 # Luồng PHÁT LẠI (infra/replay_kafka_producer.py): backend đọc trạng thái và ghi lệnh qua tệp cục bộ trong thư mục này (không qua HDFS/Kafka/Spark).
 # REPLAY_CONTROL=0 để backend không điều khiển được (chỉ xem trạng thái). Luồng dữ liệu thật không bao giờ bị điều khiển.

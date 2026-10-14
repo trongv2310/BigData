@@ -1,0 +1,6 @@
+{
+  "error": {
+    "code": "PIPELINE_UNAVAILABLE",
+    "message": "Không đọc được /co/output/step_summary.json trên HDFS (HdfsUnreachable); không biết trạng thái pipeline."
+  }
+}

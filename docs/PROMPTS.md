@@ -52,6 +52,20 @@ Bạn là agent frontend. Đọc lại AGENTS.md mục 5, docs/TASKS.md (D3 đã
 Backend đổi ngưỡng CO sang thang OpenWeather: SAFE < 4400, WARNING từ 4400, DANGER từ 12400 µg/m³ (ví dụ 1280 µg/m³ giờ là SAFE). Việc: (1) sửa đoạn chữ cố định "500 và 1000 µg/m³ ... kế thừa từ spark_streaming_consumer.py" ở AqiTab.tsx (~dòng 442) thành mô tả đúng; chỉ ghi ngưỡng như thông tin (thang CO của OpenWeather), vẫn hiển thị status do backend trả, không tự tính, không gọi là quy chuẩn Việt Nam; có thể nói 4400 xấp xỉ hướng dẫn 24 giờ 4 mg/m³ của WHO 2021. (2) Sửa ghi chú ở Tổng quan "chưa có quy chuẩn chính thức" cho khớp (đừng khẳng định đó là quy chuẩn). (3) npm run generate:types, lint và build sạch, xem trên trình duyệt với backend thật, ghi HANDOFF và mở PR.
 ```
 
+## Antigravity (frontend) — P19: trạng thái `partial` và kết quả phân tích bước 5, 6a (hợp đồng 0.3.0, mock đã sẵn)
+
+```
+Bạn là agent frontend. Đọc lại AGENTS.md, docs/HANDOFF.md (Backend, mục A3b 14/10/2026, cùng mục A3 và A2), docs/contract/openapi.yaml (PipelineStepState, SqlAnalysis, DayClusters) và chạy mock (python mock/serve.py). Chỉ sửa frontend/ và mục "Frontend" của HANDOFF; thiếu trường thì ghi yêu cầu, đừng tự suy ra. Chạy npm run generate:types trước.
+1. Trạng thái bước pipeline có thêm `partial`: hiện "mới xong một phần" (khác "đang chạy": không có tiến trình nào chạy) và LUÔN hiện `detail` của bước đó.
+2. Trang (hoặc tab) kết quả phân tích, đọc GET /api/analysis/sql và GET /api/analysis/day-clusters (thử ?mock=notready, ?mock=nostability, và trạng thái 503). Hiển thị nguyên văn số backend trả, không tự tính lại:
+   - So sánh trước/sau 01/07/2025: số thô (periods) VÀ số cùng tháng lịch (seasonalLikeForLike, seasonalByMonth). Đồ thị CO trung bình theo ngày quanh điểm gãy (dailyAroundBreak) để thấy đây là chuyển tiếp khoảng hai tuần chứ không phải một bước nhảy; ghi chú rõ: nguyên nhân điểm gãy dữ liệu chưa xác định, không kết luận CO ngoài đời giảm thật (nguồn: OpenWeather, cũng có ở bản raw).
+   - CO theo giờ (hourly.before/after), theo tháng (monthly; tháng đầu và cuối chỉ có một phần dữ liệu, xem n).
+   - Tương quan: bảng TÁCH theo giai đoạn (before, after); cột "all" nếu hiện phải kèm chú thích trộn hai mức CO; nhắc đây là tương quan, không phải nhân quả. Không dùng cho gió/nhiệt độ để kết luận nguyên nhân.
+   - Phân cụm ngày: tâm cụm 24 giờ (center, giờ +07) của k đã chọn, bảng silhouette theo k (selection), cấu trúc "yếu" (structure) phải thấy rõ; kèm stability (nếu không null): k nào được chọn theo từng seed, silhouette và ARI của k=2 và k=3, cụm k=3. Nói rõ k=2 không ổn định ở mọi seed còn k=3 thì ổn định.
+3. Không trộn các số này với luồng sống (live-openweather) hay phát lại trên cùng một biểu đồ; bộ dữ liệu này là lịch sử Kaggle/OpenWeather 04/2022 đến 03/2026.
+Quy ước hiển thị: số mock trong pipeline-steps.json và model-metrics.json là minh họa (có nhãn [MOCK]); analysis-sql.json và analysis-day-clusters.json là kết quả thật.
+```
+
 ## Lead duyệt PR của frontend
 
 ```

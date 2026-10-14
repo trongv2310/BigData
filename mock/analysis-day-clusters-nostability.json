@@ -1,0 +1,184 @@
+{
+  "generatedAt": "2026-10-14T14:28:11+07:00",
+  "source": "/co/processed/aqi_clean",
+  "mode": "shape (CO từng giờ chia cho CO trung bình của ngày)",
+  "criterion": "silhouette lớn nhất (squaredEuclidean) trong k=2..8; hòa thì k nhỏ hơn",
+  "seed": 42,
+  "maxIter": 100,
+  "daysUsed": 1460,
+  "daysExcludedIncomplete": 2,
+  "daysTotal": 1462,
+  "firstDay": "2022-04-02",
+  "lastDay": "2026-03-31",
+  "k": 2,
+  "silhouette": 0.4452,
+  "structure": "yếu",
+  "selection": [
+    {
+      "k": 2,
+      "silhouette": 0.4452,
+      "wssse": 4317.5072,
+      "sizes": [
+        1073,
+        387
+      ]
+    },
+    {
+      "k": 3,
+      "silhouette": 0.4426,
+      "wssse": 3234.0863,
+      "sizes": [
+        710,
+        409,
+        341
+      ]
+    },
+    {
+      "k": 4,
+      "silhouette": 0.3617,
+      "wssse": 2880.1539,
+      "sizes": [
+        579,
+        372,
+        273,
+        236
+      ]
+    },
+    {
+      "k": 5,
+      "silhouette": 0.337,
+      "wssse": 2622.0294,
+      "sizes": [
+        520,
+        360,
+        243,
+        197,
+        140
+      ]
+    },
+    {
+      "k": 6,
+      "silhouette": 0.3268,
+      "wssse": 2412.1172,
+      "sizes": [
+        441,
+        316,
+        225,
+        215,
+        134,
+        129
+      ]
+    },
+    {
+      "k": 7,
+      "silhouette": 0.3029,
+      "wssse": 2277.5723,
+      "sizes": [
+        401,
+        255,
+        201,
+        189,
+        172,
+        128,
+        114
+      ]
+    },
+    {
+      "k": 8,
+      "silhouette": 0.3083,
+      "wssse": 2141.9405,
+      "sizes": [
+        397,
+        258,
+        206,
+        143,
+        139,
+        122,
+        105,
+        90
+      ]
+    }
+  ],
+  "clusters": [
+    {
+      "cluster": 0,
+      "days": 387,
+      "meanDailyCo": 1641.82,
+      "medianDailyCo": 1629.43,
+      "afterBreakShare": 0.0413,
+      "weekendShare": 0.2636,
+      "center": [
+        1.1116,
+        0.9552,
+        0.8437,
+        0.7946,
+        0.7502,
+        0.6936,
+        0.6889,
+        0.7775,
+        0.7371,
+        0.7659,
+        0.7411,
+        0.5657,
+        0.4963,
+        0.4752,
+        0.5249,
+        0.6058,
+        0.6623,
+        0.9065,
+        1.3513,
+        1.7299,
+        1.8995,
+        1.956,
+        1.9891,
+        1.9781
+      ],
+      "peakHour": 22,
+      "troughHour": 13,
+      "peakToTrough": 4.19
+    },
+    {
+      "cluster": 1,
+      "days": 1073,
+      "meanDailyCo": 971.1,
+      "medianDailyCo": 691.49,
+      "afterBreakShare": 0.2404,
+      "weekendShare": 0.2945,
+      "center": [
+        1.3194,
+        1.2109,
+        1.1449,
+        1.1382,
+        1.1239,
+        1.0829,
+        1.0879,
+        1.2119,
+        1.1237,
+        1.1194,
+        1.0567,
+        0.794,
+        0.708,
+        0.6797,
+        0.7074,
+        0.747,
+        0.7622,
+        0.8369,
+        0.9666,
+        1.0263,
+        1.0155,
+        1.0191,
+        1.0392,
+        1.0784
+      ],
+      "peakHour": 0,
+      "troughHour": 13,
+      "peakToTrough": 1.94
+    }
+  ],
+  "notes": [
+    "Hình dạng đã loại mức CO, nên cụm không chỉ là 'giai đoạn trước/sau 01/07/2025'; afterBreakShare cho biết cụm nghiêng về giai đoạn nào.",
+    "Giờ tính theo +07; ngày đầu (01/04/2022) và ngày cuối (01/04/2026) thiếu giờ nên bị loại.",
+    "Silhouette 0.4452 nghĩa là cấu trúc cụm yếu (quy ước Kaufman và Rousseeuw 1990)."
+  ],
+  "stability": null
+}

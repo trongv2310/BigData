@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: CO HCMC Dashboard API
-  version: 0.2.0
+  version: 0.3.0
   description: |
     Hợp đồng giữa backend (Claude, lead) và frontend (Antigravity).
     Chỉ lead được sửa file này. Muốn thêm hoặc đổi trường: ghi vào docs/HANDOFF.md hoặc mở PR riêng sửa contract.
@@ -14,6 +14,7 @@ info:
     - Kênh thời gian thực (WebSocket) mô tả ở docs/contract/events.md; schema sự kiện là StreamEvent ở dưới.
     - Hai luồng dữ liệu chạy song song và không bao giờ trộn vào một đường biểu đồ: PHÁT LẠI (`source=replay-dataset`, mô phỏng từ bộ lịch sử)
       và DỮ LIỆU THẬT (`source=live-openweather`). `live-open-meteo` là nguồn khác, không bật mặc định.
+    - Thay đổi 0.3.0: PipelineStepState thêm `partial`; thêm GET /api/analysis/sql và GET /api/analysis/day-clusters (kết quả bước 5 và 6a của pipeline).
     - Thay đổi 0.2.0 (Bước 0): AqiReading thêm originalDatetime, coPredicted, modelVersion; /api/aqi/latest nhận `source`; thêm /api/replay/*,
       /api/pipeline/steps, /api/model/metrics; /api/predict có thể trả kind=ml. Route mới có mock ngay, backend thật làm dần (xem docs/HANDOFF.md).
 servers:
@@ -292,6 +293,55 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/PipelineSteps" }
+        "503":
+          description: Không đọc được HDFS hoặc step_summary.json hỏng (mã PIPELINE_UNAVAILABLE); backend không đoán trạng thái
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  /api/analysis/sql:
+    get:
+      summary: Kết quả bước 5 (Spark SQL) của pipeline - CO theo giờ, tháng, trước/sau điểm gãy, tương quan
+      operationId: getSqlAnalysis
+      description: Nội dung /co/output/sql_analysis.json do pipeline/05_sql_analysis.py ghi. Giao diện hiển thị nguyên văn, không tự tính lại.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SqlAnalysis" }
+        "404":
+          description: Chưa chạy bước 5 (mã ANALYSIS_NOT_READY)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "503":
+          description: Không đọc được HDFS hoặc tệp hỏng (mã ANALYSIS_UNAVAILABLE)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  /api/analysis/day-clusters:
+    get:
+      summary: Kết quả bước 6a - phân cụm ngày theo hình dạng 24 giờ, kèm độ ổn định theo seed nếu đã chạy
+      operationId: getDayClusters
+      description: |
+        Nội dung /co/output/day_clusters.json (06a_cluster_days.py), cộng trường `stability` lấy từ /co/output/day_clusters_stability.json
+        (06a_cluster_stability.py), null nếu chưa chạy. Nhãn từng ngày nằm ở Parquet trên HDFS, không có trong phản hồi này.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DayClusters" }
+        "404":
+          description: Chưa chạy bước 6a (mã ANALYSIS_NOT_READY)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "503":
+          description: Không đọc được HDFS hoặc tệp hỏng (mã ANALYSIS_UNAVAILABLE)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
   /api/model/metrics:
     get:
       summary: Chỉ số của mô hình dự đoán CO trên tập kiểm tra, kèm hai mốc so sánh
@@ -773,7 +823,10 @@ components:
 
     PipelineStepState:
       type: string
-      enum: [notStarted, running, done, failed]
+      enum: [notStarted, running, partial, done, failed]
+      description: |
+        notStarted: chưa chạy. running: đang chạy. partial: một phần của bước đã xong nhưng bước chưa xong (ví dụ cluster-and-model mới có phân cụm ngày 6a, chưa có mô hình 6b);
+        không có tiến trình nào đang chạy, và `detail` nói rõ phần nào xong, phần nào chưa. done: xong. failed: lỗi, lý do ở `detail`.
     PipelineStep:
       type: object
       additionalProperties: false
@@ -817,6 +870,240 @@ components:
           minItems: 9
           maxItems: 9
           items: { $ref: "#/components/schemas/PipelineStep" }
+
+    SqlAnalysisStat:
+      type: object
+      additionalProperties: false
+      required: [n, mean, median]
+      properties:
+        n: { type: integer, minimum: 0 }
+        mean: { type: [number, "null"], description: "µg/m³" }
+        median: { type: [number, "null"], description: "µg/m³" }
+    SqlAnalysisHour:
+      type: object
+      additionalProperties: false
+      required: [hour, n, mean, median]
+      properties:
+        hour: { type: integer, minimum: 0, maximum: 23, description: "Giờ +07" }
+        n: { type: integer, minimum: 0 }
+        mean: { type: [number, "null"] }
+        median: { type: [number, "null"] }
+    SqlAnalysisPeriod:
+      type: object
+      additionalProperties: false
+      required: [n, mean, std, min, max, p10, median, p90]
+      properties:
+        n: { type: integer, minimum: 0 }
+        mean: { type: [number, "null"] }
+        std: { type: [number, "null"] }
+        min: { type: [number, "null"] }
+        max: { type: [number, "null"] }
+        p10: { type: [number, "null"] }
+        median: { type: [number, "null"] }
+        p90: { type: [number, "null"] }
+    SqlAnalysisCorrelation:
+      type: object
+      additionalProperties: { type: [number, "null"], minimum: -1, maximum: 1 }
+      description: Hệ số Pearson của CO với từng biến (khóa là tên biến); null khi không tính được (ví dụ biến hằng số)
+    SqlAnalysis:
+      type: object
+      additionalProperties: false
+      required: [generatedAt, source, rows, breakVn, hourly, monthly, periods, seasonalLikeForLike, seasonalByMonth, dailyAroundBreak, correlation]
+      properties:
+        generatedAt: { $ref: "#/components/schemas/DateTime" }
+        source: { type: string, description: "Đường dẫn HDFS của dữ liệu đã làm sạch" }
+        rows: { type: integer, minimum: 0 }
+        breakVn: { type: string, description: "Mốc điểm gãy theo giờ +07, dạng yyyy-MM-dd HH:mm. Là quy ước; xem dailyAroundBreak" }
+        hourly:
+          type: object
+          additionalProperties: false
+          required: [all, before, after]
+          properties:
+            all: { type: array, items: { $ref: "#/components/schemas/SqlAnalysisHour" } }
+            before: { type: array, items: { $ref: "#/components/schemas/SqlAnalysisHour" } }
+            after: { type: array, items: { $ref: "#/components/schemas/SqlAnalysisHour" } }
+        monthly:
+          type: array
+          description: CO theo tháng; tháng đầu và cuối chỉ có một phần dữ liệu (xem n)
+          items:
+            type: object
+            additionalProperties: false
+            required: [year, month, n, mean, median, max]
+            properties:
+              year: { type: integer }
+              month: { type: integer, minimum: 1, maximum: 12 }
+              n: { type: integer, minimum: 0 }
+              mean: { type: [number, "null"] }
+              median: { type: [number, "null"] }
+              max: { type: [number, "null"] }
+        periods:
+          type: object
+          additionalProperties: false
+          required: [before, after]
+          properties:
+            before: { $ref: "#/components/schemas/SqlAnalysisPeriod" }
+            after: { $ref: "#/components/schemas/SqlAnalysisPeriod" }
+            meanChangePct: { type: [number, "null"], description: "Thay đổi CO trung bình trước -> sau, % (so thô, không loại mùa vụ)" }
+            medianChangePct: { type: [number, "null"] }
+        seasonalLikeForLike:
+          type: object
+          additionalProperties: false
+          required: [before, after, months]
+          description: So cùng tháng lịch với cùng tháng lịch (giai đoạn sau chỉ phủ các tháng trong `months`)
+          properties:
+            before: { $ref: "#/components/schemas/SqlAnalysisStat" }
+            after: { $ref: "#/components/schemas/SqlAnalysisStat" }
+            months: { type: array, items: { type: integer, minimum: 1, maximum: 12 } }
+            meanChangePct: { type: [number, "null"] }
+        seasonalByMonth:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [month, before, after, changePct]
+            properties:
+              month: { type: integer, minimum: 1, maximum: 12 }
+              before:
+                oneOf:
+                  - { type: "null" }
+                  - type: object
+                    additionalProperties: false
+                    required: [n, mean]
+                    properties: { n: { type: integer }, mean: { type: [number, "null"] } }
+              after:
+                oneOf:
+                  - { type: "null" }
+                  - type: object
+                    additionalProperties: false
+                    required: [n, mean]
+                    properties: { n: { type: integer }, mean: { type: [number, "null"] } }
+              changePct: { type: [number, "null"], description: "null khi thiếu một bên, không bịa" }
+        dailyAroundBreak:
+          type: array
+          description: CO trung bình từng ngày (+07) quanh điểm gãy; cho thấy mức giảm là chuyển tiếp kéo dài chứ không phải một bước nhảy tức thời
+          items:
+            type: object
+            additionalProperties: false
+            required: [date, n, mean]
+            properties:
+              date: { type: string, pattern: '^\d{4}-\d{2}-\d{2}$' }
+              n: { type: integer, minimum: 0 }
+              mean: { type: [number, "null"] }
+        correlation:
+          type: object
+          additionalProperties: false
+          required: [variables, all, before, after]
+          description: |
+            Tương quan Pearson của CO với từng biến. `all` trộn hai mức CO của hai giai đoạn nên không thay được `before` và `after`. Tương quan không phải nhân quả.
+          properties:
+            variables: { type: array, items: { type: string } }
+            all: { $ref: "#/components/schemas/SqlAnalysisCorrelation" }
+            before: { $ref: "#/components/schemas/SqlAnalysisCorrelation" }
+            after: { $ref: "#/components/schemas/SqlAnalysisCorrelation" }
+
+    DayClusterInfo:
+      type: object
+      additionalProperties: false
+      required: [cluster, days, meanDailyCo, medianDailyCo, afterBreakShare, weekendShare, center, peakHour, troughHour, peakToTrough]
+      properties:
+        cluster: { type: integer, minimum: 0 }
+        days: { type: integer, minimum: 1 }
+        meanDailyCo: { type: number, description: "µg/m³, trung bình của CO trung bình mỗi ngày trong cụm" }
+        medianDailyCo: { type: number }
+        afterBreakShare: { type: number, minimum: 0, maximum: 1, description: "Tỷ lệ ngày trong cụm thuộc giai đoạn sau điểm gãy" }
+        weekendShare: { type: number, minimum: 0, maximum: 1 }
+        center:
+          type: array
+          minItems: 24
+          maxItems: 24
+          description: Tâm cụm = hình dạng 24 giờ (CO từng giờ / CO trung bình ngày); phần tử i là giờ +07 thứ i
+          items: { type: number }
+        peakHour: { type: integer, minimum: 0, maximum: 23 }
+        troughHour: { type: integer, minimum: 0, maximum: 23 }
+        peakToTrough: { type: number, description: "Tâm cụm: giá trị cao nhất chia thấp nhất" }
+    DayClusterStabilityK:
+      type: object
+      additionalProperties: false
+      required: [silhouetteBySeed, silhouetteMin, silhouetteMean, silhouetteMax, ariVsBaseSeed, ariPairwiseMin, ariPairwiseMean, sizesBySeed]
+      properties:
+        silhouetteBySeed: { type: object, additionalProperties: { type: number } }
+        silhouetteMin: { type: number }
+        silhouetteMean: { type: number }
+        silhouetteMax: { type: number }
+        ariVsBaseSeed: { type: object, additionalProperties: { type: number }, description: "Chỉ số Rand điều chỉnh so với seed gốc, theo seed (1 = giống hệt, gần 0 = như ngẫu nhiên)" }
+        ariPairwiseMin: { type: number }
+        ariPairwiseMean: { type: number }
+        sizesBySeed: { type: object, additionalProperties: { type: array, items: { type: integer } } }
+    DayClusterStability:
+      type: object
+      additionalProperties: false
+      required: [generatedAt, source, seeds, baseSeed, daysUsed, chosenKBySeed, silhouetteTableBySeed, stability, k3, notes]
+      properties:
+        generatedAt: { $ref: "#/components/schemas/DateTime" }
+        source: { type: string }
+        seeds: { type: array, items: { type: integer } }
+        baseSeed: { type: integer }
+        daysUsed: { type: integer }
+        chosenKBySeed: { type: object, additionalProperties: { type: integer }, description: "k được chọn (silhouette lớn nhất) theo từng seed" }
+        silhouetteTableBySeed:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: object
+              additionalProperties: false
+              required: [k, silhouette]
+              properties: { k: { type: integer }, silhouette: { type: number } }
+        stability:
+          type: object
+          description: Khóa là k (chỉ có "2" và "3")
+          additionalProperties: { $ref: "#/components/schemas/DayClusterStabilityK" }
+        k3:
+          type: object
+          additionalProperties: false
+          required: [silhouette, clusters]
+          properties:
+            silhouette: { type: number }
+            clusters: { type: array, items: { $ref: "#/components/schemas/DayClusterInfo" } }
+        notes: { type: array, items: { type: string } }
+    DayClusters:
+      type: object
+      additionalProperties: false
+      required: [generatedAt, source, mode, criterion, seed, maxIter, daysUsed, daysExcludedIncomplete, daysTotal, firstDay, lastDay, k, silhouette, structure, selection, clusters, notes, stability]
+      properties:
+        generatedAt: { $ref: "#/components/schemas/DateTime" }
+        source: { type: string }
+        mode: { type: string, description: "Điểm phân cụm là gì (hình dạng đã chuẩn hóa theo trung bình ngày, không phải CO thô)" }
+        criterion: { type: string, description: "Tiêu chí chọn k" }
+        seed: { type: integer }
+        maxIter: { type: integer }
+        daysUsed: { type: integer, minimum: 1 }
+        daysExcludedIncomplete: { type: integer, minimum: 0 }
+        daysTotal: { type: integer, minimum: 1 }
+        firstDay: { type: string }
+        lastDay: { type: string }
+        k: { type: integer, minimum: 2, description: "Số cụm được chọn theo tiêu chí" }
+        silhouette: { type: number }
+        structure: { type: string, description: "Nhãn chữ cho silhouette (rõ, yếu, gần như không có cấu trúc cụm)" }
+        selection:
+          type: array
+          description: Silhouette của từng k đã thử (seed gốc)
+          items:
+            type: object
+            additionalProperties: false
+            required: [k, silhouette, wssse, sizes]
+            properties:
+              k: { type: integer }
+              silhouette: { type: number }
+              wssse: { type: number }
+              sizes: { type: array, items: { type: integer } }
+        clusters: { type: array, items: { $ref: "#/components/schemas/DayClusterInfo" } }
+        notes: { type: array, items: { type: string } }
+        stability:
+          description: Độ ổn định theo seed và kết quả k=3; null nếu chưa chạy 06a_cluster_stability.py
+          oneOf:
+            - { type: "null" }
+            - { $ref: "#/components/schemas/DayClusterStability" }
 
     ErrorMetrics:
       type: object

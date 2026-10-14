@@ -85,7 +85,7 @@
       "order": 6,
       "id": "cluster-and-model",
       "title": "Phân cụm ngày và mô hình dự đoán CO",
-      "state": "running",
+      "state": "partial",
       "updatedAt": "2026-10-14T08:40:00+07:00",
       "summary": [
         {
@@ -99,7 +99,7 @@
           "unit": "trong 3"
         }
       ],
-      "detail": "[MOCK] Thay RFM và K-Means của đề mẫu: phân cụm ngày theo hình dạng 24 giờ, rồi huấn luyện mô hình dự đoán CO."
+      "detail": "[MOCK] Mới xong phần phân cụm ngày (6a); phần mô hình dự đoán CO (6b) chưa chạy nên bước này chưa xong."
     },
     {
       "order": 7,

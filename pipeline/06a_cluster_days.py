@@ -5,7 +5,7 @@
 Đầu vào /co/processed/aqi_clean. Mỗi ngày (giờ +07, đủ 24 giờ) là một điểm 24 chiều = CO từng giờ chia cho CO trung bình của ngày đó (hình dạng, không phải mức).
 k chọn bằng silhouette lớn nhất trong khoảng k-min..k-max (hòa thì k nhỏ); mọi k đều được ghi lại. Chi tiết và lý do ở day_clusters.py.
 Ra: /co/output/day_clusters (Parquet: date, cluster, mean_co, after_2025_07_01, dayofweek, shape[24], raw[24]) và /co/output/day_clusters.json (bảng chọn k, tâm cụm, thống kê cụm).
-Bước `cluster-and-model` chỉ xong khi cả 6b (mô hình dự đoán) xong, nên script này ghi trạng thái "running" kèm chú thích phần nào đã xong. Đã có đầu ra thì dừng, chỉ ghi đè khi có --overwrite.
+Bước `cluster-and-model` chỉ xong khi cả 6b (mô hình dự đoán) xong, nên script này ghi trạng thái "partial" kèm chú thích phần nào đã xong. Đã có đầu ra thì dừng, chỉ ghi đè khi có --overwrite.
 """
 import argparse
 import json
@@ -32,7 +32,7 @@ def main() -> int:
 
     from pyspark.sql import functions as F
 
-    with c.step("cluster-and-model", final_state="running") as r:
+    with c.step("cluster-and-model", final_state="partial", merge=True) as r:
         spark = c.spark_session("HCMC_CO_06a_cluster_days")
         df = spark.read.parquet(f"{c.HDFS_URI}{c.CLEAN_DIR}")
         days, excluded, total_days = dc.day_table(spark, df)
