@@ -92,7 +92,7 @@ class FakeConsumer:
         return {tp: len(self.messages) for tp in parts}
 
     def assign(self, parts):
-        pass
+        self.tp = parts[0]  # poll trả theo đúng partition được gán (producer đọc topic thô, backend đọc READING_TOPIC)
 
     def seek(self, tp, off):
         self.pos = off
@@ -102,7 +102,7 @@ class FakeConsumer:
 
     def poll(self, timeout_ms=0, max_records=500):
         self.polls += 1
-        tp = next(iter(kafka_stream_tp()))
+        tp = getattr(self, "tp", None) or next(iter(kafka_stream_tp()))
         end = min(self.pos + max_records, len(self.messages))
         out = [SimpleNamespace(offset=i, value=self.messages[i][0], timestamp=self.messages[i][1]) for i in range(self.pos, end)]
         self.pos = end
@@ -113,7 +113,7 @@ class FakeConsumer:
 
 
 def kafka_stream_tp():
-    return [kafka_stream.TopicPartition(config.KAFKA_TOPIC, 0)]
+    return [kafka_stream.TopicPartition(config.READING_TOPIC, 0)]  # topic mà backend đọc (kafka_stream._partitions), không phải topic thô
 
 
 def msg(rec) -> tuple[bytes, int]:

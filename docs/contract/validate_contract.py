@@ -120,6 +120,10 @@ def check_reading(where, d):
         err(f"{where}: bản ghi replay-dataset phải có originalDatetime")
     if d["source"].startswith("live-") and d["originalDatetime"] is not None:
         err(f"{where}: bản ghi {d['source']} phải có originalDatetime = null")
+    if d["source"] == "replay-dataset" and d["coIsForecast"] is not False:
+        err(f"{where}: bản ghi replay-dataset phải có coIsForecast = false (giá trị lịch sử, không bao giờ là dự báo)")
+    if d["source"] == "live-open-meteo" and d["coIsForecast"] is not None:
+        err(f"{where}: bản ghi live-open-meteo phải có coIsForecast = null (nguồn không cho biết)")
     if (d["coPredicted"] is None) != (d["modelVersion"] is None):
         err(f"{where}: coPredicted và modelVersion phải cùng null hoặc cùng có giá trị")
 

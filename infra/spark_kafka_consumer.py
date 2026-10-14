@@ -28,7 +28,7 @@ import enrich as en  # noqa: E402
 
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
-from pyspark.sql.types import DoubleType, LongType, StringType, StructField, StructType
+from pyspark.sql.types import BooleanType, DoubleType, LongType, StringType, StructField, StructType
 
 os.environ.setdefault("HADOOP_CONF_DIR", "/home/trong/hadoop/etc/hadoop")
 
@@ -76,6 +76,8 @@ schema = StructType([
     # Bước A5: đầu vào của mô hình do producer dựng (null/không có nếu thiếu lịch sử) và ghi chú về cách dựng
     StructField("modelInputs", en.model_inputs_schema(), True),
     StructField("featureNote", StringType(), True),
+    # hợp đồng 0.5.0: co có phải điểm dự báo của OpenWeather không (xem model_inputs.forecast_flag); không có trường thì null
+    StructField("coIsForecast", BooleanType(), True),
 ])
 
 raw = (spark.readStream.format("kafka")
@@ -103,7 +105,7 @@ if regressor is None:
 else:
     print(f"\n>>> Mô hình dự đoán CO: {version_or_reason} ({len(features)} đặc trưng) <<<\n", flush=True)
     enriched = en.enrich(processed, regressor, version_or_reason)
-enriched = enriched.withColumnRenamed("featureNote", "feature_note")
+enriched = enriched.withColumnRenamed("featureNote", "feature_note").withColumnRenamed("coIsForecast", "co_is_forecast")
 
 query = (enriched.writeStream.outputMode("append").format("parquet")
          .option("path", a.out).option("checkpointLocation", a.checkpoint)
@@ -112,7 +114,7 @@ query = (enriched.writeStream.outputMode("append").format("parquet")
 if a.enriched_topic:
     # cùng bản ghi, dạng JSON giữ nguyên tên trường của producer (datetime, originalDatetime, station, co, wind_speed_kmh, temperature_C, provider, ...) + co_predicted, model_version
     json_cols = ["datetime", "originalDatetime", "station", "co", "wind_speed_kmh", "temperature_C", "coObservedAt", "weatherObservedAt", "provider", "owmDt", "aqi",
-                 "no", "no2", "o3", "so2", "pm2_5", "pm10", "nh3", "co_predicted", "model_version", "feature_note"]
+                 "no", "no2", "o3", "so2", "pm2_5", "pm10", "nh3", "co_predicted", "model_version", "co_is_forecast", "feature_note"]
     out_json = enriched.select(F.col("station").alias("key"), F.to_json(F.struct(*[F.col(c) for c in json_cols], F.col("partition").alias("kafka_partition"),
                                                                                  F.col("offset").alias("kafka_offset"))).alias("value"))
     (out_json.writeStream.format("kafka").option("kafka.bootstrap.servers", a.bootstrap).option("topic", a.enriched_topic)

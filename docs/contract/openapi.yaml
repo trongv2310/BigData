@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: CO HCMC Dashboard API
-  version: 0.4.0
+  version: 0.5.0
   description: |
     Hợp đồng giữa backend (Claude, lead) và frontend (Antigravity).
     Chỉ lead được sửa file này. Muốn thêm hoặc đổi trường: ghi vào docs/HANDOFF.md hoặc mở PR riêng sửa contract.
@@ -14,6 +14,7 @@ info:
     - Kênh thời gian thực (WebSocket) mô tả ở docs/contract/events.md; schema sự kiện là StreamEvent ở dưới.
     - Hai luồng dữ liệu chạy song song và không bao giờ trộn vào một đường biểu đồ: PHÁT LẠI (`source=replay-dataset`, mô phỏng từ bộ lịch sử)
       và DỮ LIỆU THẬT (`source=live-openweather`). `live-open-meteo` là nguồn khác, không bật mặc định.
+    - Thay đổi 0.5.0: AqiReading thêm coIsForecast (boolean hoặc null, bắt buộc): `co` là điểm DỰ BÁO của OpenWeather chứ không phải quan sát.
     - Thay đổi 0.4.0: ModelMetrics có thêm transition (ranh giới chuyển tiếp theo dữ liệu), alternatives (hai phương án so sánh), breakpoint.cause; backend trả nguyên văn model_metrics.json.
     - Thay đổi 0.3.0: PipelineStepState thêm `partial`; thêm GET /api/analysis/sql và GET /api/analysis/day-clusters (kết quả bước 5 và 6a của pipeline).
     - Thay đổi 0.2.0 (Bước 0): AqiReading thêm originalDatetime, coPredicted, modelVersion; /api/aqi/latest nhận `source`; thêm /api/replay/*,
@@ -570,7 +571,7 @@ components:
     AqiReading:
       type: object
       additionalProperties: false
-      required: [datetime, originalDatetime, station, isSimulatedStation, source, co, windSpeedKmh, temperatureC, coAccumulationIndex, status, coPredicted, modelVersion]
+      required: [datetime, originalDatetime, station, isSimulatedStation, source, co, windSpeedKmh, temperatureC, coAccumulationIndex, status, coPredicted, modelVersion, coIsForecast]
       properties:
         datetime:
           $ref: "#/components/schemas/DateTime"
@@ -599,6 +600,14 @@ components:
           description: |
             µg/m³. CO mà mô hình dự đoán cho chính bản ghi này (cùng thời điểm với `co`, nên so sánh trực tiếp với `co`), tính từ CO của các giờ trước và các đầu vào
             nêu ở ModelMetrics.features. null khi chưa có mô hình hoặc chưa đủ lịch sử (ví dụ chưa đủ độ trễ 24 giờ trên luồng sống): không bao giờ điền số thay thế.
+        coIsForecast:
+          type: [boolean, "null"]
+          description: |
+            Cho biết `co` có phải điểm DỰ BÁO của nguồn chứ không phải quan sát hay giá trị lịch sử.
+            true: `co` là điểm dự báo của OpenWeather cho một giờ chưa tới (đo ngày 14/10/2026: lúc 16:30 nguồn trả giá trị của điểm 17:00); khi đó `coPredicted` là dự đoán của mô hình ta cho giờ đó,
+            và giao diện phải ghi rõ "giá trị dự báo của OpenWeather", không gọi là quan sát.
+            false: `co` thuộc giờ hiện hành hoặc đã qua (luồng live-openweather) hoặc là giá trị lịch sử của bộ dữ liệu (luồng replay-dataset, luôn false).
+            null: không xác định (bản ghi cũ trước khi có trường này, nguồn live-open-meteo, hoặc không lấy/không khớp được lịch sử OpenWeather để kiểm). Giao diện không được suy ra true hay false từ null.
         modelVersion:
           type: [string, "null"]
           description: Phiên bản mô hình đã tạo `coPredicted` (trùng ModelMetrics.models[].version và PredictResponse.model.version); null khi coPredicted là null.
@@ -727,7 +736,7 @@ components:
             Có thể có thêm bảng `live` (Spark ghi từ Kafka vào HDFS /live/co_stream; chưa có dữ liệu thì bảng này không tồn tại) với các cột:
             datetime_vn (timestamp, giờ Việt Nam), station, co, wind_speed_kmh, temperature_C, co_accumulation_index, canh_bao,
             co_observed_at, weather_observed_at, provider, original_datetime_vn (chỉ bản phát lại), aqi, no, no2, o3, so2, pm2_5, pm10, nh3 (từ Bước A1, dòng cũ null),
-            co_actual (= co), co_predicted, model_version, feature_note (từ Bước A5; co_predicted và model_version null nếu bản ghi thiếu đầu vào cho mô hình hoặc ghi trước A5),
+            co_actual (= co), co_is_forecast, co_predicted, model_version, feature_note (từ Bước A5; co_predicted và model_version null nếu bản ghi thiếu đầu vào cho mô hình hoặc ghi trước A5),
             kafka_partition, kafka_offset, kafka_timestamp (UTC). `provider` phân biệt 'openweather' (dữ liệu thật), 'replay-dataset' (phát lại, mô phỏng) và
             'open-meteo' (tin cũ): bảng chứa lẫn các nguồn nên luôn lọc theo provider, không trộn vào một chuỗi. Khác bộ Kaggle, nên cũng không trộn với bảng `aqi`.
             Giá trị timestamp trả về dạng chuỗi "yyyy-MM-dd HH:mm:ss". Lần gọi đầu tiên khởi động Spark nên có thể mất 10 giây trở lên.

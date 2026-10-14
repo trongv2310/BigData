@@ -78,15 +78,23 @@ Bạn là agent frontend. Đọc lại AGENTS.md, docs/HANDOFF.md (Backend, mụ
 3. Bước pipeline: bước 6 và 7 giờ là done (không còn partial); trạng thái partial vẫn phải hiển thị đúng nếu gặp.
 ```
 
-## Antigravity (frontend) — P21: dự đoán CO trên hai luồng (không đổi hợp đồng; reading đã mang coPredicted)
+## Antigravity (frontend) — P21: dự đoán CO và cờ dự báo trên hai luồng (hợp đồng 0.5.0: AqiReading thêm coIsForecast)
 
 ```
-Bạn là agent frontend. Đọc lại AGENTS.md, docs/HANDOFF.md (Backend, mục A5 14/10/2026), docs/contract/events.md (mục reading, coPredicted) và openapi.yaml (AqiReading.coPredicted, modelVersion). Chỉ sửa frontend/ và mục "Frontend" của HANDOFF; không đổi hợp đồng. Hợp đồng KHÔNG đổi: không cần generate:types lại.
-Từ A5, backend phát `reading` kèm coPredicted (µg/m³) và modelVersion cho CẢ HAI luồng (replay-dataset và live-openweather) khi bản ghi có đủ đầu vào cho mô hình; không thì cả hai là null (hiện "chưa có dự đoán", không điền số).
+Bạn là agent frontend. Đọc lại AGENTS.md, docs/HANDOFF.md (Backend, mục A5 và mục coIsForecast 14/10/2026), docs/contract/events.md (mục reading, coPredicted, coIsForecast) và openapi.yaml (AqiReading: coPredicted, modelVersion, coIsForecast). Chỉ sửa frontend/ và mục "Frontend" của HANDOFF.
+BƯỚC ĐẦU BẮT BUỘC: hợp đồng đổi (0.5.0, AqiReading có thêm trường bắt buộc coIsForecast), nên phải sinh lại kiểu trước khi làm gì khác:
+    cd frontend
+    npm run generate:types        # = openapi-typescript ../docs/contract/openapi.yaml -o src/types/api.ts
+rồi chạy npm run lint và npm run build; sửa mọi chỗ TypeScript báo thiếu coIsForecast (ví dụ chỗ dựng AqiReading giả trong mã mẫu). Không sửa tay api.ts.
+Từ A5, backend phát `reading` (và /api/aqi/latest) kèm:
+  - coPredicted (µg/m³) và modelVersion cho CẢ HAI luồng (replay-dataset và live-openweather) khi bản ghi có đủ đầu vào cho mô hình; không thì cả hai null (hiện "chưa có dự đoán", không điền số);
+  - coIsForecast (boolean hoặc null): true = co là điểm DỰ BÁO của OpenWeather cho giờ kế tiếp (nguồn có lúc trả giá trị của giờ sắp tới sớm khoảng 30 phút), KHÔNG phải quan sát; false = co thuộc giờ hiện hành hoặc đã qua (luồng phát lại luôn false); null = không xác định (bản ghi cũ, Open-Meteo, hoặc không kiểm được). KHÔNG suy ra true/false từ null.
 1. Mỗi cột (PHÁT LẠI bên trái, DỮ LIỆU THẬT bên phải): hiện thêm "Dự đoán của mô hình" cạnh giá trị đo (co), kèm chênh lệch (coPredicted trừ co, chỉ để hiển thị) và modelVersion. Không trộn hai luồng vào một đường.
-2. Đồ thị chuỗi reading mới nhất của từng luồng: hai đường "thực tế" và "dự đoán" của CHÍNH luồng đó.
-3. Ghi chú bắt buộc: (a) luồng phát lại bắt đầu từ đầu TẬP KIỂM TRA của mô hình (07/02/2026) nên dự đoán ở đó là ngoài mẫu huấn luyện, nhưng nó vẫn là mô phỏng; (b) luồng thật: nhiệt độ và gió đưa vào mô hình là của quan sát hiện tại thay vì giờ trước (xấp xỉ), mỗi giờ chỉ có một bản ghi, chưa kiểm sai số dài hạn; (c) mô hình học từ giai đoạn sau 07/2025 và nguyên nhân điểm gãy dữ liệu chưa xác định (xem trang chỉ số mô hình); (d) mô hình chỉ hơn mốc "CO giờ trước" một chút trên tập kiểm tra (xem /api/model/metrics).
-4. coPredicted đến muộn hơn bản ghi thô vài giây (Spark xử lý mỗi 5 giây); nếu Spark dừng thì không có reading mới nào (backend đọc topic đã làm giàu): hiện trạng thái Spark ở Tổng quan như hiện nay và đừng báo "mất kết nối dữ liệu" sai lý do.
+2. Khi coIsForecast = true ở luồng thật: gắn nhãn rõ "giá trị dự báo của OpenWeather" thay cho "quan sát/đo", cả ở thẻ số, bảng và đồ thị (ví dụ điểm rỗng hoặc kiểu nét khác, có chú giải); coPredicted khi đó là dự đoán của mô hình ta cho giờ đó. Khi null ở luồng thật: hiện "chưa rõ là quan sát hay dự báo" (đừng giả định). Khi false: hiện như quan sát của nguồn (lưu ý đó là số của mô hình khí quyển, không phải cảm biến).
+3. Đồ thị chuỗi reading mới nhất của từng luồng: hai đường "thực tế" và "dự đoán" của CHÍNH luồng đó.
+4. Ghi chú bắt buộc: (a) luồng phát lại bắt đầu từ đầu TẬP KIỂM TRA của mô hình (07/02/2026) nên dự đoán ở đó là ngoài mẫu huấn luyện, nhưng nó vẫn là mô phỏng; (b) luồng thật: nhiệt độ và gió đưa vào mô hình là của quan sát hiện tại thay vì giờ trước (xấp xỉ), mỗi giờ chỉ có một bản ghi, chưa kiểm sai số dài hạn; (c) mô hình học từ giai đoạn sau 07/2025 và nguyên nhân điểm gãy dữ liệu chưa xác định (xem trang chỉ số mô hình); (d) mô hình chỉ hơn mốc "CO giờ trước" một chút trên tập kiểm tra (xem /api/model/metrics).
+5. coPredicted đến muộn hơn bản ghi thô vài giây (Spark xử lý mỗi 5 giây); nếu Spark dừng thì không có reading mới nào (backend đọc topic đã làm giàu): hiện trạng thái Spark ở Tổng quan như hiện nay và đừng báo "mất kết nối dữ liệu" sai lý do.
+Dùng mock (python mock/serve.py): mock/stream-events.ndjson có một reading live-openweather với coIsForecast = true và các reading phát lại với false; /api/aqi/latest?source=... trả false.
 ```
 
 ## Lead duyệt PR của frontend

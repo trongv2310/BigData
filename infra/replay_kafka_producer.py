@@ -85,6 +85,7 @@ def make_message(row: dict, n: int, now: datetime) -> dict:
         "wind_speed_kmh": row["wind"],
         "temperature_C": row["temp"],
         "provider": "replay-dataset",
+        "coIsForecast": False,  # giá trị lịch sử của bộ dữ liệu, không bao giờ là điểm dự báo
     }
     for p in POLLUTANTS:
         msg[p] = row[p]

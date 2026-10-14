@@ -25,6 +25,7 @@ Hai luồng `reading` cùng đi trên kênh này (hợp đồng 0.2.0):
 - `source = live-open-meteo`: nguồn khác, không bật mặc định.
 - Giao diện lọc theo `source` để vẽ hai cột riêng và không trộn hai nguồn vào một đường biểu đồ.
 - `coPredicted` và `modelVersion` (Bước A5): do job Spark (`infra/spark_kafka_consumer.py`) tính bằng mô hình đã lưu rồi ghi vào topic `hcmc_co_enriched`; backend đọc topic đó để phát `reading`, nên `reading` đến chậm hơn bản ghi thô vài giây (Spark xử lý mỗi 5 giây) và CẦN Spark đang chạy. Chỉ có khi bản ghi có đủ 15 đầu vào của mô hình (CO các giờ t-1, t-2, t-3, t-24 và thời tiết/chất khí giờ t-1): phát lại lấy từ bộ dữ liệu, dữ liệu thật lấy từ lịch sử theo giờ của OpenWeather. Thiếu đầu vào, hoặc chưa có mô hình, thì `coPredicted` và `modelVersion` là `null` (không điền, không đoán). Luồng phát lại bắt đầu từ đầu tập kiểm tra của mô hình nên dự đoán trên đó là ngoài mẫu huấn luyện.
+- `coIsForecast` (hợp đồng 0.5.0): `true` khi `co` của bản ghi thật là điểm DỰ BÁO của OpenWeather cho giờ kế tiếp (nguồn có lúc trả giá trị của giờ sắp tới sớm khoảng 30 phút), `false` khi `co` thuộc giờ hiện hành hoặc đã qua (luồng phát lại luôn `false`), `null` khi không xác định (nguồn Open-Meteo, bản ghi cũ, hoặc không khớp được lịch sử để kiểm). Giao diện hiện rõ "giá trị dự báo" khi `true` và không suy ra gì từ `null`.
 - Không có sự kiện `replay.status`: giao diện lấy trạng thái phát lại bằng `GET /api/replay/status` (sau mỗi lần điều khiển và định kỳ).
 
 Quy tắc:
