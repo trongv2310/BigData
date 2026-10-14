@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from pydantic import BaseModel, ConfigDict, Field
 
-from .. import aqi_data, predict
+from .. import aqi_data, ml_engine, ml_predict, predict
 from ..clients import hdfs
 from ..errors import ApiError
 
@@ -33,6 +33,12 @@ class PredictRequest(BaseModel):
 @router.post("/api/predict")
 async def predict_co(req: PredictRequest):
     global _cache
+    try:
+        ml = await ml_predict.try_predict(req)  # có mô hình đã huấn luyện thì dùng mô hình (kind=ml); chưa có thì rơi xuống heuristic như trước
+    except ml_engine.MlUnavailable as e:
+        raise ApiError(503, "PREDICT_UNAVAILABLE", str(e))
+    if ml is not None:
+        return ml
     try:
         ds = await aqi_data.get()
     except (hdfs.HdfsUnreachable, hdfs.HdfsNotFound, hdfs.HdfsError, OSError, ValueError, KeyError) as e:

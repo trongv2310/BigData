@@ -66,6 +66,18 @@ Bạn là agent frontend. Đọc lại AGENTS.md, docs/HANDOFF.md (Backend, mụ
 Quy ước hiển thị: số mock trong pipeline-steps.json và model-metrics.json là minh họa (có nhãn [MOCK]); analysis-sql.json và analysis-day-clusters.json là kết quả thật.
 ```
 
+## Antigravity (frontend) — P20: mô hình dự đoán CO và dự đoán ml (hợp đồng 0.4.0, mock là kết quả thật)
+
+```
+Bạn là agent frontend. Đọc lại AGENTS.md, docs/HANDOFF.md (Backend, mục A4 14/10/2026), docs/contract/openapi.yaml (ModelMetrics, ModelSetup, ModelTransition, PredictRequest/PredictResponse) và chạy mock (python mock/serve.py). Chỉ sửa frontend/ và mục "Frontend" của HANDOFF; thiếu trường thì ghi yêu cầu. Chạy npm run generate:types trước.
+1. Trang chỉ số mô hình, đọc GET /api/model/metrics (thử ?mock=untrained cho 404 và ?mock=unavailable cho 503). mock/model-metrics.json là kết quả THẬT. Hiển thị nguyên văn, không tự so sánh hay tự tính:
+   - Phương án chính: bảng ba mô hình + hai mốc (RMSE, MAE, R2), dùng beatsPreviousHour / beatsHourlyMean của backend để nói thắng/không thắng, đánh dấu isBest (chọn theo kiểm định, KHÔNG phải mô hình có RMSE kiểm tra thấp nhất; hiện rõ điều đó), conclusion, trainedOn, splitMethod, trainSet/testSet (nhấn mạnh tập kiểm tra chỉ ~52 ngày cuối).
+   - alternatives (full-80-20 và full-with-regime): hiện cạnh phương án chính để so sánh; ở cả hai KHÔNG mô hình nào thắng mốc CO giờ trước, phải thấy rõ, không làm mờ.
+   - transition và breakpoint: ranh giới chuyển tiếp THEO DỮ LIỆU và các cửa sổ (windows), phần dư theo tháng (monthlyResidual) dưới dạng đồ thị, độ nhạy (sensitivity). Ghi rõ breakpoint.cause (nguyên nhân chưa xác định) và không kết luận CO ngoài đời giảm thật. Nói rõ ranh giới không duy nhất.
+2. Tab Dự đoán CO: khi PredictResponse.model.kind = "ml" thì hiện model.name/version, model.trainedOn, và LUÔN hiện filledInputs (những đầu vào mà form bỏ trống và backend điền bằng trung vị; nói rõ kết quả gần như chỉ phản ánh trung vị nếu CO các giờ trước không được nhập). Thêm các ô nhập tùy chọn coLag1h, coLag2h, coLag3h, coLag24h và các chất khí (no, no2, o3, so2, pm25, pm10, nh3). Nhắc: nhiệt độ, gió là của giờ NGAY TRƯỚC giờ cần dự đoán. interval có thể là null. Xử lý lỗi 503 PREDICT_UNAVAILABLE. Mô hình học từ giai đoạn sau 07/2025 nên không dùng cho dữ liệu lịch sử trước đó.
+3. Bước pipeline: bước 6 và 7 giờ là done (không còn partial); trạng thái partial vẫn phải hiển thị đúng nếu gặp.
+```
+
 ## Lead duyệt PR của frontend
 
 ```

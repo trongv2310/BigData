@@ -1,0 +1,6 @@
+{
+  "error": {
+    "code": "MODEL_UNAVAILABLE",
+    "message": "Không đọc được /co/output/model_metrics.json trên HDFS (HdfsUnreachable); không biết mô hình đã huấn luyện chưa."
+  }
+}

@@ -76,6 +76,9 @@ class PredictNewInputs(Base):
         self.use_csv(d / "p.csv")
         predict_route._cache = None
         self.addCleanup(lambda: setattr(predict_route, "_cache", None))
+        nn = config.NAMENODE_HTTP
+        config.NAMENODE_HTTP = "http://127.0.0.1:1"  # heuristic: không đọc HDFS thật (máy có thể đã có mô hình ml)
+        self.addCleanup(lambda: setattr(config, "NAMENODE_HTTP", nn))
 
     REQ = {"hour": 12, "month": 11, "temperatureC": 30, "windSpeedKmh": 8}
 

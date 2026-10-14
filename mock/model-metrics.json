@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-14T09:00:00+07:00",
-  "target": "[MOCK] CO (µg/m³) của giờ t, dự đoán từ thông tin đến giờ t-1 (độ trễ CO 1, 2, 3, 24 giờ) cộng giờ, tháng, nhiệt độ, gió, các chất khác.",
+  "generatedAt": "2026-10-14T15:53:31+07:00",
+  "target": "CO (µg/m³) của giờ t, dự đoán từ thông tin đến giờ t-1: nhiệt độ, gió và nồng độ các chất khác của giờ t-1; CO của các giờ t-1, t-2, t-3 và t-24; giờ và tháng của t (giờ +07). Khi dùng cho form /api/predict, temperatureC và windSpeedKmh là của giờ ngay trước đó.",
   "horizonHours": 1,
   "features": [
     "hour",
@@ -19,60 +19,60 @@
     "coLag3h",
     "coLag24h"
   ],
-  "trainedOn": "[MOCK, số minh họa, chưa huấn luyện thật] Bộ Kaggle (OpenWeather) 35064 dòng giờ, 04/2022 đến 03/2026, giờ +07:00, sau khi làm sạch; bỏ 24 dòng đầu vì thiếu độ trễ 24 giờ.",
+  "trainedOn": "Bộ Kaggle (OpenWeather) đã làm sạch (/co/processed/aqi_clean), CHỈ giai đoạn sau chuyển tiếp: từ 2025-07-13T00:00:00+07:00 đến 2026-02-07T19:00:00+07:00 (5036 giờ), đã loại 24 giờ đầu của giai đoạn (độ trễ 24 giờ cần dữ liệu trong chính giai đoạn). Kiểm tra trên 2026-02-07T20:00:00+07:00 đến 2026-04-01T06:00:00+07:00 (1259 giờ), chỉ phủ khoảng 2 tháng cuối (mùa vụ khác với phần huấn luyện). Dữ liệu gốc đã tiền xử lý từ trước (o3 điền ở 14,9% dòng, độ ẩm/nhiệt độ có dấu hiệu nội suy).",
   "trainSet": {
-    "from": "2022-04-02T07:00:00+07:00",
-    "to": "2025-06-14T07:00:00+07:00",
-    "rows": 28032
+    "from": "2025-07-13T00:00:00+07:00",
+    "to": "2026-02-07T19:00:00+07:00",
+    "rows": 5036
   },
   "testSet": {
-    "from": "2025-06-14T08:00:00+07:00",
-    "to": "2026-04-01T07:00:00+07:00",
-    "rows": 7008
+    "from": "2026-02-07T20:00:00+07:00",
+    "to": "2026-04-01T06:00:00+07:00",
+    "rows": 1259
   },
-  "splitMethod": "[MOCK] Theo thời gian: 80% đầu để huấn luyện, 20% cuối để kiểm tra, không xáo ngẫu nhiên.",
+  "splitMethod": "Theo thời gian: 80% đầu của giai đoạn sau chuyển tiếp để huấn luyện, 20% cuối để kiểm tra, không xáo ngẫu nhiên. Mô hình tốt nhất chọn theo RMSE trên 20% cuối của tập huấn luyện (kiểm định), không chọn trên tập kiểm tra.",
   "models": [
     {
       "name": "Hồi quy tuyến tính",
       "kind": "linear-regression",
-      "version": "MOCK-lr-1",
+      "version": "linear-regression-20261014",
       "isBest": false,
       "test": {
-        "rmse": 71.4,
-        "mae": 38.2,
-        "r2": 0.62
+        "rmse": 41.297,
+        "mae": 14.727,
+        "r2": 0.9128
       },
-      "beatsPreviousHour": false,
+      "beatsPreviousHour": true,
       "beatsHourlyMean": true,
-      "params": null
+      "params": "regParam=0 (bình phương tối thiểu thường), chuẩn hóa đầu vào; RMSE kiểm định 27.1"
     },
     {
       "name": "Random Forest",
       "kind": "random-forest",
-      "version": "MOCK-rf-1",
-      "isBest": false,
-      "test": {
-        "rmse": 66.9,
-        "mae": 35.7,
-        "r2": 0.67
-      },
-      "beatsPreviousHour": false,
-      "beatsHourlyMean": true,
-      "params": "numTrees=100, maxDepth=8"
-    },
-    {
-      "name": "GBT",
-      "kind": "gbt",
-      "version": "MOCK-1",
+      "version": "random-forest-20261014",
       "isBest": true,
       "test": {
-        "rmse": 63.8,
-        "mae": 34.1,
-        "r2": 0.7
+        "rmse": 38.914,
+        "mae": 15.788,
+        "r2": 0.9225
       },
-      "beatsPreviousHour": false,
+      "beatsPreviousHour": true,
       "beatsHourlyMean": true,
-      "params": "maxIter=100, maxDepth=5"
+      "params": "numTrees=100, maxDepth=8, seed=42; RMSE kiểm định 23.5"
+    },
+    {
+      "name": "GBT (Gradient Boosted Trees)",
+      "kind": "gbt",
+      "version": "gbt-20261014",
+      "isBest": false,
+      "test": {
+        "rmse": 37.066,
+        "mae": 14.683,
+        "r2": 0.9297
+      },
+      "beatsPreviousHour": true,
+      "beatsHourlyMean": true,
+      "params": "maxIter=100, maxDepth=5, stepSize=0.1, seed=42; RMSE kiểm định 23.8"
     }
   ],
   "baselines": [
@@ -81,27 +81,387 @@
       "name": "CO giờ trước",
       "description": "Dự đoán CO giờ t bằng đúng CO giờ t-1.",
       "test": {
-        "rmse": 58.2,
-        "mae": 29.5,
-        "r2": 0.75
+        "rmse": 43.864,
+        "mae": 16.182,
+        "r2": 0.9016
       }
     },
     {
       "id": "hourly-mean",
       "name": "Trung bình theo giờ trong ngày",
-      "description": "Dự đoán bằng trung bình CO của cùng giờ trong tập huấn luyện.",
+      "description": "Dự đoán bằng CO trung bình của cùng giờ +07 trong tập huấn luyện của phương án.",
       "test": {
-        "rmse": 118.6,
-        "mae": 80.3,
-        "r2": -0.04
+        "rmse": 153.7,
+        "mae": 126.998,
+        "r2": -0.2084
       }
     }
   ],
-  "conclusion": "[MOCK] Cả ba mô hình thắng mốc trung bình theo giờ nhưng không mô hình nào thắng mốc CO giờ trước: với dữ liệu này, lặp lại giá trị giờ trước đã khó bị đánh bại.",
+  "conclusion": "Mô hình chọn theo đoạn kiểm định: Random Forest, RMSE 38.9 µg/m³ trên 1259 giờ kiểm tra. So với mốc CO giờ trước (RMSE 43.9): THẮNG (-11.3%). So với mốc trung bình theo giờ trong ngày (RMSE 153.7): thắng (-74.7%). Mô hình có RMSE thấp hơn mốc CO giờ trước: Hồi quy tuyến tính, Random Forest, GBT (Gradient Boosted Trees).",
   "breakpoint": {
-    "date": "2025-07-01T00:00:00+07:00",
-    "strategy": "indicator-feature",
-    "description": "[MOCK] Thêm biến after_2025_07_01 làm đầu vào để mô hình biết mức CO trước và sau điểm gãy.",
-    "effect": null
-  }
+    "date": "2025-07-12T00:00:00+07:00",
+    "strategy": "separate-training",
+    "description": "Phương án chính huấn luyện riêng cho giai đoạn từ 12/07/2025 (ngay sau chuyển tiếp 13/05/2025 đến 11/07/2025, xác định theo dữ liệu, không theo mốc 01/07). 60 ngày chuyển tiếp và 24 giờ sau đó bị loại khỏi tập huấn luyện. Điểm gãy là chuyển tiếp kéo dài chứ không phải một ngày; ranh giới thay đổi nhiều theo cửa sổ khớp (xem transition.windows).",
+    "effect": "Cùng tập kiểm tra của phương án chính (1259 giờ), mô hình tốt nhất của mỗi cách huấn luyện (RMSE µg/m³): chỉ giai đoạn sau chuyển tiếp 38.9 (Random Forest); toàn bộ có biến chế độ 51.3 (Hồi quy tuyến tính); mốc CO giờ trước 43.9. Độ nhạy với điểm bắt đầu giai đoạn sau: mốc quy ước 01/07/2025 (2025-07-01): 39.4; ranh giới chính (ramp ±60 ngày) (2025-07-12): 38.9; kết thúc chuyển tiếp theo cửa sổ ±90 ngày (2025-08-13): 39.9.",
+    "cause": "CHƯA XÁC ĐỊNH. Điểm gãy có trong cả bộ Kaggle lẫn bản thô OpenWeather tự cào (cùng nhà cung cấp), với hình dạng gần như y hệt, nên không phải do khâu xử lý của Kaggle. Dữ liệu này không phân biệt được thay đổi ở nguồn (cách tính, hiệu chuẩn, đầu vào mô hình khí quyển) với thay đổi thật ngoài đời. Báo cáo KHÔNG kết luận CO ngoài đời giảm thật."
+  },
+  "transition": {
+    "method": "log CO trung bình ngày, khử mùa vụ bằng chu kỳ các năm tham chiếu, khớp bước đơn rồi khớp dốc tuyến tính quanh bước (bình phương tối thiểu)",
+    "referenceEnd": "2024-12-31",
+    "seasonHalfWidthDays": 15,
+    "stepDate": "2025-05-29",
+    "stepResidualBefore": 0.062,
+    "stepResidualAfter": -1.42,
+    "windows": [
+      {
+        "halfWidthDays": 45,
+        "from": "2025-05-21",
+        "to": "2025-07-07",
+        "lengthDays": 47,
+        "residualBefore": -0.516,
+        "residualAfter": -1.622
+      },
+      {
+        "halfWidthDays": 60,
+        "from": "2025-05-13",
+        "to": "2025-07-11",
+        "lengthDays": 59,
+        "residualBefore": -0.442,
+        "residualAfter": -1.648
+      },
+      {
+        "halfWidthDays": 90,
+        "from": "2025-03-19",
+        "to": "2025-08-12",
+        "lengthDays": 146,
+        "residualBefore": 0.103,
+        "residualAfter": -1.905
+      }
+    ],
+    "main": {
+      "halfWidthDays": 60,
+      "from": "2025-05-13",
+      "to": "2025-07-11"
+    },
+    "monthlyResidual": [
+      {
+        "month": "2025-01",
+        "meanLogResidual": 0.487,
+        "days": 31
+      },
+      {
+        "month": "2025-02",
+        "meanLogResidual": 0.655,
+        "days": 28
+      },
+      {
+        "month": "2025-03",
+        "meanLogResidual": 0.153,
+        "days": 31
+      },
+      {
+        "month": "2025-04",
+        "meanLogResidual": -0.447,
+        "days": 30
+      },
+      {
+        "month": "2025-05",
+        "meanLogResidual": -0.519,
+        "days": 31
+      },
+      {
+        "month": "2025-06",
+        "meanLogResidual": -1.11,
+        "days": 30
+      },
+      {
+        "month": "2025-07",
+        "meanLogResidual": -1.683,
+        "days": 31
+      },
+      {
+        "month": "2025-08",
+        "meanLogResidual": -1.871,
+        "days": 31
+      },
+      {
+        "month": "2025-09",
+        "meanLogResidual": -1.948,
+        "days": 30
+      },
+      {
+        "month": "2025-10",
+        "meanLogResidual": -1.473,
+        "days": 31
+      },
+      {
+        "month": "2025-11",
+        "meanLogResidual": -1.449,
+        "days": 30
+      },
+      {
+        "month": "2025-12",
+        "meanLogResidual": -1.461,
+        "days": 31
+      },
+      {
+        "month": "2026-01",
+        "meanLogResidual": -1.397,
+        "days": 31
+      },
+      {
+        "month": "2026-02",
+        "meanLogResidual": -1.067,
+        "days": 28
+      },
+      {
+        "month": "2026-03",
+        "meanLogResidual": -0.761,
+        "days": 31
+      }
+    ],
+    "excludedDays": 60,
+    "excludedFrom": "2025-05-13",
+    "excludedTo": "2025-07-11",
+    "postStart": "2025-07-12",
+    "sensitivity": [
+      {
+        "label": "mốc quy ước 01/07/2025",
+        "postStart": "2025-07-01",
+        "trainRows": 5300,
+        "kind": "random-forest",
+        "test": {
+          "rmse": 39.365,
+          "mae": 15.755,
+          "r2": 0.9207
+        }
+      },
+      {
+        "label": "ranh giới chính (ramp ±60 ngày)",
+        "postStart": "2025-07-12",
+        "trainRows": 5036,
+        "kind": "random-forest",
+        "test": {
+          "rmse": 38.914,
+          "mae": 15.788,
+          "r2": 0.9225
+        }
+      },
+      {
+        "label": "kết thúc chuyển tiếp theo cửa sổ ±90 ngày",
+        "postStart": "2025-08-13",
+        "trainRows": 4268,
+        "kind": "random-forest",
+        "test": {
+          "rmse": 39.881,
+          "mae": 16.369,
+          "r2": 0.9186
+        }
+      }
+    ],
+    "note": "Ranh giới không duy nhất: các cửa sổ khớp khác nhau cho khoảng khác nhau (windows). Khoảng 18 đến 30/06/2025 là bước giảm nhanh nhất, nhưng sau khi khử mùa vụ, CO giảm dần từ tháng 4 đến tháng 9/2025 (monthlyResidual)."
+  },
+  "alternatives": [
+    {
+      "id": "full-80-20",
+      "title": "Chia 80/20 theo thời gian trên toàn bộ dữ liệu (yêu cầu gốc)",
+      "description": "Huấn luyện 2022-04-02T07:00:00+07:00 đến 2025-06-13T06:00:00+07:00 (28032 giờ), kiểm tra 2025-06-13T07:00:00+07:00 đến 2026-04-01T06:00:00+07:00 (7008 giờ). Tập kiểm tra có 6319 giờ ở giai đoạn sau chuyển tiếp (90%) và gồm cả các ngày chuyển tiếp; tập huấn luyện có 751 giờ từ ngày bắt đầu chuyển tiếp trở đi. Mốc trung bình theo giờ tính trên tập huấn luyện toàn mức cao nên không tương xứng với tập kiểm tra mức thấp.",
+      "features": [
+        "hour",
+        "month",
+        "temperatureC",
+        "windSpeedKmh",
+        "no",
+        "no2",
+        "o3",
+        "so2",
+        "pm25",
+        "pm10",
+        "nh3",
+        "coLag1h",
+        "coLag2h",
+        "coLag3h",
+        "coLag24h"
+      ],
+      "trainSet": {
+        "from": "2022-04-02T07:00:00+07:00",
+        "to": "2025-06-13T06:00:00+07:00",
+        "rows": 28032
+      },
+      "testSet": {
+        "from": "2025-06-13T07:00:00+07:00",
+        "to": "2026-04-01T06:00:00+07:00",
+        "rows": 7008
+      },
+      "splitMethod": "Theo thời gian: 80% dòng đầu của toàn bộ dữ liệu để huấn luyện, 20% cuối để kiểm tra; không loại ngày chuyển tiếp (đúng yêu cầu gốc).",
+      "models": [
+        {
+          "name": "Hồi quy tuyến tính",
+          "kind": "linear-regression",
+          "version": "linear-regression-20261014",
+          "isBest": true,
+          "test": {
+            "rmse": 59.304,
+            "mae": 39.986,
+            "r2": 0.95
+          },
+          "beatsPreviousHour": false,
+          "beatsHourlyMean": true,
+          "params": "regParam=0 (bình phương tối thiểu thường), chuẩn hóa đầu vào; RMSE kiểm định 234.0"
+        },
+        {
+          "name": "Random Forest",
+          "kind": "random-forest",
+          "version": "random-forest-20261014",
+          "isBest": false,
+          "test": {
+            "rmse": 75.707,
+            "mae": 54.725,
+            "r2": 0.9185
+          },
+          "beatsPreviousHour": false,
+          "beatsHourlyMean": true,
+          "params": "numTrees=100, maxDepth=8, seed=42; RMSE kiểm định 296.7"
+        },
+        {
+          "name": "GBT (Gradient Boosted Trees)",
+          "kind": "gbt",
+          "version": "gbt-20261014",
+          "isBest": false,
+          "test": {
+            "rmse": 86.999,
+            "mae": 61.655,
+            "r2": 0.8924
+          },
+          "beatsPreviousHour": false,
+          "beatsHourlyMean": true,
+          "params": "maxIter=100, maxDepth=5, stepSize=0.1, seed=42; RMSE kiểm định 270.5"
+        }
+      ],
+      "baselines": [
+        {
+          "id": "previous-hour",
+          "name": "CO giờ trước",
+          "description": "Dự đoán CO giờ t bằng đúng CO giờ t-1.",
+          "test": {
+            "rmse": 58.056,
+            "mae": 26.674,
+            "r2": 0.9521
+          }
+        },
+        {
+          "id": "hourly-mean",
+          "name": "Trung bình theo giờ trong ngày",
+          "description": "CO trung bình của cùng giờ +07 trong tập huấn luyện (toàn mức cao, trước chuyển tiếp).",
+          "test": {
+            "rmse": 1104.954,
+            "mae": 1029.96,
+            "r2": -16.3588
+          }
+        }
+      ],
+      "conclusion": "Mô hình chọn theo đoạn kiểm định: Hồi quy tuyến tính, RMSE 59.3 µg/m³ trên 7008 giờ kiểm tra. So với mốc CO giờ trước (RMSE 58.1): KHÔNG thắng (+2.1%). So với mốc trung bình theo giờ trong ngày (RMSE 1105.0): thắng (-94.6%). Mô hình có RMSE thấp hơn mốc CO giờ trước: không có mô hình nào. Với dữ liệu này, chỉ lặp lại CO của giờ trước đã tốt hơn mọi mô hình; báo đúng như vậy."
+    },
+    {
+      "id": "full-with-regime",
+      "title": "Huấn luyện toàn bộ có biến chế độ, kiểm tra trên tập kiểm tra của phương án chính",
+      "description": "Huấn luyện 2022-04-02T07:00:00+07:00 đến 2026-02-07T19:00:00+07:00 (32317 giờ) gồm cả trước chuyển tiếp (regime=0) và sau (regime=1), đã loại 60 ngày chuyển tiếp và 24 giờ sau đó; kiểm tra đúng tập kiểm tra của phương án chính. Chia 80/20 trên toàn bộ dữ liệu thì tập huấn luyện không có dòng nào ở chế độ sau (regime hằng số) nên không đo được tác dụng của biến chế độ; vì vậy phương án này dùng tập kiểm tra của phương án chính.",
+      "features": [
+        "hour",
+        "month",
+        "temperatureC",
+        "windSpeedKmh",
+        "no",
+        "no2",
+        "o3",
+        "so2",
+        "pm25",
+        "pm10",
+        "nh3",
+        "coLag1h",
+        "coLag2h",
+        "coLag3h",
+        "coLag24h",
+        "regime"
+      ],
+      "trainSet": {
+        "from": "2022-04-02T07:00:00+07:00",
+        "to": "2026-02-07T19:00:00+07:00",
+        "rows": 32317
+      },
+      "testSet": {
+        "from": "2026-02-07T20:00:00+07:00",
+        "to": "2026-04-01T06:00:00+07:00",
+        "rows": 1259
+      },
+      "splitMethod": "Theo thời gian: mọi giờ trước tập kiểm tra của phương án chính (trừ ngày chuyển tiếp) để huấn luyện; 20% cuối của giai đoạn sau để kiểm tra.",
+      "models": [
+        {
+          "name": "Hồi quy tuyến tính",
+          "kind": "linear-regression",
+          "version": "linear-regression-20261014",
+          "isBest": true,
+          "test": {
+            "rmse": 51.276,
+            "mae": 30.158,
+            "r2": 0.8655
+          },
+          "beatsPreviousHour": false,
+          "beatsHourlyMean": true,
+          "params": "regParam=0 (bình phương tối thiểu thường), chuẩn hóa đầu vào; RMSE kiểm định 69.2"
+        },
+        {
+          "name": "Random Forest",
+          "kind": "random-forest",
+          "version": "random-forest-20261014",
+          "isBest": false,
+          "test": {
+            "rmse": 44.867,
+            "mae": 19.981,
+            "r2": 0.897
+          },
+          "beatsPreviousHour": false,
+          "beatsHourlyMean": true,
+          "params": "numTrees=100, maxDepth=8, seed=42; RMSE kiểm định 124.4"
+        },
+        {
+          "name": "GBT (Gradient Boosted Trees)",
+          "kind": "gbt",
+          "version": "gbt-20261014",
+          "isBest": false,
+          "test": {
+            "rmse": 45.505,
+            "mae": 23.587,
+            "r2": 0.8941
+          },
+          "beatsPreviousHour": false,
+          "beatsHourlyMean": true,
+          "params": "maxIter=100, maxDepth=5, stepSize=0.1, seed=42; RMSE kiểm định 119.2"
+        }
+      ],
+      "baselines": [
+        {
+          "id": "previous-hour",
+          "name": "CO giờ trước",
+          "description": "Dự đoán CO giờ t bằng đúng CO giờ t-1.",
+          "test": {
+            "rmse": 43.864,
+            "mae": 16.182,
+            "r2": 0.9016
+          }
+        },
+        {
+          "id": "hourly-mean",
+          "name": "Trung bình theo giờ trong ngày",
+          "description": "CO trung bình của cùng giờ +07 trong các dòng huấn luyện cùng chế độ với tập kiểm tra (regime=1).",
+          "test": {
+            "rmse": 153.7,
+            "mae": 126.998,
+            "r2": -0.2084
+          }
+        }
+      ],
+      "conclusion": "Mô hình chọn theo đoạn kiểm định: Hồi quy tuyến tính, RMSE 51.3 µg/m³ trên 1259 giờ kiểm tra. So với mốc CO giờ trước (RMSE 43.9): KHÔNG thắng (+16.9%). So với mốc trung bình theo giờ trong ngày (RMSE 153.7): thắng (-66.6%). Mô hình có RMSE thấp hơn mốc CO giờ trước: không có mô hình nào. Với dữ liệu này, chỉ lặp lại CO của giờ trước đã tốt hơn mọi mô hình; báo đúng như vậy."
+    }
+  ]
 }

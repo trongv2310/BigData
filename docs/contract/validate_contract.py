@@ -14,6 +14,7 @@ Kiểm tra:
 Thoát mã 1 nếu có lỗi.
 """
 import json, sys
+from datetime import date, timedelta
 from pathlib import Path
 
 if hasattr(sys.stdout, "reconfigure"):  # Windows mặc định cp1252, không in được tiếng Việt
@@ -182,6 +183,29 @@ else:
             err(f"model-metrics.json: {m_['name']}.beatsHourlyMean không khớp RMSE")
 if mm["trainSet"]["to"] >= mm["testSet"]["from"]:
     err("model-metrics.json: tập huấn luyện phải kết thúc trước khi tập kiểm tra bắt đầu (chia theo thời gian)")
+for setup_name, setup in [("chính", mm)] + [(a_["id"], a_) for a_ in mm["alternatives"]]:
+    ms, bs = setup["models"], {b_["id"]: b_["test"]["rmse"] for b_ in setup["baselines"]}
+    if sum(1 for x in ms if x["isBest"]) != 1:
+        err(f"model-metrics.json phương án {setup_name}: phải có đúng một mô hình isBest")
+    if sorted(bs) != ["hourly-mean", "previous-hour"]:
+        err(f"model-metrics.json phương án {setup_name}: baselines phải là previous-hour và hourly-mean")
+        continue
+    for x in ms:
+        if x["beatsPreviousHour"] != (x["test"]["rmse"] < bs["previous-hour"]) or x["beatsHourlyMean"] != (x["test"]["rmse"] < bs["hourly-mean"]):
+            err(f"model-metrics.json phương án {setup_name}: cờ beats* của {x['name']} không khớp RMSE")
+    if setup["trainSet"]["to"] >= setup["testSet"]["from"]:
+        err(f"model-metrics.json phương án {setup_name}: tập huấn luyện phải kết thúc trước khi tập kiểm tra bắt đầu")
+    if len({x["version"] for x in ms}) != len(ms):
+        err(f"model-metrics.json phương án {setup_name}: phiên bản mô hình phải khác nhau")
+tr_ = mm["transition"]
+if not any(w_["halfWidthDays"] == tr_["main"]["halfWidthDays"] and w_["from"] == tr_["main"]["from"] and w_["to"] == tr_["main"]["to"] for w_ in tr_["windows"]):
+    err("model-metrics.json: transition.main phải là một trong transition.windows")
+if (date.fromisoformat(tr_["excludedTo"]) - date.fromisoformat(tr_["excludedFrom"])).days + 1 != tr_["excludedDays"]:
+    err("model-metrics.json: transition.excludedDays phải bằng số ngày từ excludedFrom đến excludedTo")
+if (date.fromisoformat(tr_["excludedTo"]) + timedelta(days=1)).isoformat() != tr_["postStart"]:
+    err("model-metrics.json: transition.postStart phải là ngày sau excludedTo")
+if "CHƯA XÁC ĐỊNH" not in mm["breakpoint"]["cause"].upper():
+    err("model-metrics.json: breakpoint.cause phải nói rõ nguyên nhân điểm gãy chưa xác định")
 if len(best) == 1:
     pm = load("predict.json")["model"]
     if pm["kind"] != "ml" or pm["version"] != best[0]["version"]:

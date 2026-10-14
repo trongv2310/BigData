@@ -1,5 +1,5 @@
 {
-  "_note": "Ánh xạ route -> file mock -> schema trong openapi.yaml. {id} trong file được thay bằng tham số đường dẫn. 'variants' (tùy chọn): khi query khớp hết các cặp khóa/giá trị thì trả file/status khác; schema mặc định là schema của route khi status 200, và Error khi status >= 400. Query bắt đầu bằng 'mock' (ví dụ ?mock=stopped) là cách riêng của mock để xem trạng thái khó gặp, không có trong openapi. 'handler' (tùy chọn): route có trạng thái trong bộ nhớ của mock (replay). MỌI SỐ trong mock là minh họa, không phải kết quả thật; mock trả header X-Mock: true. Hai file analysis-sql.json và analysis-day-clusters.json là kết quả THẬT của pipeline (chép từ HDFS /co/output ngày 14/10/2026), không phải số minh họa.",
+  "_note": "Ánh xạ route -> file mock -> schema trong openapi.yaml. {id} trong file được thay bằng tham số đường dẫn. 'variants' (tùy chọn): khi query khớp hết các cặp khóa/giá trị thì trả file/status khác; schema mặc định là schema của route khi status 200, và Error khi status >= 400. Query bắt đầu bằng 'mock' (ví dụ ?mock=stopped) là cách riêng của mock để xem trạng thái khó gặp, không có trong openapi. 'handler' (tùy chọn): route có trạng thái trong bộ nhớ của mock (replay). MỌI SỐ trong mock là minh họa, không phải kết quả thật; mock trả header X-Mock: true. Các file analysis-sql.json, analysis-day-clusters.json và model-metrics.json là kết quả THẬT của pipeline (chép từ HDFS /co/output ngày 14/10/2026), không phải số minh họa.",
   "routes": [
     {
       "method": "GET",
@@ -213,6 +213,13 @@
           },
           "status": 404,
           "file": "error-model-not-trained.json"
+        },
+        {
+          "query": {
+            "mock": "unavailable"
+          },
+          "status": 503,
+          "file": "error-model-unavailable.json"
         }
       ]
     }
