@@ -727,6 +727,7 @@ components:
             Có thể có thêm bảng `live` (Spark ghi từ Kafka vào HDFS /live/co_stream; chưa có dữ liệu thì bảng này không tồn tại) với các cột:
             datetime_vn (timestamp, giờ Việt Nam), station, co, wind_speed_kmh, temperature_C, co_accumulation_index, canh_bao,
             co_observed_at, weather_observed_at, provider, original_datetime_vn (chỉ bản phát lại), aqi, no, no2, o3, so2, pm2_5, pm10, nh3 (từ Bước A1, dòng cũ null),
+            co_actual (= co), co_predicted, model_version, feature_note (từ Bước A5; co_predicted và model_version null nếu bản ghi thiếu đầu vào cho mô hình hoặc ghi trước A5),
             kafka_partition, kafka_offset, kafka_timestamp (UTC). `provider` phân biệt 'openweather' (dữ liệu thật), 'replay-dataset' (phát lại, mô phỏng) và
             'open-meteo' (tin cũ): bảng chứa lẫn các nguồn nên luôn lọc theo provider, không trộn vào một chuỗi. Khác bộ Kaggle, nên cũng không trộn với bảng `aqi`.
             Giá trị timestamp trả về dạng chuỗi "yyyy-MM-dd HH:mm:ss". Lần gọi đầu tiên khởi động Spark nên có thể mất 10 giây trở lên.

@@ -3,6 +3,7 @@
 # Luồng dữ liệu thật cần: export OWM_API_KEY=... trước khi chạy (thiếu thì bước 5 báo rõ và bỏ qua producer OpenWeather).
 # Chạy trong WSL:  bash infra/start_all.sh
 # Biến tùy chọn:   WITH_YARN=1 (bật YARN, mặc định tắt để lấy RAM)   WITH_AIRFLOW=0 (không bật Airflow)
+#                  ENRICH=0 (không dùng topic hcmc_co_enriched: backend đọc topic thô, không có coPredicted)
 #                  BACKEND_ALLOW_WRITES=1 (bật cửa sổ lệnh, mặc định tắt)   ALLOWED_ORIGINS=... (mặc định cho phép cổng 5173-5175)
 # Frontend chạy riêng trên Windows (xem docs/DEMO.md bước 7). Script không sửa các script cũ ở thư mục cha hay trong ~.
 # Đã thử khởi động nguội (wsl --shutdown rồi chạy script này) ngày 13/10/2026, xem docs/HANDOFF.md P18.
@@ -51,6 +52,11 @@ else
   warn "Kafka chưa trả lời hoặc thiếu topic hcmc_co_stream (xem infra/README.md nếu thư mục dữ liệu bị mất)"
 fi
 
+# 2b. Topic hcmc_co_enriched (bản ghi đã có dự đoán do Spark thêm, backend đọc topic này). Tạo nếu chưa có; không đụng topic khác.
+if [ "$ok" = 1 ] && [ "${ENRICH:-1}" != 0 ]; then
+  kafka kafka-topics.sh --bootstrap-server localhost:9092 --create --if-not-exists --topic hcmc_co_enriched --partitions 1 --replication-factor 1 2>&1 | tail -1
+fi
+
 # 3. YARN (tùy chọn)
 if [ "${WITH_YARN:-0}" = 1 ]; then
   step "3. YARN"
@@ -83,7 +89,7 @@ if pgrep -f "uvicorn app.main:ap[p]" > /dev/null; then
   echo "backend đã chạy"
 else
   cd "$ROOT/backend" || exit 1
-  STREAM_SOURCE=kafka FLOWS_EXTRA=1 ALLOWED_ORIGINS="$ORIGINS" BACKEND_ALLOW_WRITES="${BACKEND_ALLOW_WRITES:-}" \
+  READING_TOPIC="$([ "${ENRICH:-1}" = 0 ] && echo hcmc_co_stream || echo hcmc_co_enriched)" STREAM_SOURCE=kafka FLOWS_EXTRA=1 ALLOWED_ORIGINS="$ORIGINS" BACKEND_ALLOW_WRITES="${BACKEND_ALLOW_WRITES:-}" \
     setsid nohup python3 -m uvicorn app.main:app --host 127.0.0.1 --port 8000 > "$LOGDIR/backend.log" 2>&1 < /dev/null &
   echo "đã khởi động backend, log $LOGDIR/backend.log"
 fi

@@ -137,6 +137,12 @@ class LastPublished(unittest.TestCase):
         got = owm.last_published("x", config.KAFKA_TOPIC, consumer_cls=lambda **kw: FakeConsumer(msgs, **kw))
         self.assertEqual((got["dt"], got["values"][0]), (1791956800, 251.31))
 
+    def test_finds_openweather_message_buried_under_thousands_of_replay_messages(self):
+        old = owm.to_record(AIR, WEATHER)
+        msgs = [msg(replay_rec(i)) for i in range(1)] + [msg(old)] + [msg(replay_rec(i)) for i in range(3000)]  # phát lại 60x chiếm hàng nghìn tin cuối
+        got = owm.last_published("x", config.KAFKA_TOPIC, consumer_cls=lambda **kw: FakeConsumer(msgs, **kw))
+        self.assertEqual(got["dt"], 1791956800)
+
     def test_none_when_topic_has_only_replay(self):
         msgs = [msg(replay_rec(i)) for i in range(10)]
         self.assertIsNone(owm.last_published("x", config.KAFKA_TOPIC, consumer_cls=lambda **kw: FakeConsumer(msgs, **kw)))
@@ -299,12 +305,12 @@ class ReplayProducerPieces(unittest.TestCase):
         d = Path(tempfile.mkdtemp()) / "k.csv"
         d.write_text("datetime,co,no,no2,o3,so2,pm2_5,pm10,nh3,temperature_C,wind_speed_kmh\n"
                      "30-06-25 16:00,900,1,2,3,4,5,6,7,30,5\n30-06-25 17:00,300,1,2,3,4,5,6,7,31,6\n30-06-25 18:00,310,1,2,,4,5,6,7,32,7\n", encoding="utf-8")
-        rows = rp.load_rows(str(d), datetime(2025, 7, 1, tzinfo=VN))
-        self.assertEqual([r["co"] for r in rows], [300.0, 310.0])  # dòng trước điểm gãy bị loại
+        rows, idx = rp.load_rows(str(d), datetime(2025, 7, 1, tzinfo=VN))
+        self.assertEqual((len(rows), idx, [r["co"] for r in rows[idx:]]), (3, 1, [300.0, 310.0]))  # nạp cả bộ (cần dòng trước để dựng độ trễ), phát từ chỉ số 1
         now = datetime(2026, 10, 14, 13, 0, 5, tzinfo=VN)
-        m = rp.make_message(rows[0], 1, now)
+        m = rp.make_message(rows[idx], 1, now)
         self.assertEqual((m["datetime"], m["originalDatetime"], m["provider"]), ("2026-10-14 13:00:05", "2025-07-01 00:00:00", "replay-dataset"))
-        self.assertIsNone(rp.make_message(rows[1], 2, now)["o3"])  # ô trống -> null, không điền số
+        self.assertIsNone(rp.make_message(rows[2], 2, now)["o3"])  # ô trống -> null, không điền số
         r = reading.from_record(m)
         self.assertEqual(schema_errors("AqiReading", r), [])
         self.assertEqual((r["source"], r["originalDatetime"], r["datetime"]), ("replay-dataset", "2025-07-01T00:00:00+07:00", "2026-10-14T13:00:05+07:00"))

@@ -6,6 +6,7 @@
 #   OWM_API_KEY      khóa OpenWeather (BẮT BUỘC cho luồng dữ liệu thật; thiếu thì bỏ qua producer OpenWeather và báo rõ, không thoát lỗi)
 #   WITH_REPLAY=0    không bật luồng phát lại (mặc định bật)
 #   WITH_OPEN_METEO=1  bật thêm producer Open-Meteo cũ (nguồn KHÁC, mặc định TẮT)
+#   ENRICH=0         không ghi topic hcmc_co_enriched (Spark vẫn dự đoán và ghi Parquet /live; backend phải đọc topic thô)
 #   OWM_INTERVAL (mặc định 300 giây), REPLAY_BASE_INTERVAL (mặc định 10 giây ở tốc độ 1), LIVE_INTERVAL (Open-Meteo, mặc định 60)
 # Backend chạy riêng với STREAM_SOURCE=kafka (xem infra/README.md). Script này không đụng backend, Kafka, HDFS.
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -40,8 +41,8 @@ start() {
     launch "$OPENMETEO_PID" "$LOGDIR/live_producer.log" "producer Open-Meteo (nguồn KHÁC)" python3 infra/live_producer.py --interval "${LIVE_INTERVAL:-60}"
   fi
   if alive "$SPARK_PID"; then echo "spark consumer đã chạy (pid $(cat "$SPARK_PID"))"; else
-    setsid nohup bash -c 'cd "$1" && exec spark-submit --driver-memory "$2" --conf spark.ui.port=4040 --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1 infra/spark_kafka_consumer.py' \
-      _ "$ROOT" "${SPARK_DRIVER_MEMORY:-640m}" > "$LOGDIR/spark_kafka.log" 2>&1 < /dev/null &
+    setsid nohup bash -c 'cd "$1" && exec spark-submit --driver-memory "$2" --conf spark.ui.port=4040 --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1 infra/spark_kafka_consumer.py --enriched-topic "$3"' \
+      _ "$ROOT" "${SPARK_DRIVER_MEMORY:-1g}" "$([ "${ENRICH:-1}" = 0 ] && echo "" || echo hcmc_co_enriched)" > "$LOGDIR/spark_kafka.log" 2>&1 < /dev/null &
     echo $! > "$SPARK_PID"
     echo "spark consumer: đã khởi động (lần đầu tải connector Kafka ~1 phút), log $LOGDIR/spark_kafka.log"
   fi

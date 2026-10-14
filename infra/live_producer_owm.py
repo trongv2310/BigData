@@ -12,6 +12,11 @@ Cùng nhà cung cấp với bản raw `scripts/fetch_owm_raw.py` (thư mục cha
   - Hạn mức gói miễn phí (openweathermap.org/price, tra 14/10/2026): 60 lời gọi/phút, 1.000.000 lời gọi/tháng. Mỗi lần hỏi tốn 2 lời gọi;
     mặc định hỏi mỗi 300 giây = 576 lời gọi/ngày (khoảng 17 300/tháng), chỉ bằng 1,7% hạn mức tháng.
 
+Bước A5: mỗi lần GỬI (tối đa một lần mỗi giờ) producer gọi thêm air_pollution/history (1 lời gọi) để dựng `modelInputs` cho mô hình dự đoán CO: CO và các chất khí của
+các giờ trước lấy từ điểm theo giờ của lịch sử, tìm điểm có ĐÚNG giá trị của quan sát hiện tại (xem model_inputs.py). Nhờ vậy bản ghi sống đầu tiên đã có đủ độ trễ 24 giờ,
+không cần "khởi động nóng". Không lấy được lịch sử hoặc lịch sử không khớp thì vẫn gửi bản ghi, không có `modelInputs` (không dự đoán), kèm `featureNote` nói lý do.
+Nhiệt độ và gió của `modelInputs` là của quan sát hiện tại (API lịch sử không có thời tiết): xấp xỉ, có ghi ở `featureNote`.
+
 Chạy (WSL, Kafka đang chạy):  export OWM_API_KEY=...   rồi   python3 infra/live_producer_owm.py [--interval 300] [--once]
 """
 import argparse
@@ -22,6 +27,8 @@ import time
 from datetime import datetime, timedelta, timezone
 
 import requests
+
+import model_inputs as mi
 
 try:  # kafka-python chỉ cần khi thật sự gửi/đọc Kafka; các hàm thuần túy bên dưới thử được không cần nó
     from kafka import KafkaConsumer, KafkaProducer, TopicPartition
@@ -38,9 +45,11 @@ STATION = "Tram_TPHCM_OWM"   # backend (reading.py) nhận nhãn này và provid
 PROVIDER = "openweather"
 AIR_URL = "https://api.openweathermap.org/data/2.5/air_pollution"
 WEATHER_URL = "https://api.openweathermap.org/data/2.5/weather"
+HISTORY_URL = "https://api.openweathermap.org/data/2.5/air_pollution/history"
+HISTORY_BACK_HOURS = 27  # đủ 24 giờ độ trễ cộng chênh lệch do quan sát nằm giữa giờ
 POLLUTANTS = ["no", "no2", "o3", "so2", "pm2_5", "pm10", "nh3"]
 MAX_BACKOFF = 900.0
-SCAN_BACK = 200  # khi khởi động: đọc lùi tối đa ngần này tin cuối mỗi partition để tìm `dt` OpenWeather đã gửi
+BACK_CHUNK, BACK_MAX = 500, 50000  # khi khởi động: quét lùi từng đoạn BACK_CHUNK tin (tối đa BACK_MAX) mỗi partition cho tới khi gặp tin OpenWeather đã gửi
 
 
 def scrub(text: object, key: str | None) -> str:
@@ -95,6 +104,29 @@ def fetch_record(key: str, session: requests.Session | None = None) -> dict:
     return to_record(air.json(), weather.json())
 
 
+def fetch_history(key: str, around_dt: int, session=None) -> list[dict]:
+    """Điểm theo giờ của air_pollution/history từ HISTORY_BACK_HOURS giờ trước đến một giờ sau `around_dt`."""
+    s = session or requests
+    r = s.get(HISTORY_URL, params={"lat": LATITUDE, "lon": LONGITUDE, "start": around_dt - HISTORY_BACK_HOURS * 3600, "end": around_dt + 3600, "appid": key}, timeout=20)
+    r.raise_for_status()
+    return r.json().get("list", [])
+
+
+def attach_model_inputs(rec: dict, key: str, session=None, history_fn=None) -> dict:
+    """Thêm `modelInputs` (nếu dựng được) và `featureNote` vào rec. Lỗi lấy lịch sử không làm mất bản ghi."""
+    try:
+        history = (history_fn or fetch_history)(key, rec["owmDt"], session)
+    except (requests.RequestException, ValueError) as e:
+        rec["featureNote"] = f"không lấy được lịch sử OpenWeather ({type(e).__name__}) nên không có dự đoán cho bản ghi này"
+        return rec
+    comps = {"co": rec["co"], **{n: rec.get(n) for n in POLLUTANTS}}
+    inputs, note = mi.from_history(history, comps, {"temperatureC": rec["temperature_C"], "windSpeedKmh": rec["wind_speed_kmh"]}, observed_dt=rec["owmDt"])
+    rec["featureNote"] = note
+    if inputs is not None:
+        rec["modelInputs"] = inputs
+    return rec
+
+
 def values_of(rec: dict) -> tuple:
     """Bộ số liệu khí của một bản ghi, dùng để nhận ra "quan sát mới" (xem đầu tệp: `dt` một mình không đáng tin)."""
     return tuple(rec.get(k) for k in ("co", *POLLUTANTS))
@@ -112,7 +144,7 @@ def skip_reason(rec: dict, last: dict | None) -> str | None:
 
 
 def last_published(bootstrap: str, topic: str, consumer_cls=None) -> dict | None:
-    """{"dt", "values"} của tin OpenWeather có `owmDt` lớn nhất trong SCAN_BACK tin cuối của topic (bỏ qua tin của nguồn khác), hoặc None.
+    """{"dt", "values"} của tin OpenWeather có `owmDt` lớn nhất trong đoạn gần nhất (quét lùi) có tin OpenWeather (bỏ qua tin của nguồn khác), hoặc None.
 
     Chỉ đọc, không dùng consumer group. Topic dùng chung với bản phát lại nên tin cuối cùng có thể không phải của OpenWeather.
     """
@@ -129,21 +161,28 @@ def last_published(bootstrap: str, topic: str, consumer_cls=None) -> dict | None
         c.assign(parts)
         best = None
         for tp, end in c.end_offsets(parts).items():
-            if end <= 0:
-                continue
-            c.seek(tp, max(0, end - SCAN_BACK))
-            while True:
-                batch = c.poll(timeout_ms=3000, max_records=SCAN_BACK).get(tp, [])
-                for rec in batch:
-                    try:
-                        v = json.loads(rec.value.decode("utf-8"))
-                    except (ValueError, AttributeError):
-                        continue
-                    if isinstance(v, dict) and v.get("provider") == PROVIDER and isinstance(v.get("owmDt"), int):
-                        if best is None or v["owmDt"] > best["dt"]:
-                            best = {"dt": v["owmDt"], "values": values_of(v)}
-                if not batch or c.position(tp) >= end:
+            hi, scanned = end, 0
+            while hi > 0 and scanned < BACK_MAX:  # quét lùi từng đoạn: phát lại nhanh có thể chiếm hàng nghìn tin cuối, tin OpenWeather nằm sâu hơn
+                lo = max(0, hi - BACK_CHUNK)
+                c.seek(tp, lo)
+                while c.position(tp) < hi:
+                    batch = c.poll(timeout_ms=3000, max_records=BACK_CHUNK).get(tp, [])
+                    if not batch:
+                        break
+                    for rec in batch:
+                        if rec.offset >= hi:
+                            continue
+                        try:
+                            v = json.loads(rec.value.decode("utf-8"))
+                        except (ValueError, AttributeError):
+                            continue
+                        if isinstance(v, dict) and v.get("provider") == PROVIDER and isinstance(v.get("owmDt"), int):
+                            if best is None or v["owmDt"] > best["dt"]:
+                                best = {"dt": v["owmDt"], "values": values_of(v)}
+                scanned += hi - lo
+                if best is not None:
                     break
+                hi = lo
         return best
     except (KafkaError, ValueError) as e:
         print(f"[live_producer_owm] không đọc được tin cũ để tránh gửi trùng ({type(e).__name__}: {e})", file=sys.stderr, flush=True)
@@ -191,10 +230,12 @@ def main() -> int:
             failures = 0
             reason = skip_reason(rec, last)
             if reason is None:
+                attach_model_inputs(rec, key, session)
                 meta = producer.send(a.topic, key=STATION, value=rec).get(timeout=15)
                 last = {"dt": rec["owmDt"], "values": values_of(rec)}
                 print(f"[{datetime.now(VN):%H:%M:%S}] GỬI offset={meta.offset} quan sát {rec['coObservedAt']} (dt={rec['owmDt']}) | "
-                      f"CO={rec['co']} µg/m³ gió={rec['wind_speed_kmh']} km/h nhiệt độ={rec['temperature_C']}°C", flush=True)
+                      f"CO={rec['co']} µg/m³ gió={rec['wind_speed_kmh']} km/h nhiệt độ={rec['temperature_C']}°C | "
+                      f"{'có' if 'modelInputs' in rec else 'KHÔNG có'} đầu vào mô hình ({rec.get('featureNote', '')[:70]})", flush=True)
             else:
                 print(f"[{datetime.now(VN):%H:%M:%S}] chưa có quan sát mới: {reason} (CO={rec['co']})", flush=True)
         except requests.HTTPError as e:

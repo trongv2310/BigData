@@ -47,8 +47,8 @@ def _parse(value: bytes | None) -> dict | None:
 
 
 def _partitions(c: KafkaConsumer) -> list[TopicPartition]:
-    parts = c.partitions_for_topic(config.KAFKA_TOPIC)
-    return [TopicPartition(config.KAFKA_TOPIC, p) for p in sorted(parts or [])]
+    parts = c.partitions_for_topic(config.READING_TOPIC)
+    return [TopicPartition(config.READING_TOPIC, p) for p in sorted(parts or [])]
 
 
 def _call(fn):
