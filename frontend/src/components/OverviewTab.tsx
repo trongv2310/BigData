@@ -31,15 +31,21 @@ export const OverviewTab: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      const [servicesData, latestData] = await Promise.all([
+      const [servicesRes, latestRes] = await Promise.allSettled([
         api.getServices(),
         api.getAqiLatest(),
       ]);
-      setServices(servicesData.services);
-      setInitialReading(latestData);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setError(`Không thể tải dữ liệu: ${msg}`);
+      if (servicesRes.status === 'fulfilled') {
+        setServices(servicesRes.value.services);
+      } else {
+        const msg = servicesRes.reason instanceof Error ? servicesRes.reason.message : String(servicesRes.reason);
+        setError(`Không thể tải trạng thái dịch vụ: ${msg}`);
+      }
+      if (latestRes.status === 'fulfilled') {
+        setInitialReading(latestRes.value);
+      } else {
+        setInitialReading(null);
+      }
     } finally {
       setLoading(false);
     }
@@ -47,18 +53,20 @@ export const OverviewTab: React.FC = () => {
 
   useEffect(() => {
     let ignore = false;
-    Promise.all([api.getServices(), api.getAqiLatest()])
-      .then(([servicesData, latestData]) => {
+    Promise.allSettled([api.getServices(), api.getAqiLatest()])
+      .then(([servicesRes, latestRes]) => {
         if (!ignore) {
-          setServices(servicesData.services);
-          setInitialReading(latestData);
-          setLoading(false);
-        }
-      })
-      .catch((err) => {
-        if (!ignore) {
-          const msg = err instanceof Error ? err.message : String(err);
-          setError(`Không thể tải dữ liệu: ${msg}`);
+          if (servicesRes.status === 'fulfilled') {
+            setServices(servicesRes.value.services);
+          } else {
+            const msg = servicesRes.reason instanceof Error ? servicesRes.reason.message : String(servicesRes.reason);
+            setError(`Không thể tải trạng thái dịch vụ: ${msg}`);
+          }
+          if (latestRes.status === 'fulfilled') {
+            setInitialReading(latestRes.value);
+          } else {
+            setInitialReading(null);
+          }
           setLoading(false);
         }
       });

@@ -246,6 +246,37 @@ Mẫu:
 
 ## Frontend (Antigravity)
 
+### 2026-10-14 14:10 — Giai đoạn F3: Nối Backend thật (cổng 8000) & Sửa lỗi hiển thị
+- Xong:
+  + 1. Nối thành công Frontend với Backend thật (`http://localhost:8000` và `ws://localhost:8000/ws/stream`):
+    - Đã xác thực toàn bộ các route REST API và luồng WebSocket thật trên cụm WSL (HDFS 4/4 DataNode UP, Kafka topic `hcmc_co_stream` UP, Spark UP, Backend FastAPI UP).
+    - Cổng CORS: Vite dev server giữ vững cổng 5173 (`--strictPort`), Origin `http://localhost:5173` được backend phản hồi `Access-Control-Allow-Origin: http://localhost:5173` chuẩn xác.
+    - WebSocket `/ws/stream`: Kết nối thành công, nhận liên tục các sự kiện `service.state` cho 8 dịch vụ, `reading` cho luồng phát lại và luồng thật.
+  + 2. Kiểm tra và tối ưu hiển thị từng trang:
+    - **Tab "Dữ liệu sống" (`LiveTab`)**:
+      * Đã kiểm tra cả 2 luồng: Luồng phát lại nhận đúng bản ghi `source=replay-dataset` (CO 191.69 µg/m³, thời điểm đo gốc `2025-07-06T10:00:00+07:00`, trạm mô phỏng); Luồng thật nhận đúng `source=live-openweather` (CO 251.31 µg/m³, trạm "TP.HCM (OpenWeather)", thời điểm quan sát thật 13:14:02).
+      * Trạng thái phát lại `/api/replay/status` phản ánh đúng `state=stopped`, `controllable=false` kèm ghi chú giải thích từ backend.
+      * Tối ưu xử lý reset `initialReplay` và `initialLive` thành `null` khi API trả lỗi hoặc 404, đảm bảo hiển thị đúng trạng thái rỗng và không lưu dữ liệu cũ.
+    - **Tab "Tổng quan" (`OverviewTab`)**:
+      * Chuyển `Promise.all` sang `Promise.allSettled`: Nếu chưa có bản ghi đo (`/api/aqi/latest` trả 404 `NO_READING_YET`), danh sách 8 dịch vụ vẫn hiển thị đầy đủ, thẻ CO thể hiện trạng thái rỗng tường minh thay vì báo lỗi toàn trang.
+    - **Tab "Pipeline & Chỉ số Mô hình" (`PipelineTab`)**:
+      * Bổ sung thẻ trạng thái rỗng thân thiện khi `/api/pipeline/steps` trả về 404 (chờ bước A2 từ Claude).
+      * Xử lý chuẩn 404 `MODEL_NOT_TRAINED` cho `/api/model/metrics`.
+    - **Tab "Phân tích CO & AQI" (`AqiTab`)**: Chuỗi dữ liệu tháng 48 điểm thể hiện rõ điểm gãy ngày 01/07/2025 (sụt từ 653.68 xuống 265.69 µg/m³), biểu đồ tách biệt hai giai đoạn kèm ghi chú từ API.
+    - **Tab "SparkSQL" (`SqlTab`)**: Truy vấn SparkSQL trên `/raw/Dataset.csv` hoạt động hoàn hảo (trả 5 dòng mẫu trong 8.9s ở lần đầu, các lần sau tức thì).
+    - **Tab "Dự đoán" (`PredictTab`)**: Nhận phản hồi `heuristic` từ backend, hiển thị khoảng tin cậy 10%-90% và mô tả chi tiết dữ liệu căn cứ.
+    - **Tab "Cửa sổ lệnh" (`TerminalTab`)**: Kiểm tra bắt tay WebSocket thật, nhận đúng mã đóng 4403 ("Cửa sổ lệnh đang tắt. Đặt BACKEND_ALLOW_WRITES=1 rồi chạy lại backend") kèm hướng dẫn bảo mật.
+  + 3. Cập nhật kiểu dữ liệu (`npm run generate:types`): Đồng bộ chú thích mới về bảng `live` (thêm các cột `original_datetime_vn`, `aqi`, các chất khí từ Bước A1).
+- Chạy thế nào:
+  + Cấu hình `.env`: `VITE_API_BASE=http://localhost:8000`, `VITE_STREAM=ws`, `VITE_WS_URL=ws://localhost:8000/ws/stream`
+  + Frontend dev: `cd frontend && npm run dev -- --port 5173 --strictPort`
+  + Build production: `npm run build` (thành công 0 lỗi, ~860ms)
+  + Kiểm tra linter: `npm run lint` (0 warnings, 0 errors)
+  + Kiểm tra hợp đồng: `python docs/contract/validate_contract.py` (OK)
+- Chưa làm / đang chờ backend:
+  + Route `/api/pipeline/steps` và `/api/model/metrics` trên backend thật đang trả 404, sẽ tự động hiển thị dữ liệu đầy đủ ngay khi Claude triển khai Bước A2 và Bước A4.
+- Cần bên kia: Claude hoàn tất Bước A2/A4 để trang Pipeline hiển thị dữ liệu pipeline thật đã ghi nhận trên HDFS (`/co/output/step_summary.json`).
+
 ### 2026-10-14 13:45 — Giai đoạn F2: Trang "Pipeline" (9 bước) & Chỉ số Mô hình
 - Xong:
   + 1. Tạo trang mới `PipelineTab.tsx` ("Pipeline 9 bước & Chỉ số Mô hình"):
