@@ -33,6 +33,7 @@ import {
   formatChartTime,
   formatDataAge,
   getCoStatusBadge,
+  getForecastStatus,
 } from '../utils/format';
 
 // Đăng ký các module ChartJS
@@ -190,36 +191,34 @@ export const LiveTab: React.FC = () => {
 
     const actualCo = points.map((p) => p.co);
     const predictedCo = points.map((p) => (p.coPredicted !== null ? p.coPredicted : null));
-    const hasPredicted = points.some((p) => p.coPredicted !== null);
+    const modelVersion = points.find((p) => p.modelVersion)?.modelVersion || 'ML';
 
     const datasets: ChartData<'line'>['datasets'] = [
       {
         label: 'CO Thực tế (Mô phỏng)',
         data: actualCo,
-        borderColor: '#a855f7', // Tím tím cho mô phỏng
+        borderColor: '#a855f7', // Tím cho mô phỏng
         backgroundColor: 'rgba(168, 85, 247, 0.1)',
         fill: true,
         tension: 0.25,
         pointRadius: points.length === 1 ? 5 : 3,
         pointHoverRadius: 6,
       },
-    ];
-
-    if (hasPredicted) {
-      datasets.push({
-        label: `CO Dự đoán (${points.find((p) => p.modelVersion)?.modelVersion || 'ML'})`,
+      {
+        label: `CO Dự đoán (${modelVersion})`,
         data: predictedCo as (number | null)[],
         borderColor: '#38bdf8', // Xanh sky
         backgroundColor: 'transparent',
         fill: false,
         tension: 0.25,
         borderDash: [5, 5],
-        pointRadius: points.length === 1 ? 4 : 2.5,
+        spanGaps: false,
+        pointRadius: points.map((p) => (p.coPredicted !== null ? (points.length === 1 ? 4 : 2.5) : 0)),
         pointHoverRadius: 5,
-      });
-    }
+      },
+    ];
 
-    return { labels, datasets };
+    return { labels, datasets, points };
   }, [replayHistory, activeReplayReading]);
 
   // Chuẩn bị dữ liệu biểu đồ Live
@@ -233,88 +232,164 @@ export const LiveTab: React.FC = () => {
     const labels = points.map((p) => formatChartTime(p.datetime));
     const actualCo = points.map((p) => p.co);
     const predictedCo = points.map((p) => (p.coPredicted !== null ? p.coPredicted : null));
-    const hasPredicted = points.some((p) => p.coPredicted !== null);
+    const modelVersion = points.find((p) => p.modelVersion)?.modelVersion || 'ML';
 
     const datasets: ChartData<'line'>['datasets'] = [
       {
-        label: 'CO Quan sát Thật',
+        label: 'CO Nguồn OpenWeather',
         data: actualCo,
         borderColor: '#06b6d4', // Cyan cho dữ liệu thật
         backgroundColor: 'rgba(6, 182, 212, 0.1)',
         fill: true,
         tension: 0.25,
-        pointRadius: points.length === 1 ? 5 : 3,
+        pointStyle: points.map((p) => (p.coIsForecast === true ? 'triangle' : 'circle')),
+        pointRadius: points.map((p) =>
+          p.coIsForecast === true ? 5 : points.length === 1 ? 5 : 3
+        ),
+        pointBackgroundColor: points.map((p) =>
+          p.coIsForecast === true ? '#f59e0b' : '#06b6d4'
+        ),
+        pointBorderColor: points.map((p) =>
+          p.coIsForecast === true ? '#fbbf24' : '#06b6d4'
+        ),
         pointHoverRadius: 6,
       },
-    ];
-
-    if (hasPredicted) {
-      datasets.push({
-        label: `CO Dự đoán (${points.find((p) => p.modelVersion)?.modelVersion || 'ML'})`,
+      {
+        label: `CO Dự đoán (${modelVersion})`,
         data: predictedCo as (number | null)[],
         borderColor: '#f59e0b', // Vàng amber
         backgroundColor: 'transparent',
         fill: false,
         tension: 0.25,
         borderDash: [5, 5],
-        pointRadius: points.length === 1 ? 4 : 2.5,
+        spanGaps: false,
+        pointRadius: points.map((p) => (p.coPredicted !== null ? (points.length === 1 ? 4 : 2.5) : 0)),
         pointHoverRadius: 5,
-      });
-    }
+      },
+    ];
 
-    return { labels, datasets };
+    return { labels, datasets, points };
   }, [liveHistory, activeLiveReading]);
 
-  const commonChartOptions: ChartOptions<'line'> = {
-    responsive: true,
-    maintainAspectRatio: false,
-    interaction: {
-      mode: 'index',
-      intersect: false,
-    },
-    plugins: {
-      legend: {
-        position: 'top',
-        labels: {
-          color: '#94a3b8',
-          font: { size: 11 },
-          boxWidth: 12,
-        },
+  const replayChartOptions: ChartOptions<'line'> = useMemo(
+    () => ({
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {
+        mode: 'index',
+        intersect: false,
       },
-      tooltip: {
-        backgroundColor: '#0f172a',
-        titleColor: '#f8fafc',
-        bodyColor: '#e2e8f0',
-        borderColor: '#334155',
-        borderWidth: 1,
-        padding: 8,
-        callbacks: {
-          label: (context) => {
-            if (context.parsed.y !== null) {
-              return `${context.dataset.label}: ${context.parsed.y.toFixed(1)} µg/m³`;
-            }
-            return '';
+      plugins: {
+        legend: {
+          position: 'top',
+          labels: {
+            color: '#94a3b8',
+            font: { size: 11 },
+            boxWidth: 12,
+          },
+        },
+        tooltip: {
+          backgroundColor: '#0f172a',
+          titleColor: '#f8fafc',
+          bodyColor: '#e2e8f0',
+          borderColor: '#334155',
+          borderWidth: 1,
+          padding: 8,
+          callbacks: {
+            label: (context) => {
+              if (context.parsed.y !== null && !isNaN(context.parsed.y)) {
+                return `${context.dataset.label}: ${context.parsed.y.toFixed(1)} µg/m³`;
+              }
+              return `${context.dataset.label}: chưa đủ lịch sử`;
+            },
           },
         },
       },
-    },
-    scales: {
-      x: {
-        grid: { color: '#1e293b' },
-        ticks: { color: '#94a3b8', font: { size: 10 }, maxRotation: 45 },
-      },
-      y: {
-        grid: { color: '#1e293b' },
-        ticks: { color: '#94a3b8', font: { size: 10 } },
-        title: {
-          display: true,
-          text: 'CO (µg/m³)',
-          color: '#64748b',
-          font: { size: 10 },
+      scales: {
+        x: {
+          grid: { color: '#1e293b' },
+          ticks: { color: '#94a3b8', font: { size: 10 }, maxRotation: 45 },
+        },
+        y: {
+          grid: { color: '#1e293b' },
+          ticks: { color: '#94a3b8', font: { size: 10 } },
+          title: {
+            display: true,
+            text: 'CO (µg/m³)',
+            color: '#64748b',
+            font: { size: 10 },
+          },
         },
       },
-    },
-  };
+    }),
+    []
+  );
+
+  const liveChartOptions: ChartOptions<'line'> = useMemo(
+    () => ({
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {
+        mode: 'index',
+        intersect: false,
+      },
+      plugins: {
+        legend: {
+          position: 'top',
+          labels: {
+            color: '#94a3b8',
+            font: { size: 11 },
+            boxWidth: 12,
+          },
+        },
+        tooltip: {
+          backgroundColor: '#0f172a',
+          titleColor: '#f8fafc',
+          bodyColor: '#e2e8f0',
+          borderColor: '#334155',
+          borderWidth: 1,
+          padding: 8,
+          callbacks: {
+            label: (context) => {
+              const idx = context.dataIndex;
+              const pt = liveChartData.points[idx];
+              if (context.datasetIndex === 0) {
+                let note = '';
+                if (pt?.coIsForecast === true) {
+                  note = ' (giá trị dự báo của OpenWeather)';
+                } else if (pt?.coIsForecast === null) {
+                  note = ' (chưa rõ là quan sát hay dự báo)';
+                }
+                return `${context.dataset.label}: ${context.parsed.y !== null ? context.parsed.y.toFixed(1) : '—'} µg/m³${note}`;
+              }
+              if (context.parsed.y !== null && !isNaN(context.parsed.y)) {
+                return `${context.dataset.label}: ${context.parsed.y.toFixed(1)} µg/m³`;
+              }
+              return `${context.dataset.label}: chưa đủ lịch sử`;
+            },
+          },
+        },
+      },
+      scales: {
+        x: {
+          grid: { color: '#1e293b' },
+          ticks: { color: '#94a3b8', font: { size: 10 }, maxRotation: 45 },
+        },
+        y: {
+          grid: { color: '#1e293b' },
+          ticks: { color: '#94a3b8', font: { size: 10 } },
+          title: {
+            display: true,
+            text: 'CO (µg/m³)',
+            color: '#64748b',
+            font: { size: 10 },
+          },
+        },
+      },
+    }),
+    [liveChartData.points]
+  );
+
 
   return (
     <div className="space-y-6 min-w-0 max-w-full">
@@ -506,44 +581,76 @@ export const LiveTab: React.FC = () => {
               </div>
 
               {activeReplayReading ? (
-                <div>
-                  <div className="flex flex-wrap items-baseline gap-3">
-                    <span className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
-                      {activeReplayReading.co.toFixed(1)}
-                    </span>
-                    <span className="text-sm font-semibold text-slate-400">µg/m³ CO</span>
-
-                    {/* Huy hiệu cảnh báo từ backend */}
-                    <span
-                      className={`px-2.5 py-1 rounded-full text-xs font-bold ${
-                        getCoStatusBadge(activeReplayReading.status).badgeClass
-                      }`}
-                    >
-                      {getCoStatusBadge(activeReplayReading.status).label}
-                    </span>
-                  </div>
-
-                  {/* CO Dự đoán nếu có */}
-                  {activeReplayReading.coPredicted !== null ? (
-                    <div className="mt-2 text-xs text-slate-300 flex items-center gap-2">
-                      <span className="text-slate-400">CO Mô hình Dự đoán:</span>
-                      <span className="font-bold text-sky-400 text-sm">
-                        {activeReplayReading.coPredicted.toFixed(1)} µg/m³
-                      </span>
-                      {activeReplayReading.modelVersion && (
-                        <span className="px-1.5 py-0.2 rounded text-[10px] bg-sky-500/10 text-sky-400 font-mono border border-sky-500/20">
-                          {activeReplayReading.modelVersion}
+                <div className="space-y-4">
+                  {/* Bảng 2 cột so sánh song song: CO Thực tế vs CO Mô hình Dự đoán */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-xl bg-purple-950/30 border border-purple-500/20">
+                    {/* Cột CO Thực tế */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between text-xs text-purple-300 font-medium">
+                        <span>CO Thực tế (Mô phỏng)</span>
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
+                            getCoStatusBadge(activeReplayReading.status).badgeClass
+                          }`}
+                        >
+                          {getCoStatusBadge(activeReplayReading.status).label}
                         </span>
+                      </div>
+                      <div className="flex items-baseline gap-1.5">
+                        <span className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight font-mono">
+                          {activeReplayReading.co.toFixed(1)}
+                        </span>
+                        <span className="text-xs text-slate-400 font-medium">µg/m³</span>
+                      </div>
+                      <div className="text-[11px] text-purple-300/80">
+                        Giá trị nồng độ giờ gốc
+                      </div>
+                    </div>
+
+                    {/* Cột CO Dự đoán */}
+                    <div className="space-y-1.5 sm:border-l sm:border-purple-500/20 sm:pl-3">
+                      <div className="flex items-center justify-between text-xs text-sky-300 font-medium">
+                        <span>CO Mô hình Dự đoán</span>
+                        {activeReplayReading.modelVersion && (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] bg-sky-500/20 text-sky-300 font-mono border border-sky-500/30">
+                            {activeReplayReading.modelVersion}
+                          </span>
+                        )}
+                      </div>
+
+                      {activeReplayReading.coPredicted !== null ? (
+                        <div>
+                          <div className="flex items-baseline gap-1.5">
+                            <span className="text-3xl sm:text-4xl font-extrabold text-sky-400 tracking-tight font-mono">
+                              {activeReplayReading.coPredicted.toFixed(1)}
+                            </span>
+                            <span className="text-xs text-slate-400 font-medium">µg/m³</span>
+                          </div>
+                          {/* Chênh lệch Δ = coPredicted - co */}
+                          <div className="text-[11px] flex flex-wrap items-center gap-1.5 mt-1">
+                            <span className="text-slate-400">Chênh lệch:</span>
+                            <span className="font-mono font-semibold text-sky-300">
+                              Δ = {(activeReplayReading.coPredicted - activeReplayReading.co) >= 0 ? '+' : ''}
+                              {(activeReplayReading.coPredicted - activeReplayReading.co).toFixed(1)} µg/m³
+                            </span>
+                            <span className="text-slate-500 text-[10px]">(hiển thị)</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="py-2 space-y-1">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded bg-slate-800/90 text-slate-400 text-xs italic border border-slate-700">
+                            chưa đủ lịch sử
+                          </span>
+                          <div className="text-[10px] text-slate-500">
+                            (Cần đủ 24 giờ liên tục để chạy mô hình)
+                          </div>
+                        </div>
                       )}
                     </div>
-                  ) : (
-                    <div className="mt-2 text-xs text-slate-500 italic">
-                      Chưa có dự đoán cho bản ghi này (coPredicted: null)
-                    </div>
-                  )}
+                  </div>
 
                   {/* Thời điểm gốc (originalDatetime) — Yêu cầu cốt lõi F1 */}
-                  <div className="mt-3 pt-3 border-t border-purple-500/20 space-y-1.5 text-xs">
+                  <div className="pt-3 border-t border-purple-500/20 space-y-1.5 text-xs">
                     <div className="flex items-start gap-1.5 text-amber-300 font-medium">
                       <Clock className="w-3.5 h-3.5 shrink-0 mt-0.5 text-amber-400" />
                       <div>
@@ -567,7 +674,7 @@ export const LiveTab: React.FC = () => {
                   </div>
 
                   {/* Thông số phụ */}
-                  <div className="mt-3 grid grid-cols-3 gap-2 pt-2 border-t border-purple-500/10 text-center">
+                  <div className="grid grid-cols-3 gap-2 pt-2 border-t border-purple-500/10 text-center">
                     <div className="p-1.5 rounded bg-slate-900/60 border border-slate-800">
                       <div className="text-[10px] text-slate-400">Gió</div>
                       <div className="text-xs font-semibold text-slate-200">
@@ -608,12 +715,21 @@ export const LiveTab: React.FC = () => {
               </div>
               <div className="h-56 sm:h-64 w-full bg-slate-950/40 p-2 rounded-xl border border-slate-800">
                 {replayChartData.labels.length > 0 ? (
-                  <Line data={replayChartData} options={commonChartOptions} />
+                  <Line data={replayChartData} options={replayChartOptions} />
                 ) : (
                   <div className="h-full flex items-center justify-center text-xs text-slate-500">
                     Chưa có điểm dữ liệu để vẽ biểu đồ
                   </div>
                 )}
+              </div>
+              <div className="text-[11px] text-slate-400 mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-3 h-0.5 bg-purple-400 inline-block" /> CO thực tế (mô phỏng)
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-3 h-0.5 border-t-2 border-dashed border-sky-400 inline-block" /> CO mô hình dự đoán
+                </span>
+                <span className="text-slate-500 italic">• Cùng trục CO (µg/m³). Điểm chưa đủ lịch sử không vẽ số.</span>
               </div>
             </div>
           </div>
@@ -691,7 +807,11 @@ export const LiveTab: React.FC = () => {
             {/* Thẻ bản ghi mới nhất / Hoặc Trạng thái Rỗng Tường Minh */}
             <div className="mt-4 p-4 rounded-xl bg-cyan-950/20 border border-cyan-500/30 space-y-3 min-w-0">
               <div className="flex items-center justify-between text-xs text-slate-400">
-                <span className="font-semibold text-cyan-300">Bản ghi quan sát thực tế</span>
+                <span className="font-semibold text-cyan-300">
+                  {activeLiveReading?.coIsForecast === true
+                    ? 'Bản ghi OpenWeather (Dự báo cho giờ tới)'
+                    : 'Bản ghi OpenWeather'}
+                </span>
                 {activeLiveReading && (
                   <span className="px-2 py-0.5 rounded text-[11px] font-mono bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
                     {activeLiveReading.station} {activeLiveReading.isSimulatedStation && '(Tọa độ TP.HCM)'}
@@ -700,48 +820,101 @@ export const LiveTab: React.FC = () => {
               </div>
 
               {activeLiveReading ? (
-                <div>
-                  <div className="flex flex-wrap items-baseline gap-3">
-                    <span className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
-                      {activeLiveReading.co.toFixed(1)}
-                    </span>
-                    <span className="text-sm font-semibold text-slate-400">µg/m³ CO</span>
-
-                    {/* Huy hiệu cảnh báo từ backend */}
-                    <span
-                      className={`px-2.5 py-1 rounded-full text-xs font-bold ${
-                        getCoStatusBadge(activeLiveReading.status).badgeClass
-                      }`}
-                    >
-                      {getCoStatusBadge(activeLiveReading.status).label}
-                    </span>
-                  </div>
-
-                  {/* CO Dự đoán nếu có */}
-                  {activeLiveReading.coPredicted !== null ? (
-                    <div className="mt-2 text-xs text-slate-300 flex items-center gap-2">
-                      <span className="text-slate-400">CO Mô hình Dự đoán:</span>
-                      <span className="font-bold text-amber-400 text-sm">
-                        {activeLiveReading.coPredicted.toFixed(1)} µg/m³
-                      </span>
-                      {activeLiveReading.modelVersion && (
-                        <span className="px-1.5 py-0.2 rounded text-[10px] bg-amber-500/10 text-amber-400 font-mono border border-amber-500/20">
-                          {activeLiveReading.modelVersion}
+                <div className="space-y-4">
+                  {/* Bảng 2 cột so sánh song song: CO Nguồn OpenWeather vs CO Mô hình Dự đoán */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-xl bg-cyan-950/30 border border-cyan-500/20">
+                    {/* Cột CO Nguồn OpenWeather */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between text-xs text-cyan-300 font-medium">
+                        <span>
+                          {activeLiveReading.coIsForecast === true
+                            ? 'CO Dự báo OpenWeather'
+                            : 'CO Quan sát OpenWeather'}
                         </span>
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
+                            getCoStatusBadge(activeLiveReading.status).badgeClass
+                          }`}
+                        >
+                          {getCoStatusBadge(activeLiveReading.status).label}
+                        </span>
+                      </div>
+
+                      <div className="flex items-baseline gap-1.5">
+                        <span className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight font-mono">
+                          {activeLiveReading.co.toFixed(1)}
+                        </span>
+                        <span className="text-xs text-slate-400 font-medium">µg/m³</span>
+                      </div>
+
+                      {/* Nhãn nhỏ cờ coIsForecast: true / false / null */}
+                      {(() => {
+                        const forecastInfo = getForecastStatus(activeLiveReading.coIsForecast);
+                        return (
+                          <div className="mt-1 space-y-0.5">
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold ${forecastInfo.badgeClass}`}>
+                              {activeLiveReading.coIsForecast === true && (
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                              )}
+                              {forecastInfo.label}
+                            </span>
+                            <div className="text-[10px] text-slate-400">
+                              {forecastInfo.description}
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                    </div>
+
+                    {/* Cột CO Mô hình Dự đoán */}
+                    <div className="space-y-1.5 sm:border-l sm:border-cyan-500/20 sm:pl-3">
+                      <div className="flex items-center justify-between text-xs text-amber-300 font-medium">
+                        <span>CO Mô hình Dự đoán</span>
+                        {activeLiveReading.modelVersion && (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] bg-amber-500/20 text-amber-300 font-mono border border-amber-500/30">
+                            {activeLiveReading.modelVersion}
+                          </span>
+                        )}
+                      </div>
+
+                      {activeLiveReading.coPredicted !== null ? (
+                        <div>
+                          <div className="flex items-baseline gap-1.5">
+                            <span className="text-3xl sm:text-4xl font-extrabold text-amber-400 tracking-tight font-mono">
+                              {activeLiveReading.coPredicted.toFixed(1)}
+                            </span>
+                            <span className="text-xs text-slate-400 font-medium">µg/m³</span>
+                          </div>
+                          {/* Chênh lệch Δ = coPredicted - co */}
+                          <div className="text-[11px] flex flex-wrap items-center gap-1.5 mt-1">
+                            <span className="text-slate-400">Chênh lệch:</span>
+                            <span className="font-mono font-semibold text-amber-300">
+                              Δ = {(activeLiveReading.coPredicted - activeLiveReading.co) >= 0 ? '+' : ''}
+                              {(activeLiveReading.coPredicted - activeLiveReading.co).toFixed(1)} µg/m³
+                            </span>
+                            <span className="text-slate-500 text-[10px]">(hiển thị)</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="py-2 space-y-1">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded bg-slate-800/90 text-slate-400 text-xs italic border border-slate-700">
+                            chưa đủ lịch sử
+                          </span>
+                          <div className="text-[10px] text-slate-500">
+                            (Cần đủ 24 giờ liên tục để chạy mô hình)
+                          </div>
+                        </div>
                       )}
                     </div>
-                  ) : (
-                    <div className="mt-2 text-xs text-slate-500 italic">
-                      Chưa có dự đoán cho bản ghi này (coPredicted: null)
-                    </div>
-                  )}
+                  </div>
 
                   {/* Thời điểm quan sát thật */}
-                  <div className="mt-3 pt-3 border-t border-cyan-500/20 space-y-1.5 text-xs">
+                  <div className="pt-3 border-t border-cyan-500/20 space-y-1.5 text-xs">
                     <div className="flex items-start gap-1.5 text-cyan-200 font-medium">
                       <Clock className="w-3.5 h-3.5 shrink-0 mt-0.5 text-cyan-400" />
                       <div>
-                        <span>Thời điểm quan sát thật: </span>
+                        <span>Thời điểm ghi nhận: </span>
                         <strong className="text-cyan-100 font-bold font-mono text-sm">
                           {formatDateTime(activeLiveReading.datetime)}
                         </strong>
@@ -756,7 +929,7 @@ export const LiveTab: React.FC = () => {
                   </div>
 
                   {/* Thông số phụ */}
-                  <div className="mt-3 grid grid-cols-3 gap-2 pt-2 border-t border-cyan-500/10 text-center">
+                  <div className="grid grid-cols-3 gap-2 pt-2 border-t border-cyan-500/10 text-center">
                     <div className="p-1.5 rounded bg-slate-900/60 border border-slate-800">
                       <div className="text-[10px] text-slate-400">Gió</div>
                       <div className="text-xs font-semibold text-slate-200">
@@ -812,7 +985,7 @@ export const LiveTab: React.FC = () => {
               </div>
               <div className="h-56 sm:h-64 w-full bg-slate-950/40 p-2 rounded-xl border border-slate-800">
                 {liveChartData.labels.length > 0 ? (
-                  <Line data={liveChartData} options={commonChartOptions} />
+                  <Line data={liveChartData} options={liveChartOptions} />
                 ) : (
                   <div className="h-full flex flex-col items-center justify-center text-xs text-slate-500 space-y-2 p-4 text-center">
                     <Activity className="w-6 h-6 text-slate-600" />
@@ -822,6 +995,18 @@ export const LiveTab: React.FC = () => {
                     </span>
                   </div>
                 )}
+              </div>
+              <div className="text-[11px] text-slate-400 mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-3 h-0.5 bg-cyan-400 inline-block" /> CO OpenWeather (● quan sát)
+                </span>
+                <span className="flex items-center gap-1.5 text-amber-300">
+                  ▲ Điểm dự báo OpenWeather
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-3 h-0.5 border-t-2 border-dashed border-amber-400 inline-block" /> CO mô hình dự đoán
+                </span>
+                <span className="text-slate-500 italic">• Cùng trục CO (µg/m³). Điểm chưa đủ lịch sử không vẽ số.</span>
               </div>
             </div>
           </div>
@@ -846,6 +1031,56 @@ export const LiveTab: React.FC = () => {
               </span>
               <span className="text-slate-500">(Parquet /live)</span>
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Ghi chú bắt buộc về Mô hình & Hai Luồng Dữ liệu (Yêu cầu P21) */}
+      <div className="rounded-2xl bg-slate-900/90 border border-slate-800 p-5 shadow-lg space-y-4">
+        <div className="flex items-center gap-2 text-white font-bold text-sm sm:text-base border-b border-slate-800/80 pb-3">
+          <Info className="w-5 h-5 text-sky-400 shrink-0" />
+          <span>Ghi chú quan trọng về Mô hình Dự đoán & Hai Luồng Dữ liệu (P21)</span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-slate-300">
+          <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1.5">
+            <div className="font-semibold text-purple-300 flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-purple-400" />
+              1. Luồng phát lại: Ngoài mẫu huấn luyện nhưng vẫn là mô phỏng
+            </div>
+            <p className="text-slate-400 text-[11px] leading-relaxed">
+              Luồng phát lại bắt đầu từ mốc <strong>07/02/2026 20:00</strong> (đầu tập kiểm tra của mô hình). Các dự đoán CO tại đây là dự đoán ngoài mẫu huấn luyện (out-of-sample), nhưng toàn bộ dữ liệu vẫn là phát lại từ lịch sử Kaggle (mô phỏng).
+            </p>
+          </div>
+
+          <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1.5">
+            <div className="font-semibold text-cyan-300 flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-cyan-400" />
+              2. Luồng thật: Xấp xỉ thời tiết & Chưa kiểm sai số dài hạn
+            </div>
+            <p className="text-slate-400 text-[11px] leading-relaxed">
+              Nhiệt độ và tốc độ gió đưa vào mô hình là của quan sát hiện tại thay vì giờ trước (xấp xỉ có chủ ý do API lịch sử không có thời tiết). Mỗi giờ chỉ có 1 bản ghi mới, chuỗi chạy thực tế chưa qua kiểm định sai số dài hạn.
+            </p>
+          </div>
+
+          <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1.5">
+            <div className="font-semibold text-amber-300 flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-amber-400" />
+              3. Phạm vi mô hình & Điểm gãy dữ liệu 01/07/2025
+            </div>
+            <p className="text-slate-400 text-[11px] leading-relaxed">
+              Mô hình học từ dữ liệu giai đoạn sau 01/07/2025; nguyên nhân điểm gãy dữ liệu chưa xác định (xem tab Pipeline & Chỉ số Mô hình). Tuyệt đối không dùng mô hình này để suy luận cho dữ liệu lịch sử trước tháng 07/2025.
+            </p>
+          </div>
+
+          <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1.5">
+            <div className="font-semibold text-emerald-300 flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-400" />
+              4. Hiệu năng mô hình & Độ trễ làm giàu Spark
+            </div>
+            <p className="text-slate-400 text-[11px] leading-relaxed">
+              Trên tập kiểm tra, Random Forest chỉ hơn mốc "CO giờ trước" một chút (RMSE 38.9 vs 43.9 µg/m³). Giá trị dự đoán đến muộn hơn bản ghi thô ~5 giây qua Spark. Nếu Spark dừng, backend đọc topic làm giàu sẽ không có reading mới.
+            </p>
           </div>
         </div>
       </div>

@@ -322,7 +322,44 @@ Mẫu:
 
 ## Frontend (Antigravity)
 
+### 2026-10-14 18:00 — P21: Dự đoán CO và Cờ dự báo coIsForecast trên hai luồng (Hợp đồng 0.5.0)
+- Xong:
+  + 1. Sinh lại kiểu tự động từ OpenAPI 0.5.0 (`npm run generate:types`): Cập nhật `AqiReading` với `coIsForecast: boolean | null`, `coPredicted: number | null`, `modelVersion: string | null`, cùng các schema `ModelTransition`, `ModelSetup`, `DayClusters`...
+  + 2. Cập nhật `LiveTab.tsx`:
+    - **Cột "THẬT: OpenWeather"**:
+      * Hiển thị song song cạnh nhau: CO Nguồn OpenWeather và CO Mô hình Dự đoán (`coPredicted`), kèm chênh lệch `Δ = coPredicted - co` (với chú thích chỉ dùng để hiển thị).
+      * Xử lý cờ `coIsForecast` theo đúng hợp đồng:
+        - `true`: Gắn nhãn nổi bật "giá trị dự báo của OpenWeather" (kèm giải thích nguồn trả trước ~30 phút cho giờ tới, không phải quan sát).
+        - `false`: Gắn nhãn "giá trị quan sát của nguồn" (số từ mô hình khí quyển OpenWeather CAMS, không phải cảm biến mặt đất).
+        - `null`: Gắn nhãn "chưa rõ là quan sát hay dự báo" (tuyệt đối không tự suy đoán true/false).
+      * Khi `coPredicted === null`: Hiển thị chữ nghiêng "chưa đủ lịch sử", không vẽ số giả.
+    - **Cột "MÔ PHỎNG: Phát lại dữ liệu lịch sử"**:
+      * Hiển thị song song cạnh nhau: CO Thực tế (Mô phỏng) và CO Mô hình Dự đoán (`coPredicted`), kèm chênh lệch `Δ = coPredicted - co` và phiên bản mô hình `modelVersion`.
+      * Khi `coPredicted === null`: Hiển thị "chưa đủ lịch sử", không vẽ số.
+    - **Biểu đồ đường (Line Charts) cho từng luồng**:
+      * Cả hai luồng vẽ CO thực tế (nét liền) và CO dự đoán (nét đứt) trên cùng một trục tọa độ CO (µg/m³).
+      * Các điểm có `coPredicted === null` không vẽ số / không nối qua, tooltip thể hiện rõ "chưa đủ lịch sử".
+      * Trên biểu đồ luồng thật: Điểm dự báo (`coIsForecast === true`) được đánh dấu trực quan bằng hình tam giác màu vàng hổ phách (▲) và ghi chú rõ trong tooltip.
+    - **Khung ghi chú bắt buộc (P21)**: Bổ sung thẻ thông tin chi tiết dưới đáy tab:
+      1. Luồng phát lại bắt đầu từ mốc 07/02/2026 20:00 (đầu tập kiểm tra của mô hình), dự đoán ngoài mẫu nhưng vẫn là mô phỏng.
+      2. Luồng thật dùng thời tiết hiện tại làm xấp xỉ cho giờ trước; mỗi giờ 1 bản ghi, chưa kiểm sai số dài hạn.
+      3. Mô hình học từ sau 01/07/2025; nguyên nhân điểm gãy chưa xác định, không dùng mô hình cho dữ liệu trước 07/2025.
+      4. Mô hình chỉ hơn mốc "CO giờ trước" một chút (RMSE 38.9 vs 43.9 µg/m³).
+      5. `coPredicted` đến muộn hơn bản ghi thô ~5s qua Spark (topic `hcmc_co_enriched`); nếu Spark dừng thì không có reading mới.
+  + 3. Cập nhật `format.ts`: Bổ sung hàm tiện ích `getForecastStatus` chuẩn hóa nhãn và thông điệp cờ `coIsForecast`.
+- Chạy thế nào:
+  + Mock server: `python mock/serve.py` (cổng 8010)
+  + Frontend dev: `cd frontend && npm run dev -- --port 5173 --strictPort`
+  + Build production: `npm run build` (thành công 0 lỗi, ~1.06s)
+  + Kiểm tra linter: `npm run lint` (0 warnings, 0 errors)
+  + Kiểm tra hợp đồng: `python docs/contract/validate_contract.py` (OK)
+- Chưa làm / chưa kiểm với backend thật:
+  + Đã kiểm thử trơn tru với Mock Server cổng 8010 (cả bản ghi `coIsForecast: true` và `coIsForecast: false` trong `mock/stream-events.ndjson`).
+  + Với backend thật cổng 8000: Sẽ kiểm tra quan sát các bản ghi sống có cờ `coIsForecast` khi Claude chạy chuỗi producer sống và Spark làm giàu topic `hcmc_co_enriched`.
+- Cần bên kia: Lead backend gộp PR nhánh `feat/frontend-p21` vào `main`.
+
 ### 2026-10-14 14:10 — Giai đoạn F3: Nối Backend thật (cổng 8000) & Sửa lỗi hiển thị
+
 - Xong:
   + 1. Nối thành công Frontend với Backend thật (`http://localhost:8000` và `ws://localhost:8000/ws/stream`):
     - Đã xác thực toàn bộ các route REST API và luồng WebSocket thật trên cụm WSL (HDFS 4/4 DataNode UP, Kafka topic `hcmc_co_stream` UP, Spark UP, Backend FastAPI UP).
