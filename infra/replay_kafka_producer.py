@@ -10,7 +10,11 @@
     `status.json` do producer ghi mỗi 2 giây (nhịp tim) để backend đọc. Không có tệp nhịp tim mới trong 10 giây thì backend coi là "stopped".
     Luồng DỮ LIỆU THẬT (live_producer_owm.py) không đọc các tệp này nên không bao giờ bị ảnh hưởng.
 
-Chạy (WSL, Kafka đang chạy):  python3 infra/replay_kafka_producer.py [--base-interval 10] [--start 2025-07-01T00:00:00+07:00]
+Bước A5: mỗi bản ghi kèm `modelInputs` (đầu vào của mô hình dự đoán CO, dựng từ chính bộ dữ liệu theo thời điểm gốc, xem model_inputs.py) để consumer Spark dự đoán.
+Mặc định `--start auto`: phát từ đầu TẬP KIỂM TRA của mô hình (đọc /co/output/model_metrics.json), nên dự đoán trên luồng phát lại là NGOÀI mẫu huấn luyện;
+phát từ mốc khác (ví dụ 2025-07-01) thì phần lớn bản ghi nằm trong tập huấn luyện và dự đoán trông tốt hơn thực tế.
+
+Chạy (WSL, Kafka đang chạy):  python3 infra/replay_kafka_producer.py [--base-interval 10] [--start auto|2025-07-01T00:00:00+07:00]
 """
 import argparse
 import csv
@@ -19,7 +23,10 @@ import os
 import sys
 import time
 from datetime import datetime, timedelta, timezone
+import subprocess
 from pathlib import Path
+
+import model_inputs as mi
 
 try:
     from kafka import KafkaProducer
@@ -40,18 +47,33 @@ def parse_original(text: str) -> datetime:
     return datetime.strptime(text.strip(), "%d-%m-%y %H:%M").replace(tzinfo=timezone.utc).astimezone(VN)
 
 
-def load_rows(path: str, start: datetime) -> list[dict]:
-    """Các dòng từ `start` trở đi (theo giờ +07). Không có dòng nào thì ném ValueError."""
+FALLBACK_START = "2025-07-01T00:00:00+07:00"
+
+
+def auto_start(hdfs_bin: str = os.environ.get("HDFS_BIN", "/home/trong/hadoop/bin/hdfs")) -> tuple[str, str]:
+    """(mốc bắt đầu, nguồn của mốc): đầu tập kiểm tra trong /co/output/model_metrics.json nếu đọc được, nếu không thì mốc dự phòng (kèm lý do)."""
+    try:
+        r = subprocess.run([hdfs_bin, "dfs", "-cat", "/co/output/model_metrics.json"], capture_output=True, text=True, timeout=60)
+        if r.returncode == 0:
+            return json.loads(r.stdout)["testSet"]["from"], "đầu tập kiểm tra của mô hình (model_metrics.json)"
+        why = r.stderr.strip()[-120:] or f"mã {r.returncode}"
+    except (OSError, ValueError, KeyError, subprocess.SubprocessError) as e:
+        why = type(e).__name__
+    return FALLBACK_START, f"mốc dự phòng, không đọc được model_metrics.json ({why})"
+
+
+def load_rows(path: str, start: datetime) -> tuple[list[dict], int]:
+    """TOÀN BỘ các dòng của bộ dữ liệu (cần dòng trước `start` để dựng độ trễ) và chỉ số của dòng đầu tiên có thời điểm gốc (+07) không sớm hơn `start`.
+    Không có dòng nào từ `start` thì ném ValueError."""
     rows = []
     with open(path, encoding="utf-8") as f:
         for r in csv.DictReader(f):
-            t = parse_original(r["datetime"])
-            if t >= start:
-                rows.append({"orig": t, "co": float(r["co"]), "wind": float(r["wind_speed_kmh"]), "temp": float(r["temperature_C"]),
-                             **{p: float(r[p]) if r.get(p) not in (None, "") else None for p in POLLUTANTS}})
-    if not rows:
+            rows.append({"orig": parse_original(r["datetime"]), "co": float(r["co"]), "wind": float(r["wind_speed_kmh"]), "temp": float(r["temperature_C"]),
+                         **{p: float(r[p]) if r.get(p) not in (None, "") else None for p in POLLUTANTS}})
+    idx = next((i for i, r in enumerate(rows) if r["orig"] >= start), None)
+    if idx is None:
         raise ValueError(f"bộ dữ liệu không có dòng nào từ {start.isoformat()}")
-    return rows
+    return rows, idx
 
 
 def make_message(row: dict, n: int, now: datetime) -> dict:
@@ -66,6 +88,15 @@ def make_message(row: dict, n: int, now: datetime) -> dict:
     }
     for p in POLLUTANTS:
         msg[p] = row[p]
+    return msg
+
+
+def message_for(rows: list[dict], i: int, n: int, now: datetime) -> dict:
+    """Bản ghi gửi Kafka cho dòng i, kèm modelInputs nếu dựng được độ trễ từ bộ dữ liệu (không dựng được thì không có trường này, không đoán)."""
+    msg = make_message(rows[i], n, now)
+    inputs = mi.from_dataset(rows, i)
+    if inputs is not None:
+        msg["modelInputs"] = inputs
     return msg
 
 
@@ -101,7 +132,7 @@ def write_status(state_dir: Path, state: dict, base_interval: float, emitted: in
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--csv", default=DEFAULT_CSV)
-    p.add_argument("--start", default="2025-07-01T00:00:00+07:00", help="phát từ dòng có thời điểm gốc (+07) không sớm hơn mốc này")
+    p.add_argument("--start", default="auto", help="phát từ dòng có thời điểm gốc (+07) không sớm hơn mốc này; auto = đầu tập kiểm tra của mô hình")
     p.add_argument("--base-interval", type=float, default=10.0, help="giây giữa hai bản ghi ở tốc độ 1 (mặc định 10)")
     p.add_argument("--bootstrap", default="localhost:9092")
     p.add_argument("--topic", default="hcmc_co_stream")
@@ -111,12 +142,14 @@ def main() -> int:
 
     state_dir = Path(a.state_dir)
     state_dir.mkdir(parents=True, exist_ok=True)
-    rows = load_rows(a.csv, datetime.fromisoformat(a.start))
+    start_s, start_src = auto_start() if a.start == "auto" else (a.start, "tham số --start")
+    rows, start_idx = load_rows(a.csv, datetime.fromisoformat(start_s))
+    span = len(rows) - start_idx
     producer = KafkaProducer(bootstrap_servers=a.bootstrap, acks="all", retries=5,
                              key_serializer=lambda k: k.encode("utf-8"),
                              value_serializer=lambda v: json.dumps(v, ensure_ascii=False).encode("utf-8"))
     state = read_control(state_dir, {"paused": False, "speed": 1})
-    print(f"[replay_kafka] MÔ PHỎNG: phát lại {len(rows)} dòng lịch sử từ {rows[0]['orig']:%Y-%m-%d %H:%M} (+07), mỗi {a.base_interval:g}s ở tốc độ 1 -> "
+    print(f"[replay_kafka] MÔ PHỎNG: phát lại {span} dòng lịch sử từ {rows[start_idx]['orig']:%Y-%m-%d %H:%M} (+07) [{start_src}], mỗi {a.base_interval:g}s ở tốc độ 1 -> "
           f"Kafka {a.bootstrap} topic {a.topic}; điều khiển qua {state_dir}", flush=True)
 
     emitted, last_orig = 0, None
@@ -132,8 +165,9 @@ def main() -> int:
             write_status(state_dir, state, a.base_interval, emitted, last_orig)  # xác nhận ngay để backend thấy lệnh đã nhận
         now_m = time.monotonic()
         if not state["paused"] and now_m >= next_send:
-            row = rows[emitted % len(rows)]
-            msg = make_message(row, emitted + 1, datetime.now(VN))
+            i = start_idx + emitted % span
+            row = rows[i]
+            msg = message_for(rows, i, emitted + 1, datetime.now(VN))
             meta = producer.send(a.topic, key="replay", value=msg).get(timeout=15)
             emitted, last_orig = emitted + 1, row["orig"]
             next_send = now_m + a.base_interval / state["speed"]

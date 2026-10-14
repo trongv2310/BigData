@@ -21,6 +21,9 @@ SPARK_UI_PORTS = [int(p) for p in _env("SPARK_UI_PORTS", "4040,4041,4042,4043").
 AIRFLOW_HTTP = _env("AIRFLOW_UI", "http://localhost:8080")
 KAFKA_BOOTSTRAP = _env("KAFKA_BOOTSTRAP", "localhost:9092")
 KAFKA_TOPIC = _env("KAFKA_TOPIC", "hcmc_co_stream")
+# Topic mà backend đọc để phát `reading` và trả /api/aqi/latest: mặc định là topic thô của producer. Đặt hcmc_co_enriched khi Spark (infra/spark_kafka_consumer.py)
+# đang làm giàu bản ghi bằng dự đoán (coPredicted, modelVersion); khi đó Spark phải chạy thì mới có reading mới.
+READING_TOPIC = _env("READING_TOPIC", KAFKA_TOPIC)
 # Thư mục checkpoint (trên HDFS) của các truy vấn Spark đọc Kafka: Spark không dùng consumer group nên độ trễ lấy từ offset đã commit ở đây
 SPARK_KAFKA_CHECKPOINTS = [p for p in _env("SPARK_KAFKA_CHECKPOINTS", "/live/_checkpoints/co_stream").split(",") if p.strip()]
 HDFS_STREAM_DIR = _env("HDFS_STREAM_DIR", "/stream_input")

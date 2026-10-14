@@ -45,6 +45,8 @@ def from_record(rec: dict) -> dict:
     wind = float(rec["wind_speed_kmh"])
     station = rec.get("station") or ""
     source = source_of(rec)
+    predicted, version = rec.get("co_predicted"), rec.get("model_version")
+    predicted = float(predicted) if isinstance(predicted, (int, float)) and not isinstance(predicted, bool) and isinstance(version, str) and version else None
     original = None
     if source == "replay-dataset" and rec.get("originalDatetime"):  # thời điểm gốc của dòng lịch sử; nguồn thật luôn null
         original = timeutil.iso(datetime.fromisoformat(rec["originalDatetime"]))
@@ -61,9 +63,9 @@ def from_record(rec: dict) -> dict:
         "temperatureC": float(rec["temperature_C"]),
         "coAccumulationIndex": round(co / (wind + 1.0), 2),
         "status": status_for(co),
-        # chỉ có từ Bước A5 (chưa có mô hình): null, không điền số thay thế
-        "coPredicted": None,
-        "modelVersion": None,
+        # do Spark (infra/spark_kafka_consumer.py) thêm vào bản ghi đã làm giàu; bản ghi thô, hoặc thiếu đầu vào cho mô hình: null, không điền số thay thế
+        "coPredicted": predicted,
+        "modelVersion": version if predicted is not None else None,
     }
 
 

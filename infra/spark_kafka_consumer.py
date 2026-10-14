@@ -3,6 +3,11 @@
 Topic chứa CẢ hai luồng: cột `provider` phân biệt 'openweather' (thật), 'replay-dataset' (phát lại, mô phỏng) và 'open-meteo' (tin cũ).
 Luôn lọc theo provider khi truy vấn /live, đừng trộn các nguồn vào một chuỗi.
 
+Bước A5 (dự đoán trên luồng): nạp mô hình dự đoán CO do pipeline/06b_train.py lưu (/co/output/model_best) và, với mỗi bản ghi có đủ `modelInputs` (producer dựng, xem
+model_inputs.py), thêm co_actual (= co), co_predicted, model_version, model_inputs, feature_note vào Parquet /live. Bản ghi thiếu đầu vào: co_predicted và model_version là null (không điền).
+Cùng bản ghi đã làm giàu còn được ghi vào topic Kafka --enriched-topic (hcmc_co_enriched) để backend phát `reading` kèm coPredicted/modelVersion qua /ws/stream. Chưa có mô hình
+thì chạy như cũ (dự đoán null) và nói rõ ở log. Đổi mô hình (phiên bản mới) thì khởi động lại job này.
+
 Thay cho spark_streaming_consumer.py ở thư mục cha (script cũ đọc file JSON trong HDFS, không bị sửa). Cùng phép tính:
   co_accumulation_index = co / (wind_speed_kmh + 1);  canh_bao theo thang CO của OpenWeather (quyết định D3, chốt 13/10/2026):
   từ 4400 µg/m³ là WARNING, từ 12400 là DANGER (cùng giá trị với CO_WARNING_UG, CO_DANGER_UG của backend). Script cũ dùng 500/1000.
@@ -16,6 +21,10 @@ từ offset đã xử lý, không xử lý lại). Thêm --console để in từ
 """
 import argparse
 import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import enrich as en  # noqa: E402
 
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
@@ -32,6 +41,11 @@ p.add_argument("--checkpoint", default="hdfs://localhost:9000/live/_checkpoints/
 p.add_argument("--trigger", default="30 seconds")
 p.add_argument("--warning", type=float, default=float(os.environ.get("CO_WARNING_UG", "4400")), help="µg/m³: từ mức này là WARNING")
 p.add_argument("--danger", type=float, default=float(os.environ.get("CO_DANGER_UG", "12400")), help="µg/m³: từ mức này là DANGER")
+p.add_argument("--model-dir", default="hdfs://localhost:9000/co/output/model_best", help="PipelineModel do 06b_train.py lưu")
+p.add_argument("--model-reference", default="hdfs://localhost:9000/co/output/model_inputs_reference.json", help="tệp danh sách đặc trưng và phiên bản mô hình")
+p.add_argument("--enriched-topic", default="hcmc_co_enriched", help="topic Kafka ghi bản ghi đã làm giàu (rỗng = không ghi)")
+p.add_argument("--enriched-checkpoint", default="hdfs://localhost:9000/live/_checkpoints/co_enriched")
+p.add_argument("--enriched-trigger", default="5 seconds")
 p.add_argument("--console", action="store_true")
 a = p.parse_args()
 
@@ -59,6 +73,9 @@ schema = StructType([
     StructField("pm2_5", DoubleType(), True),
     StructField("pm10", DoubleType(), True),
     StructField("nh3", DoubleType(), True),
+    # Bước A5: đầu vào của mô hình do producer dựng (null/không có nếu thiếu lịch sử) và ghi chú về cách dựng
+    StructField("modelInputs", en.model_inputs_schema(), True),
+    StructField("featureNote", StringType(), True),
 ])
 
 raw = (spark.readStream.format("kafka")
@@ -79,12 +96,30 @@ processed = (parsed
                                       .when(F.col("co") >= a.warning, "CANH BAO (WARNING)")
                                       .otherwise("AN TOAN (SAFE)")))
 
-query = (processed.writeStream.outputMode("append").format("parquet")
+regressor, features, version_or_reason = en.load_model(spark, a.model_dir, a.model_reference)
+if regressor is None:
+    print(f"\n!!! CHƯA CÓ MÔ HÌNH ({version_or_reason}): co_predicted sẽ là null. Chạy pipeline/06b_train.py rồi khởi động lại job này. !!!\n", flush=True)
+    enriched = en.without_model(processed)
+else:
+    print(f"\n>>> Mô hình dự đoán CO: {version_or_reason} ({len(features)} đặc trưng) <<<\n", flush=True)
+    enriched = en.enrich(processed, regressor, version_or_reason)
+enriched = enriched.withColumnRenamed("featureNote", "feature_note")
+
+query = (enriched.writeStream.outputMode("append").format("parquet")
          .option("path", a.out).option("checkpointLocation", a.checkpoint)
          .trigger(processingTime=a.trigger).start())
 
+if a.enriched_topic:
+    # cùng bản ghi, dạng JSON giữ nguyên tên trường của producer (datetime, originalDatetime, station, co, wind_speed_kmh, temperature_C, provider, ...) + co_predicted, model_version
+    json_cols = ["datetime", "originalDatetime", "station", "co", "wind_speed_kmh", "temperature_C", "coObservedAt", "weatherObservedAt", "provider", "owmDt", "aqi",
+                 "no", "no2", "o3", "so2", "pm2_5", "pm10", "nh3", "co_predicted", "model_version", "feature_note"]
+    out_json = enriched.select(F.col("station").alias("key"), F.to_json(F.struct(*[F.col(c) for c in json_cols], F.col("partition").alias("kafka_partition"),
+                                                                                 F.col("offset").alias("kafka_offset"))).alias("value"))
+    (out_json.writeStream.format("kafka").option("kafka.bootstrap.servers", a.bootstrap).option("topic", a.enriched_topic)
+     .option("checkpointLocation", a.enriched_checkpoint).trigger(processingTime=a.enriched_trigger).start())
+
 if a.console:
-    processed.writeStream.outputMode("append").format("console").option("truncate", False).start()
+    enriched.drop("model_inputs").writeStream.outputMode("append").format("console").option("truncate", False).start()
 
 print(f"\n>>> SPARK STRUCTURED STREAMING: Kafka {a.bootstrap}/{a.topic} -> {a.out} (checkpoint {a.checkpoint}) <<<\n", flush=True)
 spark.streams.awaitAnyTermination()

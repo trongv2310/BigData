@@ -29,6 +29,19 @@ Bộ Kaggle (lịch sử, MÔ PHỎNG) ─▶ infra/replay_kafka_producer.py ─
 - **`/live` chứa cả hai luồng**: lọc theo cột `provider` (`openweather` thật, `replay-dataset` phát lại, `open-meteo` tin cũ); không trộn vào một chuỗi. Spark consumer đã thêm các cột `originalDatetime`, `owmDt`, `aqi`, `no`, `no2`, `o3`, `so2`, `pm2_5`, `pm10`, `nh3`; dòng cũ để null, view `live` của `/api/sql` gộp schema (`mergeSchema`) nên đọc được cả file cũ lẫn mới.
 - **Open-Meteo** (`infra/live_producer.py`) vẫn còn nhưng KHÔNG bật mặc định (`WITH_OPEN_METEO=1` mới bật). Đây là nguồn KHÁC (mô hình CAMS, CO cao hơn nhiều so với OpenWeather); backend gắn `source=live-open-meteo`, không trộn với `live-openweather` và không dùng để dự đoán. Các phần dưới đây về Open-Meteo là lịch sử của D1 và còn đúng cho nguồn đó.
 
+### Dự đoán CO trên luồng (Bước A5)
+
+```
+producer (OpenWeather | phát lại) --[bản ghi + modelInputs]--> Kafka hcmc_co_stream --> Spark: nạp /co/output/model_best, dự đoán --+--> HDFS /live/co_stream (Parquet: co_actual, co_predicted, model_version, model_inputs, feature_note)
+                                                                                                                                     +--> Kafka hcmc_co_enriched --> backend (READING_TOPIC) --> /ws/stream, /api/aqi/latest (coPredicted, modelVersion)
+```
+
+- **Độ trễ CO các giờ trước (vấn đề của luồng):** mô hình cần CO của giờ t-1, t-2, t-3 và t-24 (cộng thời tiết và chất khí của giờ t-1), mà luồng sống chỉ có tối đa một quan sát mỗi giờ nên tự nó cần 24 giờ mới đủ. Cách xử lý: mỗi producer tự dựng `modelInputs` từ nơi nó có lịch sử (`infra/model_inputs.py`). Phát lại: từ chính bộ dữ liệu theo `originalDatetime`. Dữ liệu thật: mỗi lần gửi (tối đa một lần mỗi giờ) gọi thêm `air_pollution/history` của OpenWeather (1 lời gọi), tìm điểm lịch sử theo giờ có ĐÚNG giá trị của quan sát hiện tại rồi lấy các giờ liền trước; nhờ vậy bản ghi sống đầu tiên đã đủ độ trễ, không cần khởi động nóng. Thiếu lịch sử liên tục thì không có `modelInputs` và bản ghi đi tiếp với `co_predicted` null.
+- **Điều đã đo:** giá trị "hiện tại" của Air Pollution API bằng điểm lịch sử của giờ hiện hành (ví dụ cả giờ 13:xx ngày 14/10 đều là 251,31, đúng điểm 13:00 của lịch sử; điểm lịch sử căn đúng :00), còn `dt` của API hiện tại không đáng tin (A1).
+- **Xấp xỉ có chủ ý cho dữ liệu thật:** nhiệt độ và gió trong `modelInputs` là của quan sát hiện tại thay vì giờ t-1 (API lịch sử không có thời tiết); ghi ở `feature_note`.
+- **Chạy:** `bash infra/start_all.sh` (tạo topic `hcmc_co_enriched`, Spark dùng `--driver-memory 1g`, backend đặt `READING_TOPIC=hcmc_co_enriched`). `ENRICH=0` để backend đọc topic thô (không có `coPredicted`). Spark phải chạy thì `reading` mới đến; đổi phiên bản mô hình thì khởi động lại job Spark. Phát lại mặc định bắt đầu từ đầu tập kiểm tra của mô hình (`--start auto`), nên dự đoán trên đó là ngoài mẫu huấn luyện; bắt đầu từ mốc khác thì phần lớn là trong mẫu.
+- **Kiểm:** `spark-submit --driver-memory 1g pipeline/08_check_stream.py` đọc `/live/co_stream`, đối chiếu dự đoán trên luồng với dự đoán offline và ghi bước 8 vào `step_summary.json`.
+
 ## Dữ liệu sống Open-Meteo qua Kafka (D1 phương án b, lịch sử; nguồn này nay KHÔNG bật mặc định)
 
 ```

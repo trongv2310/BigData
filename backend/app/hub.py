@@ -110,7 +110,7 @@ class Hub:
                 else:
                     before = pos
                     readings, pos = await kafka_stream.read_new(pos)
-                    if config.FLOWS_EXTRA:
+                    if config.FLOWS_EXTRA and config.READING_TOPIC == config.KAFKA_TOPIC:  # offset của topic làm giàu không phải offset Kafka ACK của producer
                         for p, end in pos.items():
                             for offset in range(max(before.get(p, end), end - FLOW_BURST_MAX), end):
                                 for step in flows.kafka_produce_steps(p, offset):
