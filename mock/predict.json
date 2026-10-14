@@ -1,15 +1,29 @@
 {
-  "coPredicted": 227.8,
+  "coPredicted": 298.7,
   "unit": "µg/m³",
   "status": "SAFE",
-  "interval": {
-    "low": 156.1,
-    "high": 440.1
-  },
+  "interval": null,
+  "filledInputs": [
+    {
+      "name": "coLag1h",
+      "value": 312.4,
+      "origin": "[MOCK] CO của bản ghi live-openweather gần nhất"
+    },
+    {
+      "name": "coLag2h",
+      "value": 305.1,
+      "origin": "[MOCK] CO của bản ghi live-openweather trước đó 1 giờ"
+    },
+    {
+      "name": "no2",
+      "value": 18.3,
+      "origin": "[MOCK] trung vị NO2 theo giờ của tập huấn luyện"
+    }
+  ],
   "model": {
-    "name": "hourly-median-since-2025-07",
-    "version": "1.0",
-    "kind": "heuristic",
-    "trainedOn": "Không phải mô hình học máy. Trung vị và khoảng 10%-90% của CO quanh giờ được hỏi (±1 giờ), lấy từ 6583 dòng của bộ Kaggle từ 01/07/2025 đến 01/04/2026 (giờ VN, giai đoạn sau điểm gãy 01/07/2025). Chỉ giờ trong ngày được dùng. Tháng, thứ, nhiệt độ và gió được kiểm hợp lệ nhưng không dùng: kiểm tra chéo trên chính dữ liệu này cho thấy giờ chỉ giảm sai số rất ít (sai số tuyệt đối trung bình trên tuần kiểm tra: 111 µg/m³ khi dùng giờ, 119 khi chỉ dùng trung vị chung) và các biến còn lại không giảm thêm đáng kể. Không dự báo được các đợt ô nhiễm kéo dài nhiều ngày, nên khoảng 10%-90% mới là thông tin chính."
+    "name": "GBT",
+    "version": "MOCK-1",
+    "kind": "ml",
+    "trainedOn": "[MOCK, số minh họa, chưa huấn luyện thật] GBT huấn luyện trên bộ Kaggle (OpenWeather) 04/2022 đến 06/2025 (80% đầu theo thời gian). Không có khoảng dự đoán. Xem /api/model/metrics."
   }
 }

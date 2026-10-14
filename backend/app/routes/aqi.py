@@ -28,8 +28,14 @@ def _time(name: str, value: str | None):
 
 
 @router.get("/api/aqi/latest")
-async def aqi_latest():
-    """Bản ghi mới nhất của luồng (theo STREAM_SOURCE: tin Kafka và/hoặc file /stream_input); luồng trống hoặc nguồn tắt thì lấy dòng cuối bộ dữ liệu (source=replay-dataset, datetime cũ)."""
+async def aqi_latest(source: Literal["replay-dataset", "live-openweather", "live-open-meteo"] | None = None):
+    """Bản ghi mới nhất của luồng (theo STREAM_SOURCE: tin Kafka và/hoặc file /stream_input).
+
+    Không có `source`: nếu luồng trống hoặc nguồn tắt thì lấy dòng cuối bộ dữ liệu (source=replay-dataset, datetime cũ), như trước.
+    Có `source`: chỉ trả bản ghi của đúng nguồn đó, không bao giờ thay bằng nguồn khác hay dòng bộ dữ liệu; không có thì 404 NO_READING_YET.
+    GIỚI HẠN (đến Bước A1): backend mới chỉ biết bản ghi mới nhất của cả luồng, nên 404 cũng có thể xảy ra khi bản ghi mới nhất thuộc nguồn khác
+    dù trước đó nguồn này từng có bản ghi.
+    """
     r = None
     if config.STREAM_SOURCE in ("kafka", "both"):
         try:
@@ -41,6 +47,10 @@ async def aqi_latest():
             r = await stream_input.latest_reading()
         except (hdfs.HdfsUnreachable, hdfs.HdfsError):
             r = None
+    if source is not None:
+        if r is None or r["source"] != source:
+            raise ApiError(404, "NO_READING_YET", f"Chưa có bản ghi nào của nguồn {source} trong luồng hiện tại.")
+        return r
     return r or aqi_data.last_reading(await _dataset())
 
 

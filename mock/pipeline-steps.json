@@ -1,0 +1,132 @@
+{
+  "generatedAt": "2026-10-14T09:00:05+07:00",
+  "steps": [
+    {
+      "order": 1,
+      "id": "prepare-hdfs",
+      "title": "Chuẩn bị HDFS",
+      "state": "done",
+      "updatedAt": "2026-10-14T08:00:00+07:00",
+      "summary": [
+        {
+          "label": "Thư mục",
+          "value": 3,
+          "unit": null
+        }
+      ],
+      "detail": "[MOCK] Tạo /co/raw, /co/processed, /co/output."
+    },
+    {
+      "order": 2,
+      "id": "upload-raw",
+      "title": "Upload Dataset.csv",
+      "state": "done",
+      "updatedAt": "2026-10-14T08:05:00+07:00",
+      "summary": [
+        {
+          "label": "Số dòng",
+          "value": 35064,
+          "unit": "dòng"
+        },
+        {
+          "label": "Số cột",
+          "value": 16,
+          "unit": "cột"
+        }
+      ],
+      "detail": "[MOCK] Sao chép Dataset.csv vào /co/raw; số liệu minh họa."
+    },
+    {
+      "order": 3,
+      "id": "read-spark",
+      "title": "Đọc bằng Spark",
+      "state": "done",
+      "updatedAt": "2026-10-14T08:10:00+07:00",
+      "summary": [
+        {
+          "label": "Thiếu giá trị",
+          "value": 0,
+          "unit": "ô"
+        }
+      ],
+      "detail": "[MOCK] Kiểm schema, đếm thiếu và giá trị lạ."
+    },
+    {
+      "order": 4,
+      "id": "clean",
+      "title": "Làm sạch",
+      "state": "done",
+      "updatedAt": "2026-10-14T08:20:00+07:00",
+      "summary": [
+        {
+          "label": "Dòng sau làm sạch",
+          "value": 35064,
+          "unit": "dòng"
+        }
+      ],
+      "detail": "[MOCK] Đổi datetime UTC sang +07:00, thêm hour, month, dayofweek, after_2025_07_01."
+    },
+    {
+      "order": 5,
+      "id": "spark-sql",
+      "title": "Spark SQL",
+      "state": "done",
+      "updatedAt": "2026-10-14T08:30:00+07:00",
+      "summary": [
+        {
+          "label": "Truy vấn",
+          "value": 5,
+          "unit": "truy vấn"
+        }
+      ],
+      "detail": "[MOCK] CO theo giờ, theo tháng, trước/sau 01/07/2025, tương quan."
+    },
+    {
+      "order": 6,
+      "id": "cluster-and-model",
+      "title": "Phân cụm ngày và mô hình dự đoán CO",
+      "state": "running",
+      "updatedAt": "2026-10-14T08:40:00+07:00",
+      "summary": [
+        {
+          "label": "Số cụm",
+          "value": 3,
+          "unit": "cụm"
+        },
+        {
+          "label": "Mô hình đã huấn luyện",
+          "value": 1,
+          "unit": "trong 3"
+        }
+      ],
+      "detail": "[MOCK] Thay RFM và K-Means của đề mẫu: phân cụm ngày theo hình dạng 24 giờ, rồi huấn luyện mô hình dự đoán CO."
+    },
+    {
+      "order": 7,
+      "id": "save-results",
+      "title": "Lưu kết quả",
+      "state": "notStarted",
+      "updatedAt": null,
+      "summary": [],
+      "detail": null
+    },
+    {
+      "order": 8,
+      "id": "kafka-ingest",
+      "title": "Kafka ingest và dự đoán trên luồng sống",
+      "state": "notStarted",
+      "updatedAt": null,
+      "summary": [],
+      "detail": null
+    },
+    {
+      "order": 9,
+      "id": "airflow-dag",
+      "title": "Airflow DAG",
+      "state": "notStarted",
+      "updatedAt": null,
+      "summary": [],
+      "detail": null
+    }
+  ]
+}

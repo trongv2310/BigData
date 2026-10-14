@@ -12,12 +12,20 @@ Mỗi tin là một JSON:
 
 | type | Khi nào phát | data |
 |---|---|---|
-| `reading` | Có bản ghi đo mới trong luồng | `AqiReading` |
+| `reading` | Có bản ghi đo mới trong luồng (cả hai luồng, phân biệt bằng `source`, xem dưới) | `AqiReading` |
 | `hdfs.op` | Có thao tác ghi trên HDFS (mkdir, create, addBlock, close, rename, delete) | op, path, blockId, datanode, bytes |
 | `flow.step` | Một bước của luồng (xem `/api/flows/{id}`) bắt đầu, xong hoặc lỗi | flowId, runId, step, state |
 | `spark.progress` | Mỗi micro-batch của Structured Streaming | queryName, batchId, numInputRows, tốc độ. Backend thật không có số của Spark (REST không lộ StreamingQueryProgress) nên **suy ra** từ job/stage: `queryName` là tên ứng dụng, tốc độ xử lý chưa tính lập kế hoạch và commit, tốc độ vào = 0 khi chưa có batch trước (xem `backend/app/spark_progress.py`) |
 | `kafka.stats` | Định kỳ vài giây | topic, messagesPerSecond, lagTotal |
 | `service.state` | Một dịch vụ đổi trạng thái up/down | `ServiceStatus` |
+
+Hai luồng `reading` cùng đi trên kênh này (hợp đồng 0.2.0):
+- `source = replay-dataset`: PHÁT LẠI, mô phỏng từ bộ lịch sử. `datetime` là lúc phát; thời điểm đo gốc nằm ở `originalDatetime`. Có thể tạm dừng và đổi tốc độ bằng `POST /api/replay/control`; tốc độ 60× của một bản ghi mỗi `baseIntervalSeconds` vẫn phải nằm dưới giới hạn 20 tin/giây.
+- `source = live-openweather`: DỮ LIỆU THẬT, `originalDatetime = null`. Không bị `replay/control` ảnh hưởng. Tần suất do nguồn quyết định (số đo chính xác sẽ ghi ở infra/README.md sau Bước A1), không phải theo giây.
+- `source = live-open-meteo`: nguồn khác, không bật mặc định.
+- Giao diện lọc theo `source` để vẽ hai cột riêng và không trộn hai nguồn vào một đường biểu đồ.
+- `coPredicted` và `modelVersion` đi cùng `reading` khi đã có mô hình (Bước A5); trước đó, và khi chưa đủ độ trễ CO, chúng là `null`.
+- Không có sự kiện `replay.status`: giao diện lấy trạng thái phát lại bằng `GET /api/replay/status` (sau mỗi lần điều khiển và định kỳ).
 
 Quy tắc:
 - `seq` tăng dần cho cả kết nối. Thấy nhảy số thì frontend gọi lại REST tương ứng để lấy trạng thái đầy đủ.

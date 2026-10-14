@@ -1,0 +1,6 @@
+{
+  "error": {
+    "code": "NO_READING_YET",
+    "message": "Chưa có bản ghi nào của nguồn live-open-meteo (nguồn này không bật mặc định; dùng source=live-openweather)."
+  }
+}

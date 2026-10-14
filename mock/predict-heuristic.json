@@ -1,0 +1,16 @@
+{
+  "coPredicted": 227.8,
+  "unit": "µg/m³",
+  "status": "SAFE",
+  "interval": {
+    "low": 156.1,
+    "high": 440.1
+  },
+  "model": {
+    "name": "hourly-median-since-2025-07",
+    "version": "1.0",
+    "kind": "heuristic",
+    "trainedOn": "Không phải mô hình học máy. Trung vị và khoảng 10%-90% của CO quanh giờ được hỏi (±1 giờ), lấy từ 6583 dòng của bộ Kaggle từ 01/07/2025 đến 01/04/2026 (giờ VN, giai đoạn sau điểm gãy 01/07/2025). Chỉ giờ trong ngày được dùng. Tháng, thứ, nhiệt độ và gió được kiểm hợp lệ nhưng không dùng: kiểm tra chéo trên chính dữ liệu này cho thấy giờ chỉ giảm sai số rất ít (sai số tuyệt đối trung bình trên tuần kiểm tra: 111 µg/m³ khi dùng giờ, 119 khi chỉ dùng trung vị chung) và các biến còn lại không giảm thêm đáng kể. Không dự báo được các đợt ô nhiễm kéo dài nhiều ngày, nên khoảng 10%-90% mới là thông tin chính."
+  },
+  "filledInputs": []
+}
