@@ -20,6 +20,8 @@ import type {
   ReplayStatus,
   PipelineSteps,
   ModelMetrics,
+  SqlAnalysis,
+  DayClusters,
 } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8010';
@@ -156,8 +158,19 @@ export const api = {
     });
   },
 
-  // F2: 9 bước Pipeline và Chỉ số Mô hình
-  getPipelineSteps: () => fetchJson<PipelineSteps>('/api/pipeline/steps'),
+  // F2 & P19: 9 bước Pipeline, Chỉ số Mô hình và Kết quả Phân tích
+  getPipelineSteps: (mockVariant?: string) => {
+    const q = mockVariant ? `?mock=${encodeURIComponent(mockVariant)}` : '';
+    return fetchJson<PipelineSteps>(`/api/pipeline/steps${q}`);
+  },
+  getAnalysisSql: (mockVariant?: string) => {
+    const q = mockVariant ? `?mock=${encodeURIComponent(mockVariant)}` : '';
+    return fetchJson<SqlAnalysis>(`/api/analysis/sql${q}`);
+  },
+  getAnalysisDayClusters: (mockVariant?: string) => {
+    const q = mockVariant ? `?mock=${encodeURIComponent(mockVariant)}` : '';
+    return fetchJson<DayClusters>(`/api/analysis/day-clusters${q}`);
+  },
   getModelMetrics: (mockVariant?: string) => {
     const q = mockVariant ? `?mock=${encodeURIComponent(mockVariant)}` : '';
     return fetchJson<ModelMetrics>(`/api/model/metrics${q}`);

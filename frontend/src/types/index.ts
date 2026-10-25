@@ -48,4 +48,10 @@ export type ErrorMetrics = Schemas['ErrorMetrics'];
 export type DataSplitInfo = Schemas['DataSplitInfo'];
 export type ModelMetrics = Schemas['ModelMetrics'];
 
+// P19: Phân tích SQL và Phân cụm ngày
+export type SqlAnalysis = Schemas['SqlAnalysis'];
+export type DayClusters = Schemas['DayClusters'];
+export type DayClusterInfo = Schemas['DayClusterInfo'];
+export type DayClusterStability = Schemas['DayClusterStability'];
+
 export type { paths, components };
