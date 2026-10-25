@@ -30,6 +30,7 @@ export const PipelineTab: React.FC = () => {
   const [modelMetrics, setModelMetrics] = useState<ModelMetrics | null>(null);
   const [modelUntrained, setModelUntrained] = useState<boolean>(false);
   const [modelErrorMsg, setModelErrorMsg] = useState<string | null>(null);
+  const [pipelineUnavailableMsg, setPipelineUnavailableMsg] = useState<string | null>(null);
 
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -37,6 +38,14 @@ export const PipelineTab: React.FC = () => {
 
   // Variant test cho mock
   const [mockVariant, setMockVariant] = useState<string>('');
+
+  const MOCK_VARIANTS = [
+    { id: '', label: 'Mặc định (Có dữ liệu)' },
+    { id: 'unavailable', label: '503 Unavailable' },
+    { id: 'untrained', label: '404 Chưa huấn luyện' },
+    { id: 'notready', label: '404 Chưa sẵn sàng' },
+    { id: 'nostability', label: 'Không có Stability' },
+  ];
 
   // Phát hiện mock server
   const [isMock, setIsMock] = useState<boolean>(() => isMockMode());
@@ -49,9 +58,10 @@ export const PipelineTab: React.FC = () => {
       setLoading(true);
       setError(null);
       setModelErrorMsg(null);
+      setPipelineUnavailableMsg(null);
 
-      // 1. Tải 9 bước pipeline
-      const stepsPromise = api.getPipelineSteps();
+      // 1. Tải 9 bước pipeline (hỗ trợ variant mock)
+      const stepsPromise = api.getPipelineSteps(variant || undefined);
 
       // 2. Tải chỉ số mô hình
       const metricsPromise = api.getModelMetrics(variant || undefined);
@@ -63,14 +73,22 @@ export const PipelineTab: React.FC = () => {
 
       if (stepsRes.status === 'fulfilled') {
         setPipelineData(stepsRes.value);
+        setPipelineUnavailableMsg(null);
         // Mặc định chọn bước đang chạy hoặc bước đầu tiên
         const runningStep = stepsRes.value.steps.find((s) => s.state === 'running');
         if (runningStep) {
           setSelectedStepId(runningStep.id);
         }
       } else {
-        const msg = stepsRes.reason instanceof Error ? stepsRes.reason.message : String(stepsRes.reason);
-        setError(`Không thể tải 9 bước pipeline: ${msg}`);
+        const reason = stepsRes.reason;
+        if (reason instanceof ApiError && (reason.code === 'PIPELINE_UNAVAILABLE' || reason.status === 503)) {
+          setPipelineData(null);
+          setPipelineUnavailableMsg(reason.message);
+        } else {
+          const msg = reason instanceof Error ? reason.message : String(reason);
+          setError(`Không thể tải 9 bước pipeline: ${msg}`);
+          setPipelineData(null);
+        }
       }
 
       if (metricsRes.status === 'fulfilled') {
@@ -119,6 +137,13 @@ export const PipelineTab: React.FC = () => {
           icon: RefreshCw,
           iconColor: 'text-sky-400 animate-spin',
         };
+      case 'partial':
+        return {
+          label: 'Mới xong một phần',
+          badgeClass: 'bg-amber-500/10 text-amber-400 border border-amber-500/30',
+          icon: AlertTriangle,
+          iconColor: 'text-amber-400',
+        };
       case 'failed':
         return {
           label: 'Thất bại',
@@ -143,6 +168,7 @@ export const PipelineTab: React.FC = () => {
 
   const completedStepsCount = pipelineData?.steps.filter((s) => s.state === 'done').length || 0;
   const runningStepsCount = pipelineData?.steps.filter((s) => s.state === 'running').length || 0;
+  const partialStepsCount = pipelineData?.steps.filter((s) => s.state === 'partial').length || 0;
   const failedStepsCount = pipelineData?.steps.filter((s) => s.state === 'failed').length || 0;
 
   return (
@@ -161,17 +187,23 @@ export const PipelineTab: React.FC = () => {
 
         <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
           {isMock && (
-            <button
-              onClick={handleVariantToggle}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition ${
-                mockVariant === 'untrained'
-                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
-                  : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
-              }`}
-              title="Chuyển đổi trạng thái mock để kiểm tra 404 MODEL_NOT_TRAINED"
-            >
-              Mock variant: {mockVariant === 'untrained' ? '404 Chưa huấn luyện' : 'Mặc định (Có mô hình)'}
-            </button>
+            <div className="flex flex-wrap items-center gap-1.5 p-1 rounded-xl bg-slate-900 border border-slate-800">
+              <span className="text-[11px] text-slate-400 px-2 font-mono">Mock:</span>
+              {MOCK_VARIANTS.map((v) => (
+                <button
+                  key={v.id}
+                  onClick={() => setMockVariant(v.id)}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-medium transition ${
+                    mockVariant === v.id
+                      ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40 shadow-sm'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800 border border-transparent'
+                  }`}
+                  title={`Kiểm thử chế độ mock variant ?mock=${v.id || 'default'}`}
+                >
+                  {v.label}
+                </button>
+              ))}
+            </div>
           )}
 
           <button
@@ -210,6 +242,21 @@ export const PipelineTab: React.FC = () => {
         </div>
       )}
 
+      {pipelineUnavailableMsg && (
+        <div className="p-5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-sm space-y-2">
+          <div className="flex items-center gap-2 text-amber-300 font-bold">
+            <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0" />
+            Dịch vụ Pipeline Chưa Khả Dụng (503 PIPELINE_UNAVAILABLE)
+          </div>
+          <p className="text-xs text-amber-200/90 leading-relaxed font-mono">
+            {pipelineUnavailableMsg}
+          </p>
+          <div className="text-[11px] text-slate-400 pt-1.5 border-t border-amber-500/20 leading-relaxed">
+            💡 <strong>Nguyên nhân thường gặp:</strong> Cụm HDFS chưa được khởi động (NameNode/DataNode đóng) hoặc tệp <code>/co/output/step_summary.json</code> chưa được các script pipeline sinh ra. Kiểm tra trạng thái NameNode/DataNode trên tab HDFS hoặc chạy <code>bash ~/start-4nodes.sh</code> trong WSL Ubuntu.
+          </div>
+        </div>
+      )}
+
       {/* ========================================================================= */}
       {/* PHẦN 1: 9 BƯỚC CỦA PIPELINE                                              */}
       {/* ========================================================================= */}
@@ -238,6 +285,11 @@ export const PipelineTab: React.FC = () => {
             {runningStepsCount > 0 && (
               <span className="text-sky-400 font-semibold animate-pulse">
                 • Đang chạy: {runningStepsCount}
+              </span>
+            )}
+            {partialStepsCount > 0 && (
+              <span className="text-amber-400 font-semibold">
+                • Mới xong một phần: {partialStepsCount}
               </span>
             )}
             {failedStepsCount > 0 && (
@@ -294,6 +346,12 @@ export const PipelineTab: React.FC = () => {
 
                   {/* Số liệu chính (Summary) */}
                   <div className="space-y-1.5 pt-1">
+                    {step.state === 'partial' && step.detail && (
+                      <div className="text-[11px] text-amber-300 bg-amber-500/10 rounded-lg px-2.5 py-1.5 border border-amber-500/20 leading-relaxed">
+                        <span className="font-semibold text-amber-400">Một phần: </span>
+                        {step.detail}
+                      </div>
+                    )}
                     {step.summary && step.summary.length > 0 ? (
                       <div className="flex flex-wrap gap-1.5">
                         {step.summary.map((item, idx) => (
@@ -368,6 +426,17 @@ export const PipelineTab: React.FC = () => {
                 </span>
               </div>
             </div>
+
+            {/* Cảnh báo đặc biệt cho trạng thái partial */}
+            {selectedStep.state === 'partial' && (
+              <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs flex items-start gap-2.5">
+                <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                <div>
+                  <strong className="font-semibold text-amber-300">Trạng thái mới xong một phần (partial):</strong>{' '}
+                  {selectedStep.detail || 'Một phần của bước đã hoàn tất (như 6a phân cụm ngày), nhưng chưa hoàn thành toàn bộ bước (chờ 6b huấn luyện mô hình). Hiện không có tiến trình nào đang chạy.'}
+                </div>
+              </div>
+            )}
 
             {/* Mô tả chi tiết (detail) */}
             <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-1.5">
