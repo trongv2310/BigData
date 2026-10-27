@@ -23,9 +23,11 @@ import type {
   PipelineStepState,
   ModelMetrics,
   SqlAnalysis,
+  DayClusters,
 } from '../types';
 import { formatDateTime } from '../utils/format';
 import { AnalysisSqlSection } from './AnalysisSqlSection';
+import { DayClustersSection } from './DayClustersSection';
 
 export const PipelineTab: React.FC = () => {
   const [pipelineData, setPipelineData] = useState<PipelineSteps | null>(null);
@@ -39,6 +41,12 @@ export const PipelineTab: React.FC = () => {
   const [sqlLoading, setSqlLoading] = useState<boolean>(true);
   const [sqlError, setSqlError] = useState<string | null>(null);
   const [sqlNotReady, setSqlNotReady] = useState<boolean>(false);
+
+  // Phân cụm K-Means (Bước 6a)
+  const [dayClusters, setDayClusters] = useState<DayClusters | null>(null);
+  const [dayClustersLoading, setDayClustersLoading] = useState<boolean>(true);
+  const [dayClustersError, setDayClustersError] = useState<string | null>(null);
+  const [dayClustersNotReady, setDayClustersNotReady] = useState<boolean>(false);
 
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -65,10 +73,12 @@ export const PipelineTab: React.FC = () => {
     try {
       setLoading(true);
       setSqlLoading(true);
+      setDayClustersLoading(true);
       setError(null);
       setModelErrorMsg(null);
       setPipelineUnavailableMsg(null);
       setSqlError(null);
+      setDayClustersError(null);
 
       // 1. Tải 9 bước pipeline (hỗ trợ variant mock)
       const stepsPromise = api.getPipelineSteps(variant || undefined);
@@ -79,10 +89,14 @@ export const PipelineTab: React.FC = () => {
       // 3. Tải phân tích Spark SQL (bước 5)
       const sqlPromise = api.getAnalysisSql(variant || undefined);
 
-      const [stepsRes, metricsRes, sqlRes] = await Promise.allSettled([
+      // 4. Tải phân cụm ngày K-Means (bước 6a)
+      const dayClustersPromise = api.getAnalysisDayClusters(variant || undefined);
+
+      const [stepsRes, metricsRes, sqlRes, dayClustersRes] = await Promise.allSettled([
         stepsPromise,
         metricsPromise,
         sqlPromise,
+        dayClustersPromise,
       ]);
 
       if (stepsRes.status === 'fulfilled') {
@@ -139,9 +153,28 @@ export const PipelineTab: React.FC = () => {
           setSqlError(msg);
         }
       }
+
+      if (dayClustersRes.status === 'fulfilled') {
+        setDayClusters(dayClustersRes.value);
+        setDayClustersNotReady(false);
+        setDayClustersError(null);
+      } else {
+        const reason = dayClustersRes.reason;
+        if (reason instanceof ApiError && reason.status === 404) {
+          setDayClusters(null);
+          setDayClustersNotReady(true);
+          setDayClustersError(null);
+        } else {
+          const msg = reason instanceof Error ? reason.message : String(reason);
+          setDayClusters(null);
+          setDayClustersNotReady(false);
+          setDayClustersError(msg);
+        }
+      }
     } finally {
       setLoading(false);
       setSqlLoading(false);
+      setDayClustersLoading(false);
     }
   }, []);
 
@@ -521,7 +554,19 @@ export const PipelineTab: React.FC = () => {
       </section>
 
       {/* ========================================================================= */}
-      {/* PHẦN 3: CHỈ SỐ MÔ HÌNH DỰ ĐOÁN CO VÀ MỐC SO SÁNH (BƯỚC 6B & 7)            */}
+      {/* PHẦN 3: PHÂN CỤM NGÀY K-MEANS & ĐỘ ỔN ĐỊNH (BƯỚC 6A)                      */}
+      {/* ========================================================================= */}
+      <section className="space-y-4 pt-4 border-t border-slate-800/80">
+        <DayClustersSection
+          data={dayClusters}
+          loading={dayClustersLoading}
+          error={dayClustersError}
+          isNotReady={dayClustersNotReady}
+        />
+      </section>
+
+      {/* ========================================================================= */}
+      {/* PHẦN 4: CHỈ SỐ MÔ HÌNH DỰ ĐOÁN CO VÀ MỐC SO SÁNH (BƯỚC 6B & 7)            */}
       {/* ========================================================================= */}
       <section className="space-y-6 pt-4 border-t border-slate-800/80">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
