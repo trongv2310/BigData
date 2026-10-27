@@ -22,8 +22,10 @@ import type {
   PipelineStep,
   PipelineStepState,
   ModelMetrics,
+  SqlAnalysis,
 } from '../types';
 import { formatDateTime } from '../utils/format';
+import { AnalysisSqlSection } from './AnalysisSqlSection';
 
 export const PipelineTab: React.FC = () => {
   const [pipelineData, setPipelineData] = useState<PipelineSteps | null>(null);
@@ -31,6 +33,12 @@ export const PipelineTab: React.FC = () => {
   const [modelUntrained, setModelUntrained] = useState<boolean>(false);
   const [modelErrorMsg, setModelErrorMsg] = useState<string | null>(null);
   const [pipelineUnavailableMsg, setPipelineUnavailableMsg] = useState<string | null>(null);
+
+  // Phân tích Spark SQL (Bước 5)
+  const [sqlAnalysis, setSqlAnalysis] = useState<SqlAnalysis | null>(null);
+  const [sqlLoading, setSqlLoading] = useState<boolean>(true);
+  const [sqlError, setSqlError] = useState<string | null>(null);
+  const [sqlNotReady, setSqlNotReady] = useState<boolean>(false);
 
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -56,9 +64,11 @@ export const PipelineTab: React.FC = () => {
   const loadData = useCallback(async (variant?: string) => {
     try {
       setLoading(true);
+      setSqlLoading(true);
       setError(null);
       setModelErrorMsg(null);
       setPipelineUnavailableMsg(null);
+      setSqlError(null);
 
       // 1. Tải 9 bước pipeline (hỗ trợ variant mock)
       const stepsPromise = api.getPipelineSteps(variant || undefined);
@@ -66,9 +76,13 @@ export const PipelineTab: React.FC = () => {
       // 2. Tải chỉ số mô hình
       const metricsPromise = api.getModelMetrics(variant || undefined);
 
-      const [stepsRes, metricsRes] = await Promise.allSettled([
+      // 3. Tải phân tích Spark SQL (bước 5)
+      const sqlPromise = api.getAnalysisSql(variant || undefined);
+
+      const [stepsRes, metricsRes, sqlRes] = await Promise.allSettled([
         stepsPromise,
         metricsPromise,
+        sqlPromise,
       ]);
 
       if (stepsRes.status === 'fulfilled') {
@@ -107,8 +121,27 @@ export const PipelineTab: React.FC = () => {
           setModelErrorMsg(msg);
         }
       }
+
+      if (sqlRes.status === 'fulfilled') {
+        setSqlAnalysis(sqlRes.value);
+        setSqlNotReady(false);
+        setSqlError(null);
+      } else {
+        const reason = sqlRes.reason;
+        if (reason instanceof ApiError && reason.status === 404) {
+          setSqlAnalysis(null);
+          setSqlNotReady(true);
+          setSqlError(null);
+        } else {
+          const msg = reason instanceof Error ? reason.message : String(reason);
+          setSqlAnalysis(null);
+          setSqlNotReady(false);
+          setSqlError(msg);
+        }
+      }
     } finally {
       setLoading(false);
+      setSqlLoading(false);
     }
   }, []);
 
@@ -476,7 +509,19 @@ export const PipelineTab: React.FC = () => {
       </section>
 
       {/* ========================================================================= */}
-      {/* PHẦN 2: CHỈ SỐ MÔ HÌNH DỰ ĐOÁN CO VÀ MỐC SO SÁNH                          */}
+      {/* PHẦN 2: KẾT QUẢ PHÂN TÍCH SPARK SQL (BƯỚC 5)                             */}
+      {/* ========================================================================= */}
+      <section className="space-y-4 pt-4 border-t border-slate-800/80">
+        <AnalysisSqlSection
+          data={sqlAnalysis}
+          loading={sqlLoading}
+          error={sqlError}
+          isNotReady={sqlNotReady}
+        />
+      </section>
+
+      {/* ========================================================================= */}
+      {/* PHẦN 3: CHỈ SỐ MÔ HÌNH DỰ ĐOÁN CO VÀ MỐC SO SÁNH (BƯỚC 6B & 7)            */}
       {/* ========================================================================= */}
       <section className="space-y-6 pt-4 border-t border-slate-800/80">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
