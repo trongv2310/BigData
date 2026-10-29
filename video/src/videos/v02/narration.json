@@ -1,0 +1,388 @@
+{
+  "video": "02_hdfs",
+  "title": "HDFS: block, NameNode, DataNode, replication, heartbeat, luồng ghi và đọc",
+  "tts": {
+    "engine": "elevenlabs",
+    "model": "eleven_v3",
+    "voiceSettings": {
+      "stability": 0.5,
+      "similarity_boost": 0.8,
+      "style": 0.2,
+      "use_speaker_boost": true
+    },
+    "voice": "vi-VN-HoaiMyNeural",
+    "rate": "+0%",
+    "voiceName": "Viên - Narrative, Warm and Clear (iSFxP4Z6YNcx9OXl62Ic)",
+    "tempo": 1.1,
+    "seeds": {
+      "s3": 2,
+      "s5": 3,
+      "s7": 2
+    }
+  },
+  "note": "text là chữ hiện trên phụ đề; say (nếu có) là chữ đưa cho giọng đọc. Giọng ElevenLabs (model eleven_v3; eleven_multilingual_v2 KHÔNG có tiếng Việt) đọc được thuật ngữ tiếng Anh nên giữ nguyên NameNode, block, checksum; chỉ viết lại số dài, cổng, đường dẫn, ký hiệu. voiceId đặt trong video/.env (ELEVENLABS_VOICE_ID). voice và rate chỉ dùng khi engine là edge. Nội dung theo storyboard/02_hdfs.md.",
+  "scenes": [
+    {
+      "id": "s1",
+      "title": "HDFS là một thư viện",
+      "sentences": [
+        {
+          "text": "HDFS là hệ thống file trải trên nhiều máy, nhưng trông như một cây thư mục duy nhất."
+        },
+        {
+          "text": "Nó sinh ra cho file lớn: ghi một lần, đọc nhiều lần."
+        },
+        {
+          "text": "Hãy hình dung một thư viện: một quầy thủ thư giữ mục lục, và nhiều kệ sách."
+        },
+        {
+          "text": "Bạn hỏi thủ thư sách ở đâu rồi tự đi lấy; thủ thư không bê sách giúp bạn."
+        },
+        {
+          "text": "Quầy thủ thư là NameNode, kệ sách là DataNode, còn bạn là client."
+        },
+        {
+          "text": "Trong đồ án, cụm ở hdfs://localhost:9000, giao diện NameNode ở cổng 9870.",
+          "say": "Trong đồ án, cụm nằm ở localhost cổng chín nghìn, giao diện NameNode ở cổng chín tám bảy không."
+        }
+      ]
+    },
+    {
+      "id": "s2",
+      "title": "Block: cắt file thành viên gạch",
+      "sentences": [
+        {
+          "text": "HDFS cắt mỗi file thành những mẩu cố định gọi là block."
+        },
+        {
+          "text": "Mặc định mỗi block tối đa 128 MiB; block cuối chỉ chiếm phần còn lại.",
+          "say": "Mặc định mỗi block tối đa một trăm hai mươi tám mê bi bai; block cuối chỉ chiếm phần còn lại."
+        },
+        {
+          "text": "Như cuốn từ điển quá dày được tách thành nhiều tập."
+        },
+        {
+          "text": "Ví dụ: file 300 MiB thành 3 block: 128, 128 và 44 MiB.",
+          "say": "Ví dụ, file ba trăm mê bi bai thành ba block: một trăm hai mươi tám, một trăm hai mươi tám, và bốn mươi tư."
+        },
+        {
+          "text": "Block to vì NameNode nhớ mọi block trong RAM; ít block thì đỡ tốn bộ nhớ."
+        },
+        {
+          "text": "File của đồ án chỉ khoảng 3 MB, nằm gọn trong 1 block 128 MiB.",
+          "say": "File của đồ án chỉ khoảng ba megabyte, nằm gọn trong một block một trăm hai mươi tám mê bi bai."
+        },
+        {
+          "text": "Để thấy việc chia, /raw/Dataset.csv được ghi với block 1 MiB.",
+          "say": "Để thấy việc chia, file Dataset chấm CSV được ghi với block một mê bi bai."
+        },
+        {
+          "text": "Kết quả: 3 179 004 byte thành 4 block: ba block 1 048 576 byte và một block cuối 33 276 byte.",
+          "say": "Kết quả: ba triệu một trăm bảy mươi chín nghìn không trăm linh bốn byte thành bốn block. Ba block đầy, mỗi block một triệu không trăm bốn mươi tám nghìn năm trăm bảy mươi sáu byte, và một block cuối ba mươi ba nghìn hai trăm bảy mươi sáu byte."
+        },
+        {
+          "text": "Lệnh hdfs fsck trả đúng 4 mã block, khớp với tab HDFS trên dashboard.",
+          "say": "Lệnh HDFS FSCK trả đúng bốn mã block, khớp với dashboard."
+        }
+      ]
+    },
+    {
+      "id": "s3",
+      "title": "NameNode: người giữ sổ",
+      "sentences": [
+        {
+          "text": "NameNode giữ siêu dữ liệu: cây thư mục, quyền, danh sách block và nơi đặt từng block."
+        },
+        {
+          "text": "Nó không giữ dữ liệu thật; cả cây nằm trong RAM để trả lời nhanh."
+        },
+        {
+          "text": "Để không mất khi tắt máy, NameNode ghi xuống đĩa fsimage, ảnh chụp cả cây, và edit log, nhật ký thay đổi.",
+          "say": "Để không mất khi tắt máy, NameNode ghi xuống đĩa FS image, ảnh chụp cả cây, và edit log, nhật ký thay đổi."
+        },
+        {
+          "text": "Như sổ hộ khẩu chép đầu năm, cộng tờ ghi: ngày 3 nhập thêm A, ngày 5 chuyển B đi."
+        },
+        {
+          "text": "Khởi động lại thì đọc sổ, rồi đọc hết tờ ghi."
+        },
+        {
+          "text": "Vị trí block không ghi xuống đĩa; NameNode dựng lại từ báo cáo của DataNode."
+        },
+        {
+          "text": "Trong đồ án, NameNode nghe ở cổng 9000; backend chỉ đọc số liệu qua JMX và WebHDFS.",
+          "say": "Trong đồ án, NameNode nghe ở cổng chín nghìn; backend chỉ đọc số liệu qua JMX và Web HDFS."
+        }
+      ]
+    },
+    {
+      "id": "s4",
+      "title": "DataNode và replication",
+      "sentences": [
+        {
+          "text": "DataNode cất block thành file trên đĩa, kèm checksum để phát hiện dữ liệu hỏng."
+        },
+        {
+          "text": "Để máy hỏng không mất dữ liệu, HDFS mặc định giữ 3 bản sao mỗi block, trên 3 DataNode khác nhau.",
+          "say": "Để máy hỏng không mất dữ liệu, HDFS mặc định giữ ba bản sao mỗi block, trên ba DataNode khác nhau."
+        },
+        {
+          "text": "Như photo hồ sơ cất ở ba tủ: cháy một tủ vẫn còn hai bản."
+        },
+        {
+          "text": "Cái giá: file 1 GB chiếm 3 GB, đổi lại chịu được 2 DataNode hỏng cùng lúc.",
+          "say": "Cái giá: file một gigabyte chiếm ba gigabyte, đổi lại chịu được hai DataNode hỏng cùng lúc."
+        },
+        {
+          "text": "Trong đồ án, replication là 1.",
+          "say": "Trong đồ án, replication là một."
+        },
+        {
+          "text": "Vì 4 DataNode chung một ổ đĩa: để 3 chỉ tốn gấp ba mà ổ hỏng vẫn mất hết.",
+          "say": "Vì bốn DataNode chung một ổ đĩa: để ba chỉ tốn gấp ba, mà ổ hỏng vẫn mất hết."
+        },
+        {
+          "text": "Có file từng ghi với replication lớn hơn 1, nên có lúc cụm có 24 block nhưng 38 bản sao.",
+          "say": "Có file từng ghi với replication lớn hơn một, nên có lúc cụm có hai mươi tư block nhưng ba mươi tám bản sao."
+        },
+        {
+          "text": "Cụm thật nhiều máy thì để 3.",
+          "say": "Cụm thật nhiều máy thì để ba."
+        },
+        {
+          "text": "Mỗi DataNode báo dung lượng cả ổ, nên tổng cụm khoảng 4 TB dù chỉ có một đĩa.",
+          "say": "Mỗi DataNode báo dung lượng cả ổ, nên tổng cụm khoảng bốn terabyte, dù chỉ có một đĩa."
+        }
+      ]
+    },
+    {
+      "id": "s5",
+      "title": "Heartbeat và báo cáo block",
+      "sentences": [
+        {
+          "text": "NameNode biết DataNode còn sống nhờ nhịp tim, mặc định 3 giây một lần.",
+          "say": "NameNode biết DataNode còn sống nhờ nhịp tim, mặc định ba giây một lần."
+        },
+        {
+          "text": "NameNode không gọi DataNode; nó trả lời nhịp tim và gài lệnh vào câu trả lời."
+        },
+        {
+          "text": "Như lớp học trực tuyến: lâu không bấm “có mặt” thì bị coi là vắng."
+        },
+        {
+          "text": "Quá khoảng 10 phút 30 giây im lặng, DataNode bị coi là chết, block của nó được chép bù.",
+          "say": "Quá khoảng mười phút ba mươi giây im lặng, DataNode bị coi là chết, và block của nó được chép bù."
+        },
+        {
+          "text": "DataNode còn gửi báo cáo block: lúc khởi động và mặc định 6 giờ một lần.",
+          "say": "DataNode còn gửi báo cáo block: lúc khởi động, và mặc định sáu giờ một lần."
+        },
+        {
+          "text": "Trong đồ án: tắt một DataNode rồi mở trang 9870, cột Last contact tăng dần tới khi node thành Dead.",
+          "say": "Trong đồ án, tắt một DataNode rồi mở trang chín tám bảy không: cột Last contact tăng dần, tới khi node thành Dead."
+        }
+      ]
+    },
+    {
+      "id": "s6",
+      "title": "Luồng ghi file",
+      "sentences": [
+        {
+          "text": "Ghi một file: client gọi NameNode tạo file; lệnh hdfs dfs -put ghi vào tên tạm ._COPYING_.",
+          "say": "Ghi một file: client gọi NameNode tạo file, lệnh put ghi vào một tên tạm có đuôi copying."
+        },
+        {
+          "text": "Client xin block; NameNode cấp mã block và danh sách DataNode."
+        },
+        {
+          "text": "Dữ liệu đi thành gói khoảng 64 KB tới DataNode đầu; DataNode này vừa ghi vừa chuyển tiếp.",
+          "say": "Dữ liệu đi thành từng gói khoảng sáu mươi tư kilobyte tới DataNode đầu; DataNode này vừa ghi vừa chuyển tiếp."
+        },
+        {
+          "text": "Xác nhận đi ngược về client; mỗi DataNode ghi xong thì báo NameNode."
+        },
+        {
+          "text": "Cuối cùng client đóng file, tên tạm đổi thành tên thật."
+        },
+        {
+          "text": "Như chuyền tay hồ sơ: mỗi người photo một bản rồi chuyền tiếp, chữ ký truyền ngược về."
+        },
+        {
+          "text": "Trong đồ án, tab Sơ đồ luồng thắp sáng các bước này khi có lượt ghi thật."
+        },
+        {
+          "text": "Có bước quan sát thật trong log NameNode, có bước chỉ suy ra; với replication 1, đường ống chỉ có một DataNode.",
+          "say": "Có bước quan sát thật trong log NameNode, có bước chỉ suy ra; với replication một, đường ống chỉ có một DataNode."
+        }
+      ]
+    },
+    {
+      "id": "s7",
+      "title": "Luồng đọc và safe mode",
+      "sentences": [
+        {
+          "text": "Đọc đơn giản hơn: client hỏi NameNode vị trí block, rồi đọc thẳng từ DataNode, kiểm checksum."
+        },
+        {
+          "text": "Checksum sai thì đọc bản sao khác."
+        },
+        {
+          "text": "Spark đọc bảng Parquet aqi_clean trên HDFS cũng theo đường này.",
+          "say": "Spark đọc bảng Par-kay đã làm sạch trên HDFS cũng theo đường này."
+        },
+        {
+          "text": "Sau khởi động, NameNode ở safe mode, chỉ đọc, chờ DataNode báo cáo block."
+        },
+        {
+          "text": "Vì vậy start_all.sh chờ safe mode tắt mới bật Spark Streaming, nếu không job sẽ lỗi.",
+          "say": "Vì vậy script start all chờ safe mode tắt mới bật Spark Streaming, nếu không job sẽ lỗi."
+        }
+      ]
+    },
+    {
+      "id": "s8",
+      "title": "Tổng kết",
+      "sentences": [
+        {
+          "text": "Tóm lại: NameNode giữ sổ, DataNode giữ block, block có bản sao, nhịp tim báo sống chết."
+        },
+        {
+          "text": "Video sau: Kafka, cuốn sổ nhật ký của dữ liệu luồng."
+        }
+      ]
+    }
+  ],
+  "terms": [
+    {
+      "term": "HDFS"
+    },
+    {
+      "term": "NameNode"
+    },
+    {
+      "term": "DataNode"
+    },
+    {
+      "term": "client"
+    },
+    {
+      "term": "block"
+    },
+    {
+      "term": "checksum"
+    },
+    {
+      "term": "replication"
+    },
+    {
+      "term": "RAM"
+    },
+    {
+      "term": "edit log"
+    },
+    {
+      "term": "FS image",
+      "accept": [
+        "fsimage"
+      ]
+    },
+    {
+      "term": "JMX"
+    },
+    {
+      "term": "Web HDFS",
+      "accept": [
+        "webhdfs"
+      ]
+    },
+    {
+      "term": "dashboard"
+    },
+    {
+      "term": "Spark"
+    },
+    {
+      "term": "Parquet"
+    },
+    {
+      "term": "safe mode"
+    },
+    {
+      "term": "Streaming"
+    },
+    {
+      "term": "Last contact"
+    },
+    {
+      "term": "Dead"
+    },
+    {
+      "term": "localhost",
+      "accept": [
+        "local host"
+      ]
+    },
+    {
+      "term": "mê bi bai",
+      "accept": [
+        "mebibai",
+        "mêbibai",
+        "mebibyte",
+        "mib"
+      ]
+    },
+    {
+      "term": "megabyte",
+      "accept": [
+        "mb"
+      ]
+    },
+    {
+      "term": "gigabyte",
+      "accept": [
+        "gb"
+      ]
+    },
+    {
+      "term": "terabyte",
+      "accept": [
+        "tb"
+      ]
+    },
+    {
+      "term": "kilobyte",
+      "accept": [
+        "kb"
+      ]
+    },
+    {
+      "term": "CSV"
+    },
+    {
+      "term": "FSCK"
+    },
+    {
+      "term": "COPYING"
+    },
+    {
+      "term": "Kafka"
+    },
+    {
+      "term": "backend",
+      "accept": [
+        "back end"
+      ]
+    },
+    {
+      "term": "log"
+    },
+    {
+      "term": "Par-kay",
+      "accept": [
+        "parquet",
+        "parkay",
+        "parke"
+      ]
+    }
+  ]
+}

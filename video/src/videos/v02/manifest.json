@@ -1,0 +1,608 @@
+{
+  "video": "02_hdfs",
+  "fps": 30,
+  "width": 1920,
+  "height": 1080,
+  "totalFrames": 10459,
+  "scenes": [
+    {
+      "id": "s1",
+      "title": "HDFS là một thư viện",
+      "from": 0,
+      "durationInFrames": 1080,
+      "audio": "audio/v02/s1.mp3",
+      "sentences": [
+        {
+          "start": 18,
+          "end": 175,
+          "text": "HDFS là hệ thống file trải trên nhiều máy, nhưng trông như một cây thư mục duy nhất."
+        },
+        {
+          "start": 182,
+          "end": 289,
+          "text": "Nó sinh ra cho file lớn: ghi một lần, đọc nhiều lần."
+        },
+        {
+          "start": 296,
+          "end": 450,
+          "text": "Hãy hình dung một thư viện: một quầy thủ thư giữ mục lục, và nhiều kệ sách."
+        },
+        {
+          "start": 456,
+          "end": 618,
+          "text": "Bạn hỏi thủ thư sách ở đâu rồi tự đi lấy; thủ thư không bê sách giúp bạn."
+        },
+        {
+          "start": 627,
+          "end": 812,
+          "text": "Quầy thủ thư là NameNode, kệ sách là DataNode, còn bạn là client."
+        },
+        {
+          "start": 817,
+          "end": 1052,
+          "text": "Trong đồ án, cụm ở hdfs://localhost:9000, giao diện NameNode ở cổng 9870."
+        }
+      ]
+    },
+    {
+      "id": "s2",
+      "title": "Block: cắt file thành viên gạch",
+      "from": 1080,
+      "durationInFrames": 2047,
+      "audio": "audio/v02/s2.mp3",
+      "sentences": [
+        {
+          "start": 18,
+          "end": 142,
+          "text": "HDFS cắt mỗi file thành những mẩu cố định gọi là block."
+        },
+        {
+          "start": 147,
+          "end": 328,
+          "text": "Mặc định mỗi block tối đa 128 MiB; block cuối chỉ chiếm phần còn lại."
+        },
+        {
+          "start": 334,
+          "end": 430,
+          "text": "Như cuốn từ điển quá dày được tách thành nhiều tập."
+        },
+        {
+          "start": 437,
+          "end": 685,
+          "text": "Ví dụ: file 300 MiB thành 3 block: 128, 128 và 44 MiB."
+        },
+        {
+          "start": 687,
+          "end": 858,
+          "text": "Block to vì NameNode nhớ mọi block trong RAM; ít block thì đỡ tốn bộ nhớ."
+        },
+        {
+          "start": 864,
+          "end": 1063,
+          "text": "File của đồ án chỉ khoảng 3 MB, nằm gọn trong 1 block 128 MiB."
+        },
+        {
+          "start": 1074,
+          "end": 1273,
+          "text": "Để thấy việc chia, /raw/Dataset.csv được ghi với block 1 MiB."
+        },
+        {
+          "start": 1280,
+          "end": 1829,
+          "text": "Kết quả: 3 179 004 byte thành 4 block: ba block 1 048 576 byte và một block cuối 33 276 byte."
+        },
+        {
+          "start": 1839,
+          "end": 2019,
+          "text": "Lệnh hdfs fsck trả đúng 4 mã block, khớp với tab HDFS trên dashboard."
+        }
+      ]
+    },
+    {
+      "id": "s3",
+      "title": "NameNode: người giữ sổ",
+      "from": 3127,
+      "durationInFrames": 1476,
+      "audio": "audio/v02/s3.mp3",
+      "sentences": [
+        {
+          "start": 18,
+          "end": 201,
+          "text": "NameNode giữ siêu dữ liệu: cây thư mục, quyền, danh sách block và nơi đặt từng block."
+        },
+        {
+          "start": 208,
+          "end": 339,
+          "text": "Nó không giữ dữ liệu thật; cả cây nằm trong RAM để trả lời nhanh."
+        },
+        {
+          "start": 347,
+          "end": 618,
+          "text": "Để không mất khi tắt máy, NameNode ghi xuống đĩa fsimage, ảnh chụp cả cây, và edit log, nhật ký thay đổi."
+        },
+        {
+          "start": 625,
+          "end": 860,
+          "text": "Như sổ hộ khẩu chép đầu năm, cộng tờ ghi: ngày 3 nhập thêm A, ngày 5 chuyển B đi."
+        },
+        {
+          "start": 868,
+          "end": 978,
+          "text": "Khởi động lại thì đọc sổ, rồi đọc hết tờ ghi."
+        },
+        {
+          "start": 987,
+          "end": 1172,
+          "text": "Vị trí block không ghi xuống đĩa; NameNode dựng lại từ báo cáo của DataNode."
+        },
+        {
+          "start": 1177,
+          "end": 1447,
+          "text": "Trong đồ án, NameNode nghe ở cổng 9000; backend chỉ đọc số liệu qua JMX và WebHDFS."
+        }
+      ]
+    },
+    {
+      "id": "s4",
+      "title": "DataNode và replication",
+      "from": 4603,
+      "durationInFrames": 1707,
+      "audio": "audio/v02/s4.mp3",
+      "sentences": [
+        {
+          "start": 18,
+          "end": 160,
+          "text": "DataNode cất block thành file trên đĩa, kèm checksum để phát hiện dữ liệu hỏng."
+        },
+        {
+          "start": 168,
+          "end": 378,
+          "text": "Để máy hỏng không mất dữ liệu, HDFS mặc định giữ 3 bản sao mỗi block, trên 3 DataNode khác nhau."
+        },
+        {
+          "start": 385,
+          "end": 539,
+          "text": "Như photo hồ sơ cất ở ba tủ: cháy một tủ vẫn còn hai bản."
+        },
+        {
+          "start": 558,
+          "end": 782,
+          "text": "Cái giá: file 1 GB chiếm 3 GB, đổi lại chịu được 2 DataNode hỏng cùng lúc."
+        },
+        {
+          "start": 789,
+          "end": 897,
+          "text": "Trong đồ án, replication là 1."
+        },
+        {
+          "start": 905,
+          "end": 1102,
+          "text": "Vì 4 DataNode chung một ổ đĩa: để 3 chỉ tốn gấp ba mà ổ hỏng vẫn mất hết."
+        },
+        {
+          "start": 1113,
+          "end": 1369,
+          "text": "Có file từng ghi với replication lớn hơn 1, nên có lúc cụm có 24 block nhưng 38 bản sao."
+        },
+        {
+          "start": 1379,
+          "end": 1443,
+          "text": "Cụm thật nhiều máy thì để 3."
+        },
+        {
+          "start": 1458,
+          "end": 1678,
+          "text": "Mỗi DataNode báo dung lượng cả ổ, nên tổng cụm khoảng 4 TB dù chỉ có một đĩa."
+        }
+      ]
+    },
+    {
+      "id": "s5",
+      "title": "Heartbeat và báo cáo block",
+      "from": 6310,
+      "durationInFrames": 1214,
+      "audio": "audio/v02/s5.mp3",
+      "sentences": [
+        {
+          "start": 18,
+          "end": 153,
+          "text": "NameNode biết DataNode còn sống nhờ nhịp tim, mặc định 3 giây một lần."
+        },
+        {
+          "start": 158,
+          "end": 330,
+          "text": "NameNode không gọi DataNode; nó trả lời nhịp tim và gài lệnh vào câu trả lời."
+        },
+        {
+          "start": 338,
+          "end": 483,
+          "text": "Như lớp học trực tuyến: lâu không bấm “có mặt” thì bị coi là vắng."
+        },
+        {
+          "start": 491,
+          "end": 699,
+          "text": "Quá khoảng 10 phút 30 giây im lặng, DataNode bị coi là chết, block của nó được chép bù."
+        },
+        {
+          "start": 706,
+          "end": 878,
+          "text": "DataNode còn gửi báo cáo block: lúc khởi động và mặc định 6 giờ một lần."
+        },
+        {
+          "start": 883,
+          "end": 1185,
+          "text": "Trong đồ án: tắt một DataNode rồi mở trang 9870, cột Last contact tăng dần tới khi node thành Dead."
+        }
+      ]
+    },
+    {
+      "id": "s6",
+      "title": "Luồng ghi file",
+      "from": 7524,
+      "durationInFrames": 1620,
+      "audio": "audio/v02/s6.mp3",
+      "sentences": [
+        {
+          "start": 18,
+          "end": 232,
+          "text": "Ghi một file: client gọi NameNode tạo file; lệnh hdfs dfs -put ghi vào tên tạm ._COPYING_."
+        },
+        {
+          "start": 237,
+          "end": 393,
+          "text": "Client xin block; NameNode cấp mã block và danh sách DataNode."
+        },
+        {
+          "start": 397,
+          "end": 642,
+          "text": "Dữ liệu đi thành gói khoảng 64 KB tới DataNode đầu; DataNode này vừa ghi vừa chuyển tiếp."
+        },
+        {
+          "start": 646,
+          "end": 801,
+          "text": "Xác nhận đi ngược về client; mỗi DataNode ghi xong thì báo NameNode."
+        },
+        {
+          "start": 808,
+          "end": 939,
+          "text": "Cuối cùng client đóng file, tên tạm đổi thành tên thật."
+        },
+        {
+          "start": 946,
+          "end": 1142,
+          "text": "Như chuyền tay hồ sơ: mỗi người photo một bản rồi chuyền tiếp, chữ ký truyền ngược về."
+        },
+        {
+          "start": 1147,
+          "end": 1318,
+          "text": "Trong đồ án, tab Sơ đồ luồng thắp sáng các bước này khi có lượt ghi thật."
+        },
+        {
+          "start": 1326,
+          "end": 1591,
+          "text": "Có bước quan sát thật trong log NameNode, có bước chỉ suy ra; với replication 1, đường ống chỉ có một DataNode."
+        }
+      ]
+    },
+    {
+      "id": "s7",
+      "title": "Luồng đọc và safe mode",
+      "from": 9144,
+      "durationInFrames": 889,
+      "audio": "audio/v02/s7.mp3",
+      "sentences": [
+        {
+          "start": 18,
+          "end": 225,
+          "text": "Đọc đơn giản hơn: client hỏi NameNode vị trí block, rồi đọc thẳng từ DataNode, kiểm checksum."
+        },
+        {
+          "start": 229,
+          "end": 297,
+          "text": "Checksum sai thì đọc bản sao khác."
+        },
+        {
+          "start": 302,
+          "end": 446,
+          "text": "Spark đọc bảng Parquet aqi_clean trên HDFS cũng theo đường này."
+        },
+        {
+          "start": 453,
+          "end": 633,
+          "text": "Sau khởi động, NameNode ở safe mode, chỉ đọc, chờ DataNode báo cáo block."
+        },
+        {
+          "start": 639,
+          "end": 860,
+          "text": "Vì vậy start_all.sh chờ safe mode tắt mới bật Spark Streaming, nếu không job sẽ lỗi."
+        }
+      ]
+    },
+    {
+      "id": "s8",
+      "title": "Tổng kết",
+      "from": 10033,
+      "durationInFrames": 426,
+      "audio": "audio/v02/s8.mp3",
+      "sentences": [
+        {
+          "start": 18,
+          "end": 243,
+          "text": "Tóm lại: NameNode giữ sổ, DataNode giữ block, block có bản sao, nhịp tim báo sống chết."
+        },
+        {
+          "start": 249,
+          "end": 398,
+          "text": "Video sau: Kafka, cuốn sổ nhật ký của dữ liệu luồng."
+        }
+      ]
+    }
+  ],
+  "cues": [
+    {
+      "start": 18,
+      "end": 182,
+      "text": "HDFS là hệ thống file trải trên nhiều máy, nhưng trông như một cây thư mục duy nhất."
+    },
+    {
+      "start": 182,
+      "end": 296,
+      "text": "Nó sinh ra cho file lớn: ghi một lần, đọc nhiều lần."
+    },
+    {
+      "start": 296,
+      "end": 456,
+      "text": "Hãy hình dung một thư viện: một quầy thủ thư giữ mục lục, và nhiều kệ sách."
+    },
+    {
+      "start": 456,
+      "end": 627,
+      "text": "Bạn hỏi thủ thư sách ở đâu rồi tự đi lấy; thủ thư không bê sách giúp bạn."
+    },
+    {
+      "start": 627,
+      "end": 817,
+      "text": "Quầy thủ thư là NameNode, kệ sách là DataNode, còn bạn là client."
+    },
+    {
+      "start": 817,
+      "end": 1068,
+      "text": "Trong đồ án, cụm ở hdfs://localhost:9000, giao diện NameNode ở cổng 9870."
+    },
+    {
+      "start": 1098,
+      "end": 1227,
+      "text": "HDFS cắt mỗi file thành những mẩu cố định gọi là block."
+    },
+    {
+      "start": 1227,
+      "end": 1414,
+      "text": "Mặc định mỗi block tối đa 128 MiB; block cuối chỉ chiếm phần còn lại."
+    },
+    {
+      "start": 1414,
+      "end": 1517,
+      "text": "Như cuốn từ điển quá dày được tách thành nhiều tập."
+    },
+    {
+      "start": 1517,
+      "end": 1767,
+      "text": "Ví dụ: file 300 MiB thành 3 block: 128, 128 và 44 MiB."
+    },
+    {
+      "start": 1767,
+      "end": 1944,
+      "text": "Block to vì NameNode nhớ mọi block trong RAM; ít block thì đỡ tốn bộ nhớ."
+    },
+    {
+      "start": 1944,
+      "end": 2154,
+      "text": "File của đồ án chỉ khoảng 3 MB, nằm gọn trong 1 block 128 MiB."
+    },
+    {
+      "start": 2154,
+      "end": 2360,
+      "text": "Để thấy việc chia, /raw/Dataset.csv được ghi với block 1 MiB."
+    },
+    {
+      "start": 2360,
+      "end": 2919,
+      "text": "Kết quả: 3 179 004 byte thành 4 block: ba block 1 048 576 byte và một block cuối 33 276 byte."
+    },
+    {
+      "start": 2919,
+      "end": 3115,
+      "text": "Lệnh hdfs fsck trả đúng 4 mã block, khớp với tab HDFS trên dashboard."
+    },
+    {
+      "start": 3145,
+      "end": 3335,
+      "text": "NameNode giữ siêu dữ liệu: cây thư mục, quyền, danh sách block và nơi đặt từng block."
+    },
+    {
+      "start": 3335,
+      "end": 3474,
+      "text": "Nó không giữ dữ liệu thật; cả cây nằm trong RAM để trả lời nhanh."
+    },
+    {
+      "start": 3474,
+      "end": 3752,
+      "text": "Để không mất khi tắt máy, NameNode ghi xuống đĩa fsimage, ảnh chụp cả cây, và edit log, nhật ký thay đổi."
+    },
+    {
+      "start": 3752,
+      "end": 3995,
+      "text": "Như sổ hộ khẩu chép đầu năm, cộng tờ ghi: ngày 3 nhập thêm A, ngày 5 chuyển B đi."
+    },
+    {
+      "start": 3995,
+      "end": 4114,
+      "text": "Khởi động lại thì đọc sổ, rồi đọc hết tờ ghi."
+    },
+    {
+      "start": 4114,
+      "end": 4304,
+      "text": "Vị trí block không ghi xuống đĩa; NameNode dựng lại từ báo cáo của DataNode."
+    },
+    {
+      "start": 4304,
+      "end": 4590,
+      "text": "Trong đồ án, NameNode nghe ở cổng 9000; backend chỉ đọc số liệu qua JMX và WebHDFS."
+    },
+    {
+      "start": 4621,
+      "end": 4771,
+      "text": "DataNode cất block thành file trên đĩa, kèm checksum để phát hiện dữ liệu hỏng."
+    },
+    {
+      "start": 4771,
+      "end": 4988,
+      "text": "Để máy hỏng không mất dữ liệu, HDFS mặc định giữ 3 bản sao mỗi block, trên 3 DataNode khác nhau."
+    },
+    {
+      "start": 4988,
+      "end": 5161,
+      "text": "Như photo hồ sơ cất ở ba tủ: cháy một tủ vẫn còn hai bản."
+    },
+    {
+      "start": 5161,
+      "end": 5392,
+      "text": "Cái giá: file 1 GB chiếm 3 GB, đổi lại chịu được 2 DataNode hỏng cùng lúc."
+    },
+    {
+      "start": 5392,
+      "end": 5508,
+      "text": "Trong đồ án, replication là 1."
+    },
+    {
+      "start": 5508,
+      "end": 5716,
+      "text": "Vì 4 DataNode chung một ổ đĩa: để 3 chỉ tốn gấp ba mà ổ hỏng vẫn mất hết."
+    },
+    {
+      "start": 5716,
+      "end": 5982,
+      "text": "Có file từng ghi với replication lớn hơn 1, nên có lúc cụm có 24 block nhưng 38 bản sao."
+    },
+    {
+      "start": 5982,
+      "end": 6061,
+      "text": "Cụm thật nhiều máy thì để 3."
+    },
+    {
+      "start": 6061,
+      "end": 6297,
+      "text": "Mỗi DataNode báo dung lượng cả ổ, nên tổng cụm khoảng 4 TB dù chỉ có một đĩa."
+    },
+    {
+      "start": 6328,
+      "end": 6468,
+      "text": "NameNode biết DataNode còn sống nhờ nhịp tim, mặc định 3 giây một lần."
+    },
+    {
+      "start": 6468,
+      "end": 6648,
+      "text": "NameNode không gọi DataNode; nó trả lời nhịp tim và gài lệnh vào câu trả lời."
+    },
+    {
+      "start": 6648,
+      "end": 6801,
+      "text": "Như lớp học trực tuyến: lâu không bấm “có mặt” thì bị coi là vắng."
+    },
+    {
+      "start": 6801,
+      "end": 7016,
+      "text": "Quá khoảng 10 phút 30 giây im lặng, DataNode bị coi là chết, block của nó được chép bù."
+    },
+    {
+      "start": 7016,
+      "end": 7193,
+      "text": "DataNode còn gửi báo cáo block: lúc khởi động và mặc định 6 giờ một lần."
+    },
+    {
+      "start": 7193,
+      "end": 7511,
+      "text": "Trong đồ án: tắt một DataNode rồi mở trang 9870, cột Last contact tăng dần tới khi node thành Dead."
+    },
+    {
+      "start": 7542,
+      "end": 7761,
+      "text": "Ghi một file: client gọi NameNode tạo file; lệnh hdfs dfs -put ghi vào tên tạm ._COPYING_."
+    },
+    {
+      "start": 7761,
+      "end": 7921,
+      "text": "Client xin block; NameNode cấp mã block và danh sách DataNode."
+    },
+    {
+      "start": 7921,
+      "end": 8170,
+      "text": "Dữ liệu đi thành gói khoảng 64 KB tới DataNode đầu; DataNode này vừa ghi vừa chuyển tiếp."
+    },
+    {
+      "start": 8170,
+      "end": 8332,
+      "text": "Xác nhận đi ngược về client; mỗi DataNode ghi xong thì báo NameNode."
+    },
+    {
+      "start": 8332,
+      "end": 8470,
+      "text": "Cuối cùng client đóng file, tên tạm đổi thành tên thật."
+    },
+    {
+      "start": 8470,
+      "end": 8671,
+      "text": "Như chuyền tay hồ sơ: mỗi người photo một bản rồi chuyền tiếp, chữ ký truyền ngược về."
+    },
+    {
+      "start": 8671,
+      "end": 8850,
+      "text": "Trong đồ án, tab Sơ đồ luồng thắp sáng các bước này khi có lượt ghi thật."
+    },
+    {
+      "start": 8850,
+      "end": 9043,
+      "text": "Có bước quan sát thật trong log NameNode, có bước chỉ suy ra; với replication 1,"
+    },
+    {
+      "start": 9043,
+      "end": 9131,
+      "text": "đường ống chỉ có một DataNode."
+    },
+    {
+      "start": 9162,
+      "end": 9373,
+      "text": "Đọc đơn giản hơn: client hỏi NameNode vị trí block, rồi đọc thẳng từ DataNode, kiểm checksum."
+    },
+    {
+      "start": 9373,
+      "end": 9446,
+      "text": "Checksum sai thì đọc bản sao khác."
+    },
+    {
+      "start": 9446,
+      "end": 9597,
+      "text": "Spark đọc bảng Parquet aqi_clean trên HDFS cũng theo đường này."
+    },
+    {
+      "start": 9597,
+      "end": 9783,
+      "text": "Sau khởi động, NameNode ở safe mode, chỉ đọc, chờ DataNode báo cáo block."
+    },
+    {
+      "start": 9783,
+      "end": 10020,
+      "text": "Vì vậy start_all.sh chờ safe mode tắt mới bật Spark Streaming, nếu không job sẽ lỗi."
+    },
+    {
+      "start": 10051,
+      "end": 10282,
+      "text": "Tóm lại: NameNode giữ sổ, DataNode giữ block, block có bản sao, nhịp tim báo sống chết."
+    },
+    {
+      "start": 10282,
+      "end": 10447,
+      "text": "Video sau: Kafka, cuốn sổ nhật ký của dữ liệu luồng."
+    }
+  ]
+}

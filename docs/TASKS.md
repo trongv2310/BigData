@@ -76,3 +76,9 @@ Mỗi bước một nhánh từ `main`, một PR nhỏ; làm xong bước nào t
 - [ ] A (frontend, sau Bước 0): `generate:types`; hai cột phát lại / dữ liệu thật; điều khiển phát lại; trang bước pipeline; trang chỉ số mô hình; `filledInputs` ở dự đoán; nhãn "dữ liệu mẫu" khi mock trả `X-Mock: true`.
 - [x] C (14/10/2026, người dùng yêu cầu): hợp đồng 0.6.0 `ServiceStatus.state = disabled` cho YARN/Airflow tắt chủ động; tab Tổng quan hiện "Tắt chủ động"; viết lại tab Dự đoán cho mô hình ML (ô CO giờ trước, chất khác, điền từ bản ghi thật). Xem HANDOFF 23:30.
 - [ ] Người dùng: chạy lại test backend và giao diện với backend thật trong WSL; chụp lại ảnh `docs/demo/`.
+
+## Video hướng dẫn (C, người dùng yêu cầu 24/10/2026)
+- [x] Kịch bản 8 video (`storyboard/00_quy_uoc.md` đến `08_…`), người dùng đã duyệt.
+- [x] Video 02 (HDFS) làm thử bằng Remotion trong `video/`: giọng edge-tts `vi-VN-HoaiMyNeural`, mỗi cảnh một mp3, phụ đề `.srt`, component dùng chung (Node, Arrow, Packet, Block, Counter, Callout, Ledger, Terminal). Xem `video/README.md`.
+- [x] Đổi giọng đọc sang ElevenLabs `eleven_v3`, giọng Viên, lời rút gọn, Whisper kiểm thuật ngữ (25/10/2026, xem HANDOFF).
+- [ ] Chờ người dùng nghe và duyệt bản ElevenLabs của video 02 trước khi làm video 01, 03 đến 08.
