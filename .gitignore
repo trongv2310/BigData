@@ -20,3 +20,8 @@ kafka_*/
 Thumbs.db
 .idea/
 .vscode/
+AGENTS.md
+CLAUDE.md
+video/public/demo/
+video/public/audio/
+video/out/
