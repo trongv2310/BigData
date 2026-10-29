@@ -1,0 +1,34 @@
+#!/bin/bash
+sudo service ssh start > /dev/null 2>&1
+$HOME/hadoop/sbin/start-dfs.sh
+
+# Start DataNode 2
+nohup env HADOOP_IDENT_STRING=dn2 $HOME/hadoop/bin/hdfs datanode \
+  -D dfs.datanode.data.dir=file:///home/trong/hadoop_data/hdfs/datanode2 \
+  -D dfs.datanode.address=0.0.0.0:9876 \
+  -D dfs.datanode.http.address=0.0.0.0:9874 \
+  -D dfs.datanode.ipc.address=0.0.0.0:9877 > /dev/null 2>&1 &
+disown
+
+# Start DataNode 3
+nohup env HADOOP_IDENT_STRING=dn3 $HOME/hadoop/bin/hdfs datanode \
+  -D dfs.datanode.data.dir=file:///home/trong/hadoop_data/hdfs/datanode3 \
+  -D dfs.datanode.address=0.0.0.0:9886 \
+  -D dfs.datanode.http.address=0.0.0.0:9884 \
+  -D dfs.datanode.ipc.address=0.0.0.0:9887 > /dev/null 2>&1 &
+disown
+
+# Start DataNode 4
+nohup env HADOOP_IDENT_STRING=dn4 $HOME/hadoop/bin/hdfs datanode \
+  -D dfs.datanode.data.dir=file:///home/trong/hadoop_data/hdfs/datanode4 \
+  -D dfs.datanode.address=0.0.0.0:9896 \
+  -D dfs.datanode.http.address=0.0.0.0:9894 \
+  -D dfs.datanode.ipc.address=0.0.0.0:9897 > /dev/null 2>&1 &
+disown
+
+echo "Dang khoi dong 4 DataNodes..."
+sleep 4
+jps
+echo "================================="
+$HOME/hadoop/bin/hdfs dfsadmin -report | grep "Live datanodes"
+echo "================================="
